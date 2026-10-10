@@ -1,13 +1,26 @@
 package com.lin0721.linmusic.desktop.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -24,10 +38,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,9 +57,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,6 +77,8 @@ import com.lin0721.linmusic.core.model.ArtistAlbum
 import com.lin0721.linmusic.core.model.ArtistInfo
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.player.PlaybackController
+import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
+import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.artist.ui.ArtistUiState
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
@@ -63,14 +87,18 @@ import java.time.ZoneId
 
 // 距离列表底部还剩几项时加载下一页
 private const val LOAD_MORE_THRESHOLD = 6
+private const val HERO_DARKEN_FRACTION = 0.35f
+private const val STICKY_BAR_ANIMATION_MS = 200
 
 private val BackdropHeight = 300.dp
 private val AlbumCardWidth = 168.dp
 private val ContentPadding = 24.dp
+private val ActionBarVerticalPadding = 16.dp
+private val PlayButtonSize = 56.dp
+private val StickyBarHeight = 64.dp
+private val StickyPlayButtonSize = 48.dp
 
 private enum class ArtistTab(val label: String) { SONGS("歌曲"), ALBUMS("专辑"), ABOUT("简介") }
-
-private enum class SongTab(val label: String) { HOT("热门"), ALL("全部") }
 
 @Composable
 fun ArtistPage(
@@ -112,6 +140,7 @@ private fun Loading(modifier: Modifier) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ArtistContent(
     state: ArtistUiState.Success,
@@ -125,7 +154,13 @@ private fun ArtistContent(
     val likedSongIds by viewModel.likedSongIds.collectAsState()
     val collectState by viewModel.collectState.collectAsState()
     var tab by rememberSaveable(state.artist.id) { mutableStateOf(ArtistTab.SONGS) }
-    var songTab by rememberSaveable(state.artist.id) { mutableStateOf(SongTab.HOT) }
+
+    val onToggleFollow = {
+        if (navigator.isLoggedIn) viewModel.toggleFollow(state.artist.id) else navigator.showMessage("请先登录账号")
+    }
+    val onPlayHot = {
+        state.topSongs.firstOrNull()?.let { viewModel.playSongInList(it, state.topSongs) } ?: Unit
+    }
 
     val actions = rememberTrackActions(
         likedSongIds = likedSongIds,
@@ -137,22 +172,36 @@ private fun ArtistContent(
         onCreateAndAdd = viewModel::createPlaylistAndAddSong
     )
 
+    val backdropUrl = remember(state.artist) { state.artist.cover.ifBlank { state.artist.avatar } }
+    var heroBase by remember(state.artist.id) { mutableStateOf(FallbackCoverPalette.base) }
+    LaunchedEffect(backdropUrl) {
+        if (backdropUrl.isNotBlank()) heroBase = extractCoverPaletteFromUrl(backdropUrl).base
+    }
+    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), label = "artistHero")
+
     val listState = rememberLazyListState()
-    val shouldLoadMore by remember(state, tab, songTab) {
+    val density = LocalDensity.current
+    val barHeightPx = with(density) { StickyBarHeight.roundToPx() }
+    val playButtonBottomPx = with(density) { (ActionBarVerticalPadding + PlayButtonSize).roundToPx() }
+    var backdropHeightPx by remember(state.artist.id) { mutableIntStateOf(0) }
+    var headerHeightPx by remember(state.artist.id) { mutableIntStateOf(0) }
+
+    val showTitleBar by remember(barHeightPx) {
+        derivedStateOf { backdropHeightPx > 0 && listState.scrolledPast(backdropHeightPx - barHeightPx) }
+    }
+    val showPlayButton by remember(barHeightPx, playButtonBottomPx) {
+        derivedStateOf { backdropHeightPx > 0 && listState.scrolledPast(backdropHeightPx + playButtonBottomPx - barHeightPx) }
+    }
+
+    val shouldLoadMore by remember(state, tab) {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
         }
     }
-    LaunchedEffect(shouldLoadMore, tab, songTab) {
+    LaunchedEffect(shouldLoadMore, tab) {
         if (!shouldLoadMore) return@LaunchedEffect
-        when {
-            tab == ArtistTab.ALBUMS -> viewModel.loadMoreAlbums()
-            tab == ArtistTab.SONGS && songTab == SongTab.ALL -> viewModel.loadMoreAllSongs()
-        }
-    }
-    LaunchedEffect(tab, songTab) {
-        if (tab == ArtistTab.SONGS && songTab == SongTab.ALL) viewModel.loadAllSongsIfNeeded()
+        if (tab == ArtistTab.ALBUMS) viewModel.loadMoreAlbums()
     }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -167,32 +216,32 @@ private fun ArtistContent(
                     ArtistHeader(
                         state = state,
                         isBlocked = state.artist.id in blockedIds,
-                        onPlayHot = { state.topSongs.firstOrNull()?.let { viewModel.playSongInList(it, state.topSongs) } },
-                        onToggleFollow = {
-                            if (navigator.isLoggedIn) viewModel.toggleFollow(state.artist.id) else navigator.showMessage("请先登录账号")
-                        },
-                        onToggleBlock = { viewModel.toggleBlockArtist(state.artist.id) }
+                        onPlayHot = onPlayHot,
+                        onToggleFollow = onToggleFollow,
+                        onToggleBlock = { viewModel.toggleBlockArtist(state.artist.id) },
+                        onHeaderHeightChanged = { headerHeightPx = it },
+                        onBackdropHeightChanged = { backdropHeightPx = it }
                     )
                 }
-                item(key = "tabs") {
-                    TabBar(ArtistTab.entries, tab, { it.label }, { tab = it }, Modifier.padding(horizontal = ContentPadding))
+                stickyHeader(key = "tabs") {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .graphicsLayer {
+                                if (headerHeightPx > 0) {
+                                    val naturalY = if (listState.firstVisibleItemIndex > 0) 0 else headerHeightPx - listState.firstVisibleItemScrollOffset
+                                    translationY = (barHeightPx - naturalY).coerceIn(0, barHeightPx).toFloat()
+                                }
+                            }
+                            .background(DesktopColors.Pane)
+                            .padding(horizontal = ContentPadding, vertical = 8.dp)
+                    ) {
+                        TabBar(ArtistTab.entries, tab, { it.label }, { tab = it })
+                    }
                 }
                 when (tab) {
                     ArtistTab.SONGS -> {
-                        item(key = "song_tabs") {
-                            TabBar(
-                                SongTab.entries,
-                                songTab,
-                                { it.label },
-                                { songTab = it },
-                                Modifier.padding(horizontal = ContentPadding, vertical = 8.dp),
-                                small = true
-                            )
-                        }
-                        val tracks = if (songTab == SongTab.HOT) state.topSongs else state.allSongs
-                        trackItems(tracks, nowPlaying?.songId, actions) { viewModel.playSongInList(it, tracks) }
-                        if (songTab == SongTab.ALL && state.allSongsLoadingMore) loadingItem("songs_loading")
-                        if (songTab == SongTab.ALL && state.allSongsLoaded && tracks.isEmpty()) emptyItem("songs_empty", "暂无歌曲")
+                        trackItems(state.topSongs, nowPlaying?.songId, actions) { viewModel.playSongInList(it, state.topSongs) }
+                        if (state.topSongs.isEmpty()) emptyItem("songs_empty", "暂无歌曲")
                     }
                     ArtistTab.ALBUMS -> {
                         val rows = state.albums.chunked(columns)
@@ -214,6 +263,23 @@ private fun ArtistContent(
                             AboutSection(state.artist.briefDesc, state.similarArtists) { navigator.openArtist(it.id, it.name) }
                         }
                     }
+                }
+            }
+            Box(Modifier.fillMaxWidth().clipToBounds()) {
+                AnimatedVisibility(
+                    visible = showTitleBar,
+                    enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
+                    exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
+                ) {
+                    ArtistStickyBar(
+                        name = state.artist.name,
+                        color = heroColor,
+                        showPlay = showPlayButton,
+                        isFollowed = state.isFollowed,
+                        listState = listState,
+                        onPlay = onPlayHot,
+                        onToggleFollow = onToggleFollow
+                    )
                 }
             }
         }
@@ -254,63 +320,125 @@ private fun LazyListScope.emptyItem(key: String, text: String) {
     }
 }
 
+private fun LazyListState.scrolledPast(thresholdPx: Int): Boolean =
+    firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset >= thresholdPx
+
+@Composable
+private fun ArtistStickyBar(
+    name: String,
+    color: Color,
+    showPlay: Boolean,
+    isFollowed: Boolean,
+    listState: LazyListState,
+    onPlay: () -> Unit,
+    onToggleFollow: () -> Unit
+) {
+    Row(
+        // 横栏盖住列表顶部，滚轮事件转给列表
+        Modifier.fillMaxWidth().height(StickyBarHeight).background(color)
+            .scrollable(listState, Orientation.Vertical)
+            .padding(horizontal = ContentPadding),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AnimatedVisibility(
+            visible = showPlay,
+            enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(tween(STICKY_BAR_ANIMATION_MS)),
+            exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(tween(STICKY_BAR_ANIMATION_MS))
+        ) {
+            PlayCircleButton(StickyPlayButtonSize, 28.dp, onPlay, Modifier.padding(end = 12.dp))
+        }
+        Text(
+            name,
+            color = DesktopColors.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        Spacer(Modifier.width(16.dp))
+        HeaderButton(if (isFollowed) "已关注" else "关注", onToggleFollow)
+    }
+}
+
+@Composable
+private fun PlayCircleButton(size: Dp, iconSize: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    DesktopTooltip("播放热门歌曲") {
+        Box(
+            modifier.size(size).clip(CircleShape).background(DesktopColors.Accent)
+                .pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.PlayArrow, "播放热门歌曲", tint = DesktopColors.TextPrimary, modifier = Modifier.size(iconSize))
+        }
+    }
+}
+
 @Composable
 private fun ArtistHeader(
     state: ArtistUiState.Success,
     isBlocked: Boolean,
     onPlayHot: () -> Unit,
     onToggleFollow: () -> Unit,
-    onToggleBlock: () -> Unit
+    onToggleBlock: () -> Unit,
+    onHeaderHeightChanged: (Int) -> Unit,
+    onBackdropHeightChanged: (Int) -> Unit
 ) {
     val artist = state.artist
-    Box(Modifier.fillMaxWidth().height(BackdropHeight)) {
-        val backdrop = artist.cover.ifBlank { artist.avatar }
-        if (backdrop.isNotBlank()) {
-            AsyncImage(
-                model = if (backdrop.startsWith("http") && !backdrop.contains("?")) "$backdrop?param=1200y600" else backdrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+    Column(Modifier.fillMaxWidth().onSizeChanged { onHeaderHeightChanged(it.height) }) {
         Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color.Transparent, DesktopColors.Pane.copy(alpha = 0.6f), DesktopColors.Pane))
+            Modifier.fillMaxWidth().height(BackdropHeight)
+                .onSizeChanged { onBackdropHeightChanged(it.height) }
+        ) {
+            val backdrop = artist.cover.ifBlank { artist.avatar }
+            if (backdrop.isNotBlank()) {
+                AsyncImage(
+                    model = if (backdrop.startsWith("http") && !backdrop.contains("?")) "$backdrop?param=1200y600" else backdrop,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color.Transparent, DesktopColors.Pane.copy(alpha = 0.6f), DesktopColors.Pane))
+                )
             )
-        )
-        Column(Modifier.align(Alignment.BottomStart).padding(ContentPadding)) {
-            Text(
-                artist.name,
-                color = DesktopColors.TextPrimary,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            val subtitle = listOfNotNull(
-                artist.trans?.takeIf { it.isNotBlank() },
-                artist.alias?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(" / "),
-                state.fansCount.takeIf { it > 0 }?.let { "${formatCount(it)} 粉丝" }
-            ).joinToString(" · ")
-            if (subtitle.isNotBlank()) {
-                Text(subtitle, color = DesktopColors.TextGray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.align(Alignment.BottomStart).padding(ContentPadding)) {
+                Text(
+                    artist.name,
+                    color = DesktopColors.TextPrimary,
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val subtitle = listOfNotNull(
+                    artist.trans?.takeIf { it.isNotBlank() },
+                    artist.alias?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(" / "),
+                    state.fansCount.takeIf { it > 0 }?.let { "${formatCount(it)} 粉丝" }
+                ).joinToString(" · ")
+                if (subtitle.isNotBlank()) {
+                    Text(subtitle, color = DesktopColors.TextGray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
-    }
-    Row(
-        Modifier.padding(horizontal = ContentPadding, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier.size(56.dp).clip(CircleShape).background(DesktopColors.Accent)
-                .clickable(enabled = state.topSongs.isNotEmpty(), onClick = onPlayHot),
-            contentAlignment = Alignment.Center
+        Row(
+            Modifier.padding(horizontal = ContentPadding, vertical = ActionBarVerticalPadding),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Rounded.PlayArrow, "播放热门歌曲", tint = DesktopColors.TextPrimary, modifier = Modifier.size(32.dp))
+            Box(
+                Modifier.size(PlayButtonSize).clip(CircleShape).background(DesktopColors.Accent)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(enabled = state.topSongs.isNotEmpty(), onClick = onPlayHot),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.PlayArrow, "播放热门歌曲", tint = DesktopColors.TextPrimary, modifier = Modifier.size(32.dp))
+            }
+            HeaderButton(if (state.isFollowed) "已关注" else "关注", onToggleFollow)
+            HeaderButton(if (isBlocked) "取消屏蔽" else "屏蔽", onToggleBlock)
         }
-        HeaderButton(if (state.isFollowed) "已关注" else "关注", onToggleFollow)
-        HeaderButton(if (isBlocked) "取消屏蔽" else "屏蔽", onToggleBlock)
     }
 }
 

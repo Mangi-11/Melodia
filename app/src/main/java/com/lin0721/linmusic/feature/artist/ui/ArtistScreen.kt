@@ -88,8 +88,6 @@ fun ArtistScreen(
                     albums = state.albums,
                     albumsHasMore = state.albumsHasMore,
                     albumsLoadingMore = state.albumsLoadingMore,
-                    allSongs = state.allSongs,
-                    allSongsLoadingMore = state.allSongsLoadingMore,
                     similarArtists = state.similarArtists,
                     likedSongIds = likedSongIds,
                     blockedArtistIds = blockedArtistIds,
@@ -124,9 +122,7 @@ fun ArtistScreen(
                     onRequireLogin = {
                         showLoginSheet = true
                     },
-                    onLoadMoreAlbums = { viewModel.loadMoreAlbums() },
-                    onLoadAllSongsIfNeeded = { viewModel.loadAllSongsIfNeeded() },
-                    onLoadMoreAllSongs = { viewModel.loadMoreAllSongs() }
+                    onLoadMoreAlbums = { viewModel.loadMoreAlbums() }
                 )
             }
         }

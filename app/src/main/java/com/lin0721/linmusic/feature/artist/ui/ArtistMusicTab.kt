@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,20 +15,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.model.Track
-import com.lin0721.linmusic.core.ui.components.FilterChipsRow
 import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
-private val MUSIC_SUB_TABS = listOf("热门50首", "全部歌曲")
-
-// 音乐 Tab: 二级切换「热门50首」（策展）与「全部歌曲」（滚动分页）
+// 音乐 Tab: 呈现热门50首歌曲
 fun LazyListScope.artistMusicTab(
     hotSongs: List<Track>,
-    allSongs: List<Track>,
-    musicSubTab: Int,
-    onMusicSubTabSelected: (Int) -> Unit,
-    allSongsLoadingMore: Boolean,
     likedSongIds: Set<Long>,
     currentTrackId: String?,
     isPlaying: Boolean,
@@ -40,17 +32,7 @@ fun LazyListScope.artistMusicTab(
     onOpenMoreOptions: (Track) -> Unit,
     onRequireLogin: () -> Unit
 ) {
-    item(key = "music_sub_tab") {
-        FilterChipsRow(
-            items = MUSIC_SUB_TABS,
-            selectedIndex = musicSubTab,
-            onSelected = onMusicSubTabSelected
-        )
-    }
-
-    val songs = if (musicSubTab == 0) hotSongs else allSongs
-
-    if (songs.isEmpty() && !(musicSubTab == 1 && allSongsLoadingMore)) {
+    if (hotSongs.isEmpty()) {
         item(key = "empty_songs") {
             Box(
                 modifier = Modifier
@@ -63,7 +45,7 @@ fun LazyListScope.artistMusicTab(
             }
         }
     } else {
-        itemsIndexed(songs, key = { _, track -> "${musicSubTab}_${track.id}" }) { index, track ->
+        itemsIndexed(hotSongs, key = { _, track -> "hot_${track.id}" }) { index, track ->
             val isActive = track.id.toString() == currentTrackId
             SongRow(
                 data = SongRowData(
@@ -76,7 +58,7 @@ fun LazyListScope.artistMusicTab(
                 isActive = isActive,
                 isPlaying = isPlaying,
                 index = index + 1,
-                onClick = { onPlaySong(track, songs) },
+                onClick = { onPlaySong(track, hotSongs) },
                 trailingSlot = {
                     val isLiked = track.id in likedSongIds
                     MelodiaIconButton(
@@ -110,21 +92,6 @@ fun LazyListScope.artistMusicTab(
                     }
                 }
             )
-        }
-
-        if (musicSubTab == 1 && allSongsLoadingMore) {
-            item(key = "all_songs_loading_more") {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = MelodiaSpacing.md),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
-            }
         }
     }
 }

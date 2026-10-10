@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -37,8 +36,6 @@ fun ArtistContent(
     albums: List<ArtistAlbum>,
     albumsHasMore: Boolean,
     albumsLoadingMore: Boolean,
-    allSongs: List<Track>,
-    allSongsLoadingMore: Boolean,
     similarArtists: List<ArtistInfo>,
     likedSongIds: Set<Long>,
     blockedArtistIds: Set<Long>,
@@ -59,9 +56,7 @@ fun ArtistContent(
     onSaveCollection: (Long, List<PlaylistCollectItem>) -> Unit,
     onSaveNewCollection: (String, Long) -> Unit,
     onRequireLogin: () -> Unit,
-    onLoadMoreAlbums: () -> Unit,
-    onLoadAllSongsIfNeeded: () -> Unit,
-    onLoadMoreAllSongs: () -> Unit
+    onLoadMoreAlbums: () -> Unit
 ) {
     val density = LocalDensity.current
     val listState = rememberLazyListState()
@@ -99,13 +94,7 @@ fun ArtistContent(
     var collectSongId by remember { mutableStateOf<Long?>(null) }
     var showBioDialog by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
-    var musicSubTab by rememberSaveable { mutableStateOf(0) }
     var optionsTrack by remember { mutableStateOf<Track?>(null) }
-
-    // 首次切到「全部歌曲」子 Tab 时触发加载
-    LaunchedEffect(musicSubTab) {
-        if (musicSubTab == 1) onLoadAllSongsIfNeeded()
-    }
 
     // 滚动到底部附近，按当前 Tab 触发对应区块的分页加载
     val shouldLoadMore by remember {
@@ -116,10 +105,9 @@ fun ArtistContent(
             total > 0 && lastVisible >= total - 5
         }
     }
-    LaunchedEffect(shouldLoadMore, selectedTab, musicSubTab) {
+    LaunchedEffect(shouldLoadMore, selectedTab) {
         if (!shouldLoadMore) return@LaunchedEffect
         when (selectedTab) {
-            0 -> if (musicSubTab == 1) onLoadMoreAllSongs()
             1 -> onLoadMoreAlbums()
         }
     }
@@ -160,8 +148,7 @@ fun ArtistContent(
                         onFollowClick = onFollowClick,
                         onMoreClick = { showMoreMenuSheet = true },
                         onPlayAll = {
-                            val queue = if (musicSubTab == 1 && allSongs.isNotEmpty()) allSongs else topSongs
-                            queue.firstOrNull()?.let { onPlaySong(it, queue) }
+                            topSongs.firstOrNull()?.let { onPlaySong(it, topSongs) }
                         }
                     )
                 }
@@ -177,10 +164,6 @@ fun ArtistContent(
                 when (selectedTab) {
                     0 -> artistMusicTab(
                         hotSongs = topSongs,
-                        allSongs = allSongs,
-                        musicSubTab = musicSubTab,
-                        onMusicSubTabSelected = { musicSubTab = it },
-                        allSongsLoadingMore = allSongsLoadingMore,
                         likedSongIds = likedSongIds,
                         currentTrackId = currentTrackId,
                         isPlaying = isPlaying,
