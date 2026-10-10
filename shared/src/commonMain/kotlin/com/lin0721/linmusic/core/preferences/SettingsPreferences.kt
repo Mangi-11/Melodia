@@ -108,6 +108,10 @@ class SettingsPreferences(
         private val KEY_FULL_SCREEN_LYRIC_AUTO_HIDE_CONTROLS = booleanPreferencesKey("full_screen_lyric_auto_hide_controls")
         // 全屏播放页信息卡片顺序与显隐，格式见 FullPlayerCardLayout
         private val KEY_FULL_PLAYER_CARD_LAYOUT = stringPreferencesKey("full_player_card_layout")
+        // 底栏项目排序与显隐，格式见 BottomBarLayout
+        private val KEY_BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
+        // 底栏仅显示图标模式，默认 false
+        private val KEY_BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
         // 启用 SuperLyric 实时歌词，默认 false
         private val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
         // 启用 LyricInfo 系统歌词注入，默认 true
@@ -354,13 +358,44 @@ class SettingsPreferences(
         }
     }
 
+    // 底栏项目配置 Flow
+    val bottomBarLayout: Flow<List<BottomBarItemSetting>> = dataStore.data.map { prefs ->
+        BottomBarLayout.decode(prefs[KEY_BOTTOM_BAR_LAYOUT], prefs[KEY_SHOW_CREATE_ENTRY])
+    }
+
+    suspend fun saveBottomBarLayout(layout: List<BottomBarItemSetting>) {
+        val normalized = BottomBarLayout.normalize(layout)
+        val createVisible = normalized.firstOrNull { it.item == BottomBarItem.CREATE }?.visible ?: true
+        dataStore.edit { prefs ->
+            prefs[KEY_BOTTOM_BAR_LAYOUT] = BottomBarLayout.encode(normalized)
+            prefs[KEY_SHOW_CREATE_ENTRY] = createVisible
+        }
+    }
+
+    // 底栏仅显示图标 Flow
+    val bottomBarIconOnly: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_BOTTOM_BAR_ICON_ONLY] ?: false
+    }
+
+    suspend fun saveBottomBarIconOnly(iconOnly: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_BOTTOM_BAR_ICON_ONLY] = iconOnly
+        }
+    }
+
     // 底栏创建歌单快捷入口 Flow
     val showCreateEntry: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_SHOW_CREATE_ENTRY] ?: true
+        val layout = BottomBarLayout.decode(prefs[KEY_BOTTOM_BAR_LAYOUT], prefs[KEY_SHOW_CREATE_ENTRY])
+        layout.firstOrNull { it.item == BottomBarItem.CREATE }?.visible ?: true
     }
 
     suspend fun saveShowCreateEntry(enabled: Boolean) {
         dataStore.edit { prefs ->
+            val layout = BottomBarLayout.decode(prefs[KEY_BOTTOM_BAR_LAYOUT], prefs[KEY_SHOW_CREATE_ENTRY])
+            val updated = layout.map {
+                if (it.item == BottomBarItem.CREATE) it.copy(visible = enabled) else it
+            }
+            prefs[KEY_BOTTOM_BAR_LAYOUT] = BottomBarLayout.encode(updated)
             prefs[KEY_SHOW_CREATE_ENTRY] = enabled
         }
     }

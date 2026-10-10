@@ -10,15 +10,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.SkipNext
+import com.lin0721.linmusic.core.preferences.BottomBarItem
+import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
+import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -486,6 +493,9 @@ fun MelodiaNavigationBar(
     onCreateClick: () -> Unit,
     isCreateMenuOpen: Boolean,
     showCreateEntry: Boolean = true,
+    bottomBarLayout: List<BottomBarItemSetting> = BottomBarLayout.DEFAULT,
+    iconOnly: Boolean = false,
+    activeTab: Screen? = null,
     expanded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -516,20 +526,35 @@ fun MelodiaNavigationBar(
                         Modifier.navigationBarsPadding().height(60.dp)
                     }
                 )
-                .padding(top = 12.dp, bottom = 2.dp),
+                .padding(
+                    top = if (iconOnly) 4.dp else 12.dp,
+                    bottom = if (iconOnly) 4.dp else 2.dp
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val navItems = buildList {
-                add(Triple("主页", Icons.Default.Home, Screen.Home))
-                add(Triple("搜索", Icons.Default.Search, Screen.Search))
-                add(Triple("音乐库", Icons.Default.LibraryMusic, Screen.Library))
-                if (showCreateEntry) {
-                    add(Triple("创建", if (isCreateMenuOpen) Icons.Rounded.Close else Icons.Default.AddBox, null))
+            val effectiveLayout = if (!showCreateEntry && bottomBarLayout == BottomBarLayout.DEFAULT) {
+                bottomBarLayout.map {
+                    if (it.item == BottomBarItem.CREATE) it.copy(visible = false) else it
+                }
+            } else {
+                bottomBarLayout
+            }
+
+            val navItems = effectiveLayout.filter { it.visible }.map { setting ->
+                when (setting.item) {
+                    BottomBarItem.HOME -> Triple("主页", Icons.Default.Home, Screen.Home)
+                    BottomBarItem.SEARCH -> Triple("搜索", Icons.Default.Search, Screen.Search)
+                    BottomBarItem.LIBRARY -> Triple("音乐库", Icons.Default.LibraryMusic, Screen.Library)
+                    BottomBarItem.CREATE -> Triple("创建", if (isCreateMenuOpen) Icons.Rounded.Close else Icons.Default.AddBox, null)
+                    BottomBarItem.LOCAL_MUSIC -> Triple("本地音乐", Icons.Default.Folder, Screen.LocalMusic)
+                    BottomBarItem.DOWNLOADS -> Triple("下载管理", Icons.Outlined.FileDownload, Screen.Downloads)
+                    BottomBarItem.CLOUD -> Triple("我的云盘", Icons.Outlined.CloudQueue, Screen.Cloud)
+                    BottomBarItem.PROFILE -> Triple("个人主页", Icons.Default.Person, Screen.MyProfile)
                 }
             }
 
             navItems.forEach { (label, icon, targetScreen) ->
-                val isSelected = targetScreen != null && currentScreen == targetScreen
+                val isSelected = targetScreen != null && (activeTab?.let { it == targetScreen } ?: (currentScreen == targetScreen))
                 
                 Column(
                     modifier = Modifier
@@ -549,22 +574,27 @@ fun MelodiaNavigationBar(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (isSelected) NavPillSelected else Color.Transparent)
-                            .padding(horizontal = MelodiaSpacing.md, vertical = 1.dp),
+                            .padding(
+                                horizontal = MelodiaSpacing.md,
+                                vertical = if (iconOnly) 6.dp else 1.dp
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = label,
                             tint = if (isSelected) Color.White else TextGray,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(if (iconOnly) 24.dp else 22.dp)
                         )
                     }
-                    Text(
-                        text = label,
-                        color = if (isSelected) Color.White else TextGray,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
+                    if (!iconOnly) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else TextGray,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
                 }
             }
         }

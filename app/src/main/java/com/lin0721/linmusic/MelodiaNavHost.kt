@@ -29,6 +29,12 @@ import com.lin0721.linmusic.feature.localmusic.ui.playlist.LocalPlaylistScreen
 import com.lin0721.linmusic.feature.localmusic.ui.playlist.LocalPlaylistsScreen
 import com.lin0721.linmusic.feature.localmusic.ui.songs.LocalSongsScreen
 import com.lin0721.linmusic.feature.localmusic.ui.tageditor.LocalTagEditorScreen
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.feature.home.ui.HomeScreen
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
 import com.lin0721.linmusic.feature.profile.ui.FollowListMode
@@ -79,6 +85,7 @@ fun MelodiaNavHost(
             onLoginScreenVisibilityChanged = onLoginScreenVisibilityChanged
         )
     }
+    val userProfile by homeViewModel.userProfile.collectAsStateWithLifecycle()
     val saveableStateHolder = rememberSaveableStateHolder()
     val frameStores = viewModel<NavFrameStores>()
     val scope = rememberCoroutineScope()
@@ -254,8 +261,22 @@ fun MelodiaNavHost(
                         onUserClick = onNavigateToProfile
                     )
                 }
-                is Screen.Account -> {
-                    com.lin0721.linmusic.feature.account.ui.AccountScreen(onBack = onBack)
+                is Screen.MyProfile -> {
+                    val profile = userProfile
+                    if (profile != null) {
+                        com.lin0721.linmusic.feature.profile.ui.ProfileScreen(
+                            uid = profile.uid,
+                            onBack = onBack,
+                            onNavigateToFollowList = onNavigateToFollowList,
+                            onPlaylistClick = { playlistId -> onNavigateToPlaylist(playlistId, false) }
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(BackgroundDark)
+                        )
+                    }
                 }
                 is Screen.PlaylistCategory -> {
                     com.lin0721.linmusic.feature.search.ui.PlaylistCategoryScreen(

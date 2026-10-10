@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.BuildConfig
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
+import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.auth.UserPreferences
 import com.lin0721.linmusic.feature.settings.data.UserBindingItem
@@ -113,6 +115,10 @@ class SettingsViewModel(
     val carMode = settingsPreferences.carMode.asState(false)
 
     val showCreateEntry = settingsPreferences.showCreateEntry.asState(true)
+
+    val bottomBarLayout = settingsPreferences.bottomBarLayout.asState(BottomBarLayout.DEFAULT)
+
+    val bottomBarIconOnly = settingsPreferences.bottomBarIconOnly.asState(false)
 
     val playerPageMode = settingsPreferences.playerPageMode.asState(SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
 
@@ -427,6 +433,14 @@ class SettingsViewModel(
     fun updateCarMode(enabled: Boolean) = launchSave { settingsPreferences.saveCarMode(enabled) }
 
     fun updateShowCreateEntry(enabled: Boolean) = launchSave { settingsPreferences.saveShowCreateEntry(enabled) }
+
+    fun updateBottomBarLayout(layout: List<BottomBarItemSetting>) = launchSave {
+        settingsPreferences.saveBottomBarLayout(layout)
+    }
+
+    fun updateBottomBarIconOnly(iconOnly: Boolean) = launchSave {
+        settingsPreferences.saveBottomBarIconOnly(iconOnly)
+    }
 
     fun updatePlayerPageMode(mode: String) = launchSave { settingsPreferences.savePlayerPageMode(mode) }
 

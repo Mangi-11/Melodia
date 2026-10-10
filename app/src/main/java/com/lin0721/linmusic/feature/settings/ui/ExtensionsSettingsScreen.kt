@@ -37,10 +37,12 @@ private val PlayerPageModes = listOf(
 fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val showLockscreen by viewModel.showLockscreen.collectAsStateWithLifecycle()
     val carMode by viewModel.carMode.collectAsStateWithLifecycle()
-    val showCreateEntry by viewModel.showCreateEntry.collectAsStateWithLifecycle()
+    val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
+    val bottomBarIconOnly by viewModel.bottomBarIconOnly.collectAsStateWithLifecycle()
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
 
+    var showBottomBarSheet by remember { mutableStateOf(false) }
     var showPlayerModeSheet by remember { mutableStateOf(false) }
     val playerModeLabel = PlayerPageModes.firstOrNull { it.first == playerPageMode }?.second ?: "自动"
     val playerModeSubtitle = when (playerPageMode) {
@@ -78,11 +80,13 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
 
             item {
                 SettingsGroupCard(SettingsSubMenu.EXTENSIONS.sectionTitles[2]) {
-                    SettingsSwitchRow(
-                        title = "显示底栏创建入口",
-                        subtitle = "关闭后可在音乐库页面通过右上角按钮创建歌单",
-                        checked = showCreateEntry,
-                        onCheckedChange = { viewModel.updateShowCreateEntry(it) }
+                    val enabledItemsSummary = remember(bottomBarLayout) {
+                        bottomBarLayout.filter { it.visible }.joinToString("、") { it.item.title }
+                    }
+                    SettingsRow(
+                        title = "底栏自定义",
+                        subtitle = "当前启用：$enabledItemsSummary",
+                        onClick = { showBottomBarSheet = true }
                     )
                 }
             }
@@ -153,6 +157,16 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                     }
                 }
             }
+        }
+
+        if (showBottomBarSheet) {
+            BottomBarCustomizationSheet(
+                layout = bottomBarLayout,
+                iconOnly = bottomBarIconOnly,
+                onLayoutChange = { viewModel.updateBottomBarLayout(it) },
+                onIconOnlyChange = { viewModel.updateBottomBarIconOnly(it) },
+                onDismiss = { showBottomBarSheet = false }
+            )
         }
     }
 }

@@ -48,7 +48,6 @@ fun ProfileSidebar(
     onNavigateToCloud: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToMessage: () -> Unit,
-    onNavigateToAccount: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     Column(
@@ -137,11 +136,6 @@ fun ProfileSidebar(
                 icon = Icons.Outlined.Notifications,
                 title = "消息",
                 onClick = { onDismiss(); onNavigateToMessage() }
-            )
-            SidebarMenuItem(
-                icon = Icons.Outlined.WorkspacePremium,
-                title = "账号与会员",
-                onClick = { onDismiss(); onNavigateToAccount() }
             )
             SidebarMenuItem(
                 icon = Icons.Outlined.Settings,

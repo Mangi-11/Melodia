@@ -43,7 +43,11 @@ private fun Screen.hasPageScopedViewModels(): Boolean = when (this) {
     else -> false
 }
 
-private fun Screen.isTabRoot(): Boolean = this == Screen.Home || this == Screen.Search || this == Screen.Library
+private fun Screen.isTabRoot(): Boolean = when (this) {
+    Screen.Home, Screen.Search, Screen.Library,
+    Screen.LocalMusic, Screen.Downloads, Screen.Cloud, Screen.MyProfile -> true
+    else -> false
+}
 
 // 按栈帧保存页面现场：滚动位置等 rememberSaveable 状态，以及页面专属 ViewModel
 @Stable

@@ -168,9 +168,9 @@ class MelodiaNavigationStateTest {
 
         val json = Json.encodeToString(NavigationSnapshot.serializer(), nav.toSnapshot())
         val restored = Json.decodeFromString(NavigationSnapshot.serializer(), json)
+        assertEquals(listOf(Screen.Library), restored.libraryStack)
         assertEquals(
             listOf(
-                Screen.Library,
                 Screen.LocalMusic,
                 Screen.LocalMusicSettings,
                 Screen.LocalArtist("茶太"),
@@ -179,7 +179,7 @@ class MelodiaNavigationStateTest {
                 Screen.LocalPlaylists,
                 Screen.LocalPlaylist(7L)
             ),
-            restored.libraryStack
+            restored.localMusicStack
         )
     }
 
@@ -331,7 +331,37 @@ class MelodiaNavigationStateTest {
         nav.openTab(Screen.Home)
 
         val ids = nav.liveEntryIds
-        assertEquals(4, ids.size)
+        assertEquals(8, ids.size)
+    }
+
+    @Test
+    fun `新增顶层 tab 拥有独立回退栈且点击底栏 tab 时重置为第一级界面`() = inSnapshot {
+        val nav = MelodiaNavigationState()
+        nav.openTab(Screen.LocalMusic)
+        assertEquals(Screen.LocalMusic, nav.currentScreen)
+
+        nav.navigateTo(Screen.LocalSongs)
+        assertEquals(Screen.LocalSongs, nav.currentScreen)
+        assertTrue(nav.canNavigateBack)
+
+        nav.openTab(Screen.Home)
+        assertEquals(Screen.Home, nav.currentScreen)
+
+        // 3A 规则：点击底栏 Tab 时重置目标 Tab 栈至第一级界面
+        nav.openTab(Screen.LocalMusic)
+        assertEquals(Screen.LocalMusic, nav.currentScreen)
+        assertFalse(nav.canNavigateBack)
+    }
+
+    @Test
+    fun `动态更新首选根 Tab 后回退时回退到新根 Tab`() = inSnapshot {
+        val nav = MelodiaNavigationState()
+        nav.updateDefaultRootTab(Screen.Search)
+        nav.openTab(Screen.Library)
+        assertEquals(Screen.Library, nav.currentScreen)
+
+        nav.navigateBack()
+        assertEquals(Screen.Search, nav.currentScreen)
     }
 
     @Test
@@ -351,7 +381,15 @@ class MelodiaNavigationStateTest {
             initialHomeIds = snapshot.homeIds,
             initialSearchIds = snapshot.searchIds,
             initialLibraryIds = snapshot.libraryIds,
-            initialNextEntryId = snapshot.nextEntryId
+            initialNextEntryId = snapshot.nextEntryId,
+            initialLocalMusicStack = snapshot.localMusicStack,
+            initialDownloadsStack = snapshot.downloadsStack,
+            initialCloudStack = snapshot.cloudStack,
+            initialMyProfileStack = snapshot.myProfileStack,
+            initialLocalMusicIds = snapshot.localMusicIds,
+            initialDownloadsIds = snapshot.downloadsIds,
+            initialCloudIds = snapshot.cloudIds,
+            initialMyProfileIds = snapshot.myProfileIds
         )
 
         assertEquals(before, restored.liveEntryIds)
@@ -376,6 +414,23 @@ class MelodiaNavigationStateTest {
             initialNextEntryId = legacy.nextEntryId
         )
 
-        assertEquals(3, restored.liveEntryIds.size)
+        assertEquals(7, restored.liveEntryIds.size)
+    }
+
+    @Test
+    fun `点击底栏Tab按钮时始终重置目标Tab回退栈至第一级界面`() = inSnapshot {
+        val nav = MelodiaNavigationState()
+        // 主页打开设置页
+        nav.navigateTo(Screen.Settings)
+        assertEquals(Screen.Settings, nav.currentScreen)
+
+        // 点击底栏切换到搜索页
+        nav.openTab(Screen.Search)
+        assertEquals(Screen.Search, nav.currentScreen)
+
+        // 点击底栏切回主页，应回到主页第一级界面而不是设置页
+        nav.openTab(Screen.Home)
+        assertEquals(Screen.Home, nav.currentScreen)
+        assertFalse(nav.canNavigateBack)
     }
 }

@@ -79,6 +79,8 @@ import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.update.UpdateManager
 import com.lin0721.linmusic.core.update.UpdateUiState
+import com.lin0721.linmusic.core.preferences.BottomBarItem
+import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
 import com.lin0721.linmusic.feature.settings.ui.UpdateDialog
@@ -125,6 +127,8 @@ fun MelodiaApp() {
     val viewModel: HomeViewModel = koinViewModel()
     val settingsPreferences: SettingsPreferences = koinInject()
     val showCreateEntry by settingsPreferences.showCreateEntry.collectAsStateWithLifecycle(initialValue = true)
+    val bottomBarLayout by settingsPreferences.bottomBarLayout.collectAsStateWithLifecycle(initialValue = BottomBarLayout.DEFAULT)
+    val bottomBarIconOnly by settingsPreferences.bottomBarIconOnly.collectAsStateWithLifecycle(initialValue = false)
     val playerPageMode by settingsPreferences.playerPageMode
         .collectAsStateWithLifecycle(initialValue = SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
     val sidePlayerPinned by settingsPreferences.sidePlayerPinned.collectAsStateWithLifecycle(initialValue = true)
@@ -169,6 +173,21 @@ fun MelodiaApp() {
     val playerSheet = rememberMelodiaPlayerSheetState()
     val navigation = rememberMelodiaNavigationState()
     val sidebar = rememberMelodiaSidebarState(SidebarWidth)
+
+    // 动态同步底栏首个可用路由为首选根 Tab
+    LaunchedEffect(bottomBarLayout) {
+        val firstRoute = bottomBarLayout.firstOrNull { it.visible && it.item.isRoute }
+        val rootScreen = when (firstRoute?.item) {
+            BottomBarItem.SEARCH -> Screen.Search
+            BottomBarItem.LIBRARY -> Screen.Library
+            BottomBarItem.LOCAL_MUSIC -> Screen.LocalMusic
+            BottomBarItem.DOWNLOADS -> Screen.Downloads
+            BottomBarItem.CLOUD -> Screen.Cloud
+            BottomBarItem.PROFILE -> Screen.MyProfile
+            else -> Screen.Home
+        }
+        navigation.updateDefaultRootTab(rootScreen)
+    }
 
     var showCreateSheet by remember { mutableStateOf(false) }
     // 听歌识曲全屏覆盖层，盖住底栏与迷你播放条
@@ -381,7 +400,6 @@ fun MelodiaApp() {
                     onNavigateToCloud = { navigation.openCloud() },
                     onNavigateToDownloads = { navigation.openDownloads() },
                     onNavigateToMessage = { navigation.openMessage() },
-                    onNavigateToAccount = { navigation.openAccount() },
                     onNavigateToSettings = { navigation.navigateTo(Screen.Settings) }
                 )
             }
@@ -509,6 +527,9 @@ fun MelodiaApp() {
                             onNavigate = { navigation.openTab(it) },
                             onCreateClick = { showCreateSheet = !showCreateSheet },
                             showCreateEntry = showCreateEntry,
+                            bottomBarLayout = bottomBarLayout,
+                            bottomBarIconOnly = bottomBarIconOnly,
+                            activeTab = navigation.activeTab,
                             onOverlayHeightChanged = { bottomOverlayHeight = it }
                         )
 
