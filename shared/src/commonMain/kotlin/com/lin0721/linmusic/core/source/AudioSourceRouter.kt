@@ -69,7 +69,14 @@ class AudioSourceRouter(
             }
             for (p in providers) {
                 try {
-                    val r = p.resolveUrl(track.name, track.ar.joinToString("/") { it.name }, track.al.name, track.dt, quality)
+                    val r = p.resolveUrl(
+                        songId = songId.toString(),
+                        songName = track.name,
+                        artists = track.ar.joinToString("/") { it.name },
+                        albumName = track.al.name,
+                        durationMs = track.dt,
+                        quality = quality
+                    )
                     if (r != null && r.url.isNotBlank()) {
                         return Pair(r.url, "社区源 (${p.platform.displayName})")
                     }
@@ -80,64 +87,36 @@ class AudioSourceRouter(
             return null
         }
 
-        // 辅助函数：解析本地直连与远程 UNM 模块
-        suspend fun tryResolveUnm(): Pair<String, String>? {
-            val enabledModules = sourcePreferences.unmEnabledModules.first()
-            val moduleOrder = sourcePreferences.unmModuleOrder.first()
-            val candidateModules = moduleOrder
-                .filter { it in enabledModules }
-                .mapNotNull { UnmModule.fromKey(it) }
-
-            // 阶段一：本地原生直连模块轮询
-            for (module in candidateModules) {
-                AppLogger.d(TAG, "尝试本地直连音源: ${module.displayName} songId=$songId")
-                val url = NativeSourceFetcher.fetchUrl(module, songId)
-                if (!url.isNullOrBlank()) {
-                    AppLogger.i(TAG, "本地直连音源 ${module.displayName} 解析成功: songId=$songId")
-                    return Pair(url, module.displayName)
-                }
-            }
-
-            // 阶段二：远程 UNM 兜底服务
+        // 辅助函数：解析远程 UNM 兜底服务
+        suspend fun tryResolveRemoteUnm(): Pair<String, String>? {
             val remoteFallbackEnabled = sourcePreferences.unmRemoteFallbackEnabled.first()
             val serverUrl = sourcePreferences.unmServerUrl.first().trim()
-            if (remoteFallbackEnabled && serverUrl.isNotBlank()) {
-                val autoMatch = sourcePreferences.unmAutoMatch.first()
-                AppLogger.d(TAG, "本地音源未命中，尝试远程 UNM 服务兜底: $serverUrl songId=$songId")
-                val remoteResult = if (autoMatch) {
-                    unmApiClient.matchSong(serverUrl, songId, null)
-                } else {
-                    var res: UnmMatchResult? = null
-                    for (module in candidateModules) {
-                        res = unmApiClient.matchSong(serverUrl, songId, module.key)
-                        if (res != null && res.url.isNotBlank()) break
-                    }
-                    res
-                }
-                if (remoteResult != null && remoteResult.url.isNotBlank()) {
-                    AppLogger.i(TAG, "远程 UNM 服务兜底成功: songId=$songId 来源=${remoteResult.source}")
-                    return Pair(remoteResult.url, "远程UNM (${remoteResult.source ?: "auto"})")
-                }
+            if (!remoteFallbackEnabled || serverUrl.isBlank()) return null
+            AppLogger.d(TAG, "尝试远程 UNM 服务: $serverUrl songId=$songId")
+            val remoteResult = unmApiClient.matchSong(serverUrl, songId, null)
+            if (remoteResult != null && remoteResult.url.isNotBlank()) {
+                AppLogger.i(TAG, "远程 UNM 服务解析成功: songId=$songId 来源=${remoteResult.source}")
+                return Pair(remoteResult.url, "远程UNM (${remoteResult.source ?: "auto"})")
             }
             return null
         }
 
         if (communityPriority) {
-            // 社区源优先：先尝试社区扩展插件，未命中再走本地直连与远程 UNM
+            // 社区源优先：先尝试社区扩展插件，未命中再走远程 UNM
             val communityRes = tryResolveCommunity()
             if (communityRes != null) {
                 matchedUrl = communityRes.first
                 matchedSource = communityRes.second
             } else {
-                val unmRes = tryResolveUnm()
+                val unmRes = tryResolveRemoteUnm()
                 if (unmRes != null) {
                     matchedUrl = unmRes.first
                     matchedSource = unmRes.second
                 }
             }
         } else {
-            // 默认顺序：本地直连与远程 UNM 优先，未命中再走社区扩展插件兜底
-            val unmRes = tryResolveUnm()
+            // 远程 UNM 优先：先尝试远程 UNM，未命中再走社区扩展插件
+            val unmRes = tryResolveRemoteUnm()
             if (unmRes != null) {
                 matchedUrl = unmRes.first
                 matchedSource = unmRes.second

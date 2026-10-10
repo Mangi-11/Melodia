@@ -132,6 +132,7 @@ fun MelodiaApp() {
     val playerPageMode by settingsPreferences.playerPageMode
         .collectAsStateWithLifecycle(initialValue = SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
     val sidePlayerPinned by settingsPreferences.sidePlayerPinned.collectAsStateWithLifecycle(initialValue = true)
+    val tabletImmersiveMode by settingsPreferences.tabletImmersiveMode.collectAsStateWithLifecycle(initialValue = false)
     // 迷你条、面板等 Android 组件直接消费 Media3 MediaItem，取具体实现
     val playerManager: PlayerManager = koinInject()
     val currentTrack by playerManager.currentTrack.collectAsStateWithLifecycle()
@@ -270,7 +271,8 @@ fun MelodiaApp() {
         window?.let { WindowCompat.getInsetsController(it, it.decorView) }
     }
 
-    val shouldHideSystemBars = if (usePanel) {
+    val isTabletImmersive = windowSizeClass == MelodiaWindowSizeClass.Expanded && tabletImmersiveMode
+    val shouldHideSystemBars = isTabletImmersive || if (usePanel) {
         isLyricsFullScreen
     } else {
         isLyricsFullScreen && !isLyricsControlsVisible

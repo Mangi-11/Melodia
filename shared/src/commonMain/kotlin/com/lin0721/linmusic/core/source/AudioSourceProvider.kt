@@ -7,6 +7,7 @@ interface AudioSourceProvider {
 
     // 根据歌曲元数据搜索匹配并返回可播放 URL
     suspend fun resolveUrl(
+        songId: String = "",
         songName: String,
         artists: String,
         albumName: String?,

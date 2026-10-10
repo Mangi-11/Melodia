@@ -72,6 +72,8 @@ class SettingsPreferences(
         private val KEY_PANEL_DEFAULT_FULLSCREEN = booleanPreferencesKey("panel_default_fullscreen")
         private val KEY_PLAYER_PAGE_MODE = stringPreferencesKey("player_page_mode")
         private val KEY_SIDE_PLAYER_PINNED = booleanPreferencesKey("side_player_pinned")
+        // 平板全局沉浸，默认 false
+        private val KEY_TABLET_IMMERSIVE_MODE = booleanPreferencesKey("tablet_immersive_mode")
         const val PLAYER_PAGE_MODE_AUTO = "auto"
         const val PLAYER_PAGE_MODE_FULLSCREEN = "fullscreen"
         const val PLAYER_PAGE_MODE_SIDE = "side"
@@ -420,6 +422,17 @@ class SettingsPreferences(
     suspend fun saveSidePlayerPinned(pinned: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_SIDE_PLAYER_PINNED] = pinned
+        }
+    }
+
+    // 平板全局沉浸 Flow
+    val tabletImmersiveMode: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_TABLET_IMMERSIVE_MODE] ?: false
+    }
+
+    suspend fun saveTabletImmersiveMode(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_TABLET_IMMERSIVE_MODE] = enabled
         }
     }
 

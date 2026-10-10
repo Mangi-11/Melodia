@@ -20,8 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Close
@@ -33,9 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
-import com.lin0721.linmusic.core.source.MusicPlatform
 import com.lin0721.linmusic.core.source.SourcePreferences
-import com.lin0721.linmusic.core.source.UnmModule
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
@@ -122,12 +118,10 @@ fun SettingsPage(modifier: Modifier = Modifier) {
 
     val quality by settingsPreferences.wifiQuality.collectAsState(initial = "lossless")
     val fallbackEnabled by sourcePreferences.fallbackEnabled.collectAsState(initial = false)
-    val searchAggregationEnabled by sourcePreferences.searchAggregationEnabled.collectAsState(initial = false)
+    val communityPriority by sourcePreferences.communityPriority.collectAsState(initial = false)
     val unmServerUrl by sourcePreferences.unmServerUrl.collectAsState(initial = "")
     val unmRemoteFallbackEnabled by sourcePreferences.unmRemoteFallbackEnabled.collectAsState(initial = false)
     val unmAutoMatch by sourcePreferences.unmAutoMatch.collectAsState(initial = true)
-    val unmEnabledModules by sourcePreferences.unmEnabledModules.collectAsState(initial = UnmModule.ALL_KEYS.toSet())
-    val unmModuleOrder by sourcePreferences.unmModuleOrder.collectAsState(initial = UnmModule.ALL_KEYS)
     val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
     val logLevelName by settingsPreferences.logLevel.collectAsState(initial = AppLogger.LogLevel.WARN.name)
     var logBytes by remember { mutableStateOf(0L) }
@@ -174,80 +168,31 @@ fun SettingsPage(modifier: Modifier = Modifier) {
 
             SettingsCard("音源与换源") {
                 SettingRow(
-                    title = "多平台聚合搜索",
-                    subtitle = "在搜索页展示酷狗、酷我、QQ 音乐等多个平台的独立搜索 Tab"
-                ) {
-                    SettingSwitch(searchAggregationEnabled) { scope.launch { sourcePreferences.saveSearchAggregationEnabled(it) } }
-                }
-
-                SettingRow(
                     title = "无版权/VIP 自动换源",
-                    subtitle = "官方网易云音源不可用或仅为试听时，优先通过本地直连音源获取完整播放直链"
+                    subtitle = "官方网易云音源不可用或仅为试听时，自动从可用音源解析完整播放直链"
                 ) {
                     SettingSwitch(fallbackEnabled) { scope.launch { sourcePreferences.saveFallbackEnabled(it) } }
                 }
 
-                Text(
-                    text = "本地直连音源（响应极速、去中心化，按优先级依次尝试）：",
-                    color = DesktopColors.TextGray,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-
-                unmModuleOrder.forEachIndexed { index, moduleKey ->
-                    val module = UnmModule.fromKey(moduleKey)
-                    val displayName = module?.displayName ?: moduleKey
-                    val description = module?.description ?: ""
-                    val isEnabled = moduleKey in unmEnabledModules
-
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                if (fallbackEnabled) {
+                    SettingRow(
+                        title = "社区源优先",
+                        subtitle = "开启后优先尝试通过 LX 插件脚本解析，失败后 fallback 到远程 UNM 服务；关闭则先尝试远程 UNM"
                     ) {
-                        Text(
-                            text = "${index + 1}. $displayName ($description)",
-                            color = if (isEnabled) DesktopColors.TextPrimary else DesktopColors.TextGray,
-                            fontSize = 14.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        SettingSwitch(isEnabled) {
-                            scope.launch { sourcePreferences.toggleUnmModule(moduleKey) }
-                        }
-                        IconButton(
-                            onClick = { scope.launch { sourcePreferences.moveUnmModuleUp(moduleKey) } },
-                            enabled = index > 0
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = "上移",
-                                tint = if (index > 0) DesktopColors.TextPrimary else DesktopColors.SurfaceLight,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { scope.launch { sourcePreferences.moveUnmModuleDown(moduleKey) } },
-                            enabled = index < unmModuleOrder.size - 1
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowDownward,
-                                contentDescription = "下移",
-                                tint = if (index < unmModuleOrder.size - 1) DesktopColors.TextPrimary else DesktopColors.SurfaceLight,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        SettingSwitch(communityPriority) { scope.launch { sourcePreferences.saveCommunityPriority(it) } }
                     }
                 }
 
                 SettingRow(
-                    title = "启用远程兜底服务",
-                    subtitle = "当本地所有已启用的音源均未解析成功时，向远程 UNM 服务器请求兜底"
+                    title = "启用远程 UNM 服务",
+                    subtitle = "向远程自建或第三方的 UNM（UnblockNeteaseMusic）服务器请求音频直链"
                 ) {
                     SettingSwitch(unmRemoteFallbackEnabled) { scope.launch { sourcePreferences.saveUnmRemoteFallbackEnabled(it) } }
                 }
 
                 if (unmRemoteFallbackEnabled) {
                     SettingRow(
-                        title = "兜底服务接口 (Base URL)",
+                        title = "远程服务接口 (Base URL)",
                         subtitle = unmServerUrl.ifBlank { "未配置" }
                     ) {
                         DesktopServerUrlInput(
@@ -259,7 +204,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
 
                     SettingRow(
                         title = "服务端自动选择模式",
-                        subtitle = "由服务端自动轮询最优源，关闭后按本地模块顺序向远程请求"
+                        subtitle = "由服务端自动轮询最优源匹配"
                     ) {
                         SettingSwitch(unmAutoMatch) { scope.launch { sourcePreferences.saveUnmAutoMatch(it) } }
                     }

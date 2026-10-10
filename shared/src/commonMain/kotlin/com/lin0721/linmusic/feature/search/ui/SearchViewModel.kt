@@ -81,20 +81,8 @@ class SearchViewModel(
     private val _featuredTrack = MutableStateFlow<Track?>(null)
     val featuredTrack: StateFlow<Track?> = _featuredTrack.asStateFlow()
 
-    val searchPlatforms: StateFlow<List<MusicPlatform>> = (sourcePreferences?.searchAggregationEnabled ?: flowOf(false))
-        .map { enabled ->
-            if (enabled) {
-                listOf(
-                    MusicPlatform.NETEASE,
-                    MusicPlatform.KUGOU,
-                    MusicPlatform.KUWO,
-                    MusicPlatform.QQ
-                )
-            } else {
-                listOf(MusicPlatform.NETEASE)
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, listOf(MusicPlatform.NETEASE))
+    val searchPlatforms: StateFlow<List<MusicPlatform>> =
+        MutableStateFlow(listOf(MusicPlatform.NETEASE)).asStateFlow()
 
     private val _selectedPlatform = MutableStateFlow(MusicPlatform.NETEASE)
     val selectedPlatform: StateFlow<MusicPlatform> = _selectedPlatform.asStateFlow()
@@ -409,6 +397,7 @@ class SearchViewModel(
             _toastEvent.emit("正在解析 ${track.platform.displayName} 音频...")
             val provider = sourceProviders.find { it.platform == track.platform }
             var playUrl = provider?.resolveUrl(
+                songId = track.id,
                 songName = track.name,
                 artists = track.artists,
                 albumName = track.albumName,
@@ -421,6 +410,7 @@ class SearchViewModel(
                 for (otherProvider in sourceProviders) {
                     if (otherProvider != provider) {
                         playUrl = otherProvider.resolveUrl(
+                            songId = track.id,
                             songName = track.name,
                             artists = track.artists,
                             albumName = track.albumName,

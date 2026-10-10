@@ -27,7 +27,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.LocalBottomOverlayInset
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.core.source.UnmApiClient
-import com.lin0721.linmusic.core.source.UnmModule
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.components.MelodiaSwitch
 import com.lin0721.linmusic.core.ui.components.ToastManager
@@ -40,14 +39,10 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val searchAggregationEnabled by viewModel.searchAggregationEnabled.collectAsStateWithLifecycle()
     val fallbackEnabled by viewModel.fallbackEnabled.collectAsStateWithLifecycle()
     val unmServerUrl by viewModel.unmServerUrl.collectAsStateWithLifecycle()
     val unmRemoteFallbackEnabled by viewModel.unmRemoteFallbackEnabled.collectAsStateWithLifecycle()
     val unmAutoMatch by viewModel.unmAutoMatch.collectAsStateWithLifecycle()
-    val unmEnabledModules by viewModel.unmEnabledModules.collectAsStateWithLifecycle()
-    val unmModuleOrder by viewModel.unmModuleOrder.collectAsStateWithLifecycle()
-
     val communityPriority by viewModel.communityPriority.collectAsStateWithLifecycle()
     val lxPluginEnabled by viewModel.lxPluginEnabled.collectAsStateWithLifecycle()
     val lxPlugins by viewModel.lxPlugins.collectAsStateWithLifecycle()
@@ -90,156 +85,30 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(MelodiaSpacing.md),
         contentPadding = PaddingValues(top = 8.dp, bottom = LocalBottomOverlayInset.current + 16.dp)
     ) {
-        // 分组 1：换源开关
+        // 分组 1：换源基础设置
         item {
             SettingsGroupCard(SettingsSubMenu.AUDIO_SOURCES.sectionTitles[0]) {
                 SettingsSwitchRow(
                     title = "无版权/VIP 自动换源",
-                    subtitle = "官方网易云音源不可用或仅为试听时，优先通过本地直连音源获取完整播放直链",
+                    subtitle = "官方网易云音源不可用或仅为试听时，自动从可用音源解析完整播放直链",
                     checked = fallbackEnabled,
                     onCheckedChange = { viewModel.updateFallbackEnabled(it) }
                 )
-                SettingsSwitchRow(
-                    title = "多平台聚合搜索",
-                    subtitle = "在搜索页面提供多平台切换标签，可检索酷狗、酷我、QQ 音乐等外部曲库",
-                    checked = searchAggregationEnabled,
-                    onCheckedChange = { viewModel.updateSearchAggregationEnabled(it) }
-                )
+                if (fallbackEnabled) {
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    SettingsSwitchRow(
+                        title = "社区源优先",
+                        subtitle = "开启后优先尝试通过 LX 插件脚本解析，失败后 fallback 到远程 UNM 服务；关闭则先尝试远程 UNM",
+                        checked = communityPriority,
+                        onCheckedChange = { viewModel.updateCommunityPriority(it) }
+                    )
+                }
             }
         }
 
-        // 分组 2：本地直连音源
+        // 分组 2：社区扩展源
         item {
             SettingsGroupCard(SettingsSubMenu.AUDIO_SOURCES.sectionTitles[1]) {
-                Text(
-                    text = "优先在本地设备直接向音源发起请求，以下都是第三方维护的音源，如果有条件可以给他们一点赞助：",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = MelodiaSpacing.sm)
-                )
-
-                unmModuleOrder.forEachIndexed { index, moduleKey ->
-                    val module = UnmModule.fromKey(moduleKey)
-                    val displayName = module?.displayName ?: moduleKey
-                    val description = module?.description ?: "第三方音源模块"
-                    val isEnabled = moduleKey in unmEnabledModules
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = if (isEnabled) 0.15f else 0.05f),
-                                modifier = Modifier.size(26.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "${index + 1}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(MelodiaSpacing.sm))
-                            Column {
-                                Text(
-                                    text = displayName,
-                                    color = if (isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = description,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isEnabled) 1f else 0.4f),
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-
-                        // 开关与上下移动操作按钮
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            MelodiaSwitch(
-                                checked = isEnabled,
-                                onCheckedChange = { viewModel.toggleUnmModule(moduleKey) }
-                            )
-
-                            Spacer(modifier = Modifier.width(4.dp))
-
-                            MelodiaIconButton(
-                                onClick = { viewModel.moveUnmModuleUp(moduleKey) },
-                                enabled = index > 0
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowUpward,
-                                    contentDescription = "上移",
-                                    tint = if (index > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            MelodiaIconButton(
-                                onClick = { viewModel.moveUnmModuleDown(moduleKey) },
-                                enabled = index < unmModuleOrder.size - 1
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDownward,
-                                    contentDescription = "下移",
-                                    tint = if (index < unmModuleOrder.size - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (index < unmModuleOrder.size - 1) {
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                    }
-                }
-            }
-        }
-
-        // 分组 3：远程兜底服务
-        item {
-            SettingsGroupCard(SettingsSubMenu.AUDIO_SOURCES.sectionTitles[2]) {
-                SettingsSwitchRow(
-                    title = "启用远程兜底服务",
-                    subtitle = "当本地所有已启用的音源均未解析成功时，向远程 UNM 服务器请求兜底",
-                    checked = unmRemoteFallbackEnabled,
-                    onCheckedChange = { viewModel.updateUnmRemoteFallbackEnabled(it) }
-                )
-
-                if (unmRemoteFallbackEnabled) {
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-
-                    SettingsRow(
-                        title = "兜底服务接口 (Base URL)",
-                        subtitle = unmServerUrl.ifBlank { "未配置（点击设置服务器地址）" },
-                        onClick = { showServerUrlDialog = true }
-                    )
-
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-
-                    SettingsSwitchRow(
-                        title = "服务端自动选择模式",
-                        subtitle = "由服务端自动轮询最优源，关闭后按本地模块顺序依次向远程请求",
-                        checked = unmAutoMatch,
-                        onCheckedChange = { viewModel.updateUnmAutoMatch(it) }
-                    )
-                }
-            }
-        }
-
-        // 分组 4：社区扩展源 (LX Music 脚本)
-        item {
-            SettingsGroupCard("社区扩展源 (LX Music 脚本)") {
                 val hasPlugins = lxPlugins.isNotEmpty()
 
                 SettingsSwitchRow(
@@ -254,17 +123,6 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
                         }
                     }
                 )
-
-                if (lxPluginEnabled && hasPlugins) {
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-
-                    SettingsSwitchRow(
-                        title = "社区源优先",
-                        subtitle = "换源时优先调用社区插件解析，未命中再尝试本地与远程服务",
-                        checked = communityPriority,
-                        onCheckedChange = { viewModel.updateCommunityPriority(it) }
-                    )
-                }
 
                 if (hasPlugins) {
                     Spacer(modifier = Modifier.height(MelodiaSpacing.xs))
@@ -425,6 +283,37 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("粘贴脚本导入", fontSize = 13.sp)
                     }
+                }
+            }
+        }
+
+        // 分组 3：远程 UNM 服务
+        item {
+            SettingsGroupCard(SettingsSubMenu.AUDIO_SOURCES.sectionTitles[2]) {
+                SettingsSwitchRow(
+                    title = "启用远程 UNM 服务",
+                    subtitle = "向远程自建或第三方的 UNM（UnblockNeteaseMusic）服务器请求音频直链",
+                    checked = unmRemoteFallbackEnabled,
+                    onCheckedChange = { viewModel.updateUnmRemoteFallbackEnabled(it) }
+                )
+
+                if (unmRemoteFallbackEnabled) {
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                    SettingsRow(
+                        title = "远程服务接口 (Base URL)",
+                        subtitle = unmServerUrl.ifBlank { "未配置（点击设置服务器地址）" },
+                        onClick = { showServerUrlDialog = true }
+                    )
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                    SettingsSwitchRow(
+                        title = "服务端自动选择模式",
+                        subtitle = "由服务端自动轮询最优源匹配",
+                        checked = unmAutoMatch,
+                        onCheckedChange = { viewModel.updateUnmAutoMatch(it) }
+                    )
                 }
             }
         }

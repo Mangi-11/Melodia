@@ -19,6 +19,7 @@ class LxAudioSourceProvider(
     override val platform: MusicPlatform = MusicPlatform.LX
 
     override suspend fun resolveUrl(
+        songId: String,
         songName: String,
         artists: String,
         albumName: String?,
@@ -47,7 +48,7 @@ class LxAudioSourceProvider(
                     val url = engine.resolveMusicUrl(
                         pluginId = plugin.id,
                         source = source,
-                        songId = "",
+                        songId = songId,
                         songName = songName,
                         singer = artists,
                         albumName = albumName ?: "",

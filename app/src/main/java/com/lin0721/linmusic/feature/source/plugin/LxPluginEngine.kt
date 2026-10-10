@@ -2,7 +2,9 @@ package com.lin0721.linmusic.feature.source.plugin
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.lin0721.linmusic.core.log.AppLogger
@@ -64,7 +66,13 @@ class LxPluginEngine(private val context: Context) {
                 onInited = { sources -> initDeferred.complete(sources) }
             )
 
-            // 执行脚本注入
+            // 注入插件全局元数据并执行脚本
+            val initTempInfoJs = "window.lx.currentScriptInfo = { name: " +
+                org.json.JSONObject.quote(headerInfo.name) + ", description: " +
+                org.json.JSONObject.quote(headerInfo.description) + ", version: " +
+                org.json.JSONObject.quote(headerInfo.version) + ", author: " +
+                org.json.JSONObject.quote(headerInfo.author) + " };"
+            tempSandbox.webView.evaluateJavascript(initTempInfoJs, null)
             tempSandbox.webView.evaluateJavascript(scriptText, null)
 
             // 等待 inited 事件触发（最长 8 秒）
@@ -99,6 +107,12 @@ class LxPluginEngine(private val context: Context) {
             )
 
             sandbox.supportedSources = item.sources
+            val initInfoJs = "window.lx.currentScriptInfo = { name: " +
+                org.json.JSONObject.quote(item.name) + ", description: " +
+                org.json.JSONObject.quote(item.description) + ", version: " +
+                org.json.JSONObject.quote(item.version) + ", author: " +
+                org.json.JSONObject.quote(item.author) + " };"
+            sandbox.webView.evaluateJavascript(initInfoJs, null)
             sandbox.webView.evaluateJavascript(item.rawScript, null)
 
             // 等待初始化
@@ -176,8 +190,10 @@ class LxPluginEngine(private val context: Context) {
         }.toString()
 
         withContext(Dispatchers.Main) {
-            val safeMusicInfo = escapeJsString(musicInfoJson)
-            val jsCode = "window.__melodia_resolve_music_url($callId, '$source', '$safeMusicInfo', '$lxQuality')"
+            val quotedMusicInfo = org.json.JSONObject.quote(musicInfoJson)
+            val quotedSource = org.json.JSONObject.quote(source)
+            val quotedQuality = org.json.JSONObject.quote(lxQuality)
+            val jsCode = "window.__melodia_resolve_music_url($callId, $quotedSource, $quotedMusicInfo, $quotedQuality)"
             sandbox.webView.evaluateJavascript(jsCode, null)
         }
 
@@ -220,7 +236,10 @@ class LxPluginEngine(private val context: Context) {
                 handleHttpRequest(sandbox.webView, id, url, method, headersJson, body)
             },
             onInited = onInited,
-            onResolved = { callId, url, _ ->
+            onResolved = { callId, url, error ->
+                if (!error.isNullOrBlank()) {
+                    AppLogger.w(TAG, "插件沙盒[$pluginId] 解析直链失败: $error")
+                }
                 val deferred = sandbox.pendingResolves[callId]
                 deferred?.complete(if (url.isNullOrBlank()) null else url)
             }
@@ -232,6 +251,14 @@ class LxPluginEngine(private val context: Context) {
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     readyDeferred.complete(Unit)
+                }
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                    consoleMessage?.let {
+                        AppLogger.d(TAG, "[$pluginId] JS Console: ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+                    }
+                    return true
                 }
             }
             addJavascriptInterface(bridge, "MelodiaHostBridge")
@@ -294,19 +321,20 @@ class LxPluginEngine(private val context: Context) {
                     put("statusCode", 200)
                 }.toString()
 
+                val quotedResp = org.json.JSONObject.quote(respJson)
+                val quotedBody = org.json.JSONObject.quote(respBody)
+
                 withContext(Dispatchers.Main) {
-                    val safeBody = escapeJsString(respBody)
-                    val safeResp = escapeJsString(respJson)
                     webView.evaluateJavascript(
-                        "window.__melodia_handle_http_response($id, null, '$safeResp', '$safeBody')",
+                        "window.__melodia_handle_http_response($id, null, $quotedResp, $quotedBody)",
                         null
                     )
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    val safeErr = escapeJsString(e.message ?: "Network error")
+                    val quotedErr = org.json.JSONObject.quote(e.message ?: "Network error")
                     webView.evaluateJavascript(
-                        "window.__melodia_handle_http_response($id, '$safeErr', null, null)",
+                        "window.__melodia_handle_http_response($id, $quotedErr, null, null)",
                         null
                     )
                 }
@@ -409,6 +437,13 @@ class LxPluginEngine(private val context: Context) {
             window.lx = {
                 version: "2.0.0",
                 env: "mobile",
+                currentScriptInfo: {
+                    name: "",
+                    description: "",
+                    version: "",
+                    author: "",
+                    rawScript: ""
+                },
                 EVENT_NAMES: {
                     request: "request",
                     inited: "inited",
@@ -450,8 +485,17 @@ class LxPluginEngine(private val context: Context) {
                 if (!cb) return;
                 delete pendingCallbacks[id];
                 var resp = null;
-                try { resp = respJson ? JSON.parse(respJson) : null; } catch(e) {}
-                cb(err ? new Error(err) : null, resp, body);
+                try { resp = respJson ? JSON.parse(respJson) : {}; } catch(e) { resp = {}; }
+                var parsedBody = body;
+                if (typeof body === 'string') {
+                    var trimmed = body.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        try { parsedBody = JSON.parse(trimmed); } catch(e) {}
+                    }
+                }
+                resp.body = parsedBody;
+                resp.statusCode = resp.statusCode || 200;
+                cb(err ? new Error(err) : null, resp, parsedBody);
             };
 
             window.__melodia_resolve_music_url = function(callId, source, musicInfoJson, quality) {
@@ -459,7 +503,7 @@ class LxPluginEngine(private val context: Context) {
                     MelodiaHostBridge.onResolveResult(callId, null, "No handler");
                     return;
                 }
-                var musicInfo = JSON.parse(musicInfoJson);
+                var musicInfo = (typeof musicInfoJson === 'object') ? musicInfoJson : JSON.parse(musicInfoJson);
                 Promise.resolve().then(function() {
                     return requestHandler({
                         source: source,

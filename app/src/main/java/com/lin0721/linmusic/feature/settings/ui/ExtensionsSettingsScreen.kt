@@ -24,7 +24,9 @@ import com.lin0721.linmusic.LocalBottomOverlayInset
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
 
 private val PlayerPageModes = listOf(
     SettingsPreferences.PLAYER_PAGE_MODE_AUTO to "自动",
@@ -41,6 +43,8 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val bottomBarIconOnly by viewModel.bottomBarIconOnly.collectAsStateWithLifecycle()
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
+    val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
+    val isExpanded = LocalMelodiaWindowSizeClass.current == MelodiaWindowSizeClass.Expanded
 
     var showBottomBarSheet by remember { mutableStateOf(false) }
     var showPlayerModeSheet by remember { mutableStateOf(false) }
@@ -105,6 +109,15 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                             subtitle = "关闭后按返回键直接收起侧边播放页",
                             checked = sidePlayerPinned,
                             onCheckedChange = { viewModel.updateSidePlayerPinned(it) }
+                        )
+                    }
+                    if (isExpanded) {
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        SettingsSwitchRow(
+                            title = "全局沉浸",
+                            subtitle = "隐藏系统状态栏与导航栏，边缘滑动呼出",
+                            checked = tabletImmersiveMode,
+                            onCheckedChange = { viewModel.updateTabletImmersiveMode(it) }
                         )
                     }
                 }

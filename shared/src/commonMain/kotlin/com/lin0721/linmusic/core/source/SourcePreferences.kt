@@ -5,7 +5,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -20,8 +19,6 @@ class SourcePreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_UNM_SERVER_URL = stringPreferencesKey("source_unm_server_url")
         private val KEY_UNM_REMOTE_FALLBACK_ENABLED = booleanPreferencesKey("source_unm_remote_fallback_enabled")
         private val KEY_UNM_AUTO_MATCH = booleanPreferencesKey("source_unm_auto_match")
-        private val KEY_UNM_ENABLED_MODULES = stringSetPreferencesKey("source_unm_enabled_modules")
-        private val KEY_UNM_MODULE_ORDER = stringPreferencesKey("source_unm_module_order")
 
         // LX 自定义插件偏好
         private val KEY_LX_PLUGIN_ENABLED = booleanPreferencesKey("source_lx_plugin_enabled")
@@ -33,18 +30,8 @@ class SourcePreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LX_PLUGIN_SOURCES = stringPreferencesKey("source_lx_plugin_sources")
         private val KEY_LX_PLUGINS_JSON = stringPreferencesKey("source_lx_plugins_json")
 
-        // 社区源优先与聚合搜索偏好
+        // 社区源优先偏好
         private val KEY_COMMUNITY_SOURCE_PRIORITY = booleanPreferencesKey("source_community_source_priority")
-        private val KEY_SEARCH_AGGREGATION_ENABLED = booleanPreferencesKey("source_search_aggregation_enabled")
-    }
-
-    // 聚合搜索开关
-    val searchAggregationEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_SEARCH_AGGREGATION_ENABLED] ?: false
-    }
-
-    suspend fun saveSearchAggregationEnabled(enabled: Boolean) {
-        dataStore.edit { prefs -> prefs[KEY_SEARCH_AGGREGATION_ENABLED] = enabled }
     }
 
     // 换源总开关
@@ -94,69 +81,6 @@ class SourcePreferences(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { prefs -> prefs[KEY_UNM_AUTO_MATCH] = enabled }
     }
 
-    // 启用的音源子模块集合
-    val unmEnabledModules: Flow<Set<String>> = dataStore.data.map { prefs ->
-        prefs[KEY_UNM_ENABLED_MODULES] ?: UnmModule.ALL_KEYS.toSet()
-    }
-
-    suspend fun saveUnmEnabledModules(modules: Set<String>) {
-        dataStore.edit { prefs -> prefs[KEY_UNM_ENABLED_MODULES] = modules }
-    }
-
-    suspend fun toggleUnmModule(moduleKey: String) {
-        val current = unmEnabledModules.first().toMutableSet()
-        if (current.contains(moduleKey)) {
-            current.remove(moduleKey)
-        } else {
-            current.add(moduleKey)
-        }
-        saveUnmEnabledModules(current)
-    }
-
-    // 音源模块重试优先级顺序
-    val unmModuleOrder: Flow<List<String>> = dataStore.data.map { prefs ->
-        val raw = prefs[KEY_UNM_MODULE_ORDER]
-        if (raw.isNullOrBlank()) {
-            UnmModule.ALL_KEYS
-        } else {
-            runCatching {
-                val list = Json.decodeFromString<List<String>>(raw)
-                val valid = list.filter { UnmModule.fromKey(it) != null }
-                val missing = UnmModule.ALL_KEYS.filter { it !in valid }
-                valid + missing
-            }.getOrDefault(UnmModule.ALL_KEYS)
-        }
-    }
-
-    suspend fun saveUnmModuleOrder(order: List<String>) {
-        dataStore.edit { prefs ->
-            prefs[KEY_UNM_MODULE_ORDER] = Json.encodeToString(order)
-        }
-    }
-
-    suspend fun moveUnmModuleUp(moduleKey: String) {
-        val current = unmModuleOrder.first().toMutableList()
-        val index = current.indexOf(moduleKey)
-        if (index > 0) {
-            val item = current.removeAt(index)
-            current.add(index - 1, item)
-            saveUnmModuleOrder(current)
-        }
-    }
-
-    suspend fun moveUnmModuleDown(moduleKey: String) {
-        val current = unmModuleOrder.first().toMutableList()
-        val index = current.indexOf(moduleKey)
-        if (index in 0 until current.size - 1) {
-            val item = current.removeAt(index)
-            current.add(index + 1, item)
-            saveUnmModuleOrder(current)
-        }
-    }
-
-    // 兼容现有调用的顺序映射
-    val fallbackOrder: Flow<List<String>> get() = unmModuleOrder
-    suspend fun saveFallbackOrder(order: List<String>) = saveUnmModuleOrder(order)
 
     // 社区源优先开关
     val communityPriority: Flow<Boolean> = dataStore.data.map { prefs ->
