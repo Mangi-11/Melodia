@@ -1,25 +1,43 @@
 package com.lin0721.linmusic.feature.cloud.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -29,11 +47,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.LocalBottomOverlayInset
+import com.lin0721.linmusic.core.ui.components.EmptyState
 import com.lin0721.linmusic.core.ui.components.ErrorState
+import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.SearchResultRowSkeleton
 import com.lin0721.linmusic.core.ui.components.SecondaryScreenScaffold
@@ -41,6 +66,7 @@ import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressScale
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.PillRadius
 import com.lin0721.linmusic.feature.cloud.upload.UploadStatus
 import org.koin.androidx.compose.koinViewModel
 
@@ -60,6 +86,11 @@ fun CloudScreen(
     val uploadTasks by viewModel.uploadTasks.collectAsStateWithLifecycle()
     var showUploadSheet by remember { mutableStateOf(false) }
 
+    val successState = uiState as? CloudUiState.Success
+    BackHandler(enabled = successState?.isSearchActive == true) {
+        viewModel.toggleSearch()
+    }
+
     val hasActiveUploads = uploadTasks.any { it.status != UploadStatus.SUCCESS && it.status != UploadStatus.FAILED }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -75,7 +106,28 @@ fun CloudScreen(
         viewModel.toastEvent.collect { ToastManager.showToast(it) }
     }
 
-    SecondaryScreenScaffold(title = "我的云盘", onBack = onBack) {
+    SecondaryScreenScaffold(
+        title = "我的云盘",
+        onBack = onBack,
+        actions = {
+            val success = uiState as? CloudUiState.Success
+            if (success != null && (success.songs.isNotEmpty() || success.isSearchActive)) {
+                MelodiaIconButton(onClick = { viewModel.toggleSearch() }) {
+                    Crossfade(
+                        targetState = success.isSearchActive,
+                        animationSpec = tween(durationMillis = 200),
+                        label = "cloud_search_icon"
+                    ) { isSearching ->
+                        Icon(
+                            if (isSearching) Icons.Rounded.Close else Icons.Rounded.Search,
+                            contentDescription = if (isSearching) "关闭搜索" else "搜索",
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val state = uiState) {
                 CloudUiState.Loading -> {
@@ -91,9 +143,11 @@ fun CloudScreen(
                 }
 
                 is CloudUiState.Success -> {
+                    val displaySongs = if (state.isSearchActive) state.filteredSongs else state.songs
                     val listState = rememberLazyListState()
-                    val shouldLoadMore by remember(state.hasMore, state.isLoadingMore) {
+                    val shouldLoadMore by remember(state.hasMore, state.isLoadingMore, state.isSearchActive) {
                         derivedStateOf {
+                            if (state.isSearchActive) return@derivedStateOf false
                             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                             lastVisible >= state.songs.size - 3 + HERO_ITEM_OFFSET && state.hasMore && !state.isLoadingMore
                         }
@@ -102,41 +156,78 @@ fun CloudScreen(
                         if (shouldLoadMore) viewModel.loadMore()
                     }
 
-                    LazyColumn(
-                        state = listState,
-                        // 行内组件（CloudSongRow/CloudStorageHeroBlock）自带水平内边距，这里只留垂直间距
-                        contentPadding = PaddingValues(
-                            top = MelodiaSpacing.sm,
-                            bottom = LocalBottomOverlayInset.current + 16.dp
-                        )
-                    ) {
-                        item(key = "hero") {
-                            CloudStorageHeroBlock(
-                                quota = state.quota,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = MelodiaSpacing.md, vertical = MelodiaSpacing.sm)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        AnimatedVisibility(
+                            visible = state.isSearchActive,
+                            enter = expandVertically(
+                                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                                expandFrom = Alignment.Top
+                            ) + fadeIn(
+                                animationSpec = tween(durationMillis = 200)
+                            ),
+                            exit = shrinkVertically(
+                                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                                shrinkTowards = Alignment.Top
+                            ) + fadeOut(
+                                animationSpec = tween(durationMillis = 150)
+                            )
+                        ) {
+                            CloudSearchField(
+                                query = state.searchQuery,
+                                isFetchingAll = state.isFetchingAll,
+                                onQueryChange = viewModel::updateSearchQuery,
+                                onClear = { viewModel.updateSearchQuery("") }
                             )
                         }
 
-                        items(state.songs, key = { it.songId }) { song ->
-                            CloudSongRow(
-                                song = song,
-                                onClick = { viewModel.playSong(song) },
-                                onOptionsClick = { viewModel.openOptions(song) }
-                            )
-                        }
+                        if (state.isSearchActive && displaySongs.isEmpty()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                EmptyState(
+                                    icon = Icons.Rounded.CloudUpload,
+                                    title = "没有匹配的歌曲"
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                // 行内组件（CloudSongRow/CloudStorageHeroBlock）自带水平内边距，这里只留垂直间距
+                                contentPadding = PaddingValues(
+                                    top = if (state.isSearchActive) 0.dp else MelodiaSpacing.sm,
+                                    bottom = LocalBottomOverlayInset.current + 16.dp
+                                )
+                            ) {
+                                if (!state.isSearchActive) {
+                                    item(key = "hero") {
+                                        CloudStorageHeroBlock(
+                                            quota = state.quota,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = MelodiaSpacing.md, vertical = MelodiaSpacing.sm)
+                                        )
+                                    }
+                                }
 
-                        if (state.isLoadingMore) {
-                            item(key = "loading_more") {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(MelodiaSpacing.md),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
+                                items(displaySongs, key = { it.songId }) { song ->
+                                    CloudSongRow(
+                                        song = song,
+                                        onClick = { viewModel.playSong(song) },
+                                        onOptionsClick = { viewModel.openOptions(song) }
                                     )
+                                }
+
+                                if (state.isLoadingMore && !state.isSearchActive) {
+                                    item(key = "loading_more") {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(MelodiaSpacing.md),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -239,3 +330,76 @@ fun CloudScreen(
         }
     }
 }
+
+@Composable
+private fun CloudSearchField(
+    query: String,
+    isFetchingAll: Boolean,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MelodiaSpacing.md, vertical = MelodiaSpacing.sm)
+            .clip(RoundedCornerShape(PillRadius))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = MelodiaSpacing.md, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    text = "按歌名/歌手/专辑搜索云盘歌曲",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isFetchingAll,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(150))
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(MelodiaSpacing.xs))
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !isFetchingAll && query.isNotEmpty(),
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(150))
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(MelodiaSpacing.xs))
+                MelodiaIconButton(
+                    onClick = onClear,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "清空输入",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+

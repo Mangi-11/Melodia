@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "CloudViewModel"
 private const val PAGE_SIZE = 30
+private const val BATCH_FETCH_SIZE = 100
 private const val MATCH_SEARCH_DEBOUNCE_MS = 400L
 
 class CloudViewModel(
@@ -73,6 +74,7 @@ class CloudViewModel(
     val uploadTasks: StateFlow<List<UploadTask>> = uploadManager.state
 
     private var matchSearchJob: Job? = null
+    private var fetchAllSongsJob: Job? = null
 
     init {
         load()
@@ -114,15 +116,23 @@ class CloudViewModel(
     }
 
     fun load() {
+        fetchAllSongsJob?.cancel()
         viewModelScope.launch {
+            val currentSuccess = _uiState.value as? CloudUiState.Success
             _uiState.value = CloudUiState.Loading
             cloudRepository.getCloudSongs(limit = PAGE_SIZE, offset = 0).first()
                 .onSuccess { page ->
-                    _uiState.value = CloudUiState.Success(
+                    val newState = CloudUiState.Success(
                         songs = page.songs,
                         quota = page.quota,
-                        hasMore = page.hasMore
+                        hasMore = page.hasMore,
+                        isSearchActive = currentSuccess?.isSearchActive ?: false,
+                        searchQuery = currentSuccess?.searchQuery ?: ""
                     )
+                    _uiState.value = newState
+                    if (newState.isSearchActive && newState.hasMore) {
+                        fetchAllSongs()
+                    }
                 }
                 .onFailure { e ->
                     _uiState.value = CloudUiState.Error(e.toUserMessage(resourceProvider))
@@ -132,7 +142,7 @@ class CloudViewModel(
 
     fun loadMore() {
         val state = _uiState.value as? CloudUiState.Success ?: return
-        if (!state.hasMore || state.isLoadingMore) return
+        if (!state.hasMore || state.isLoadingMore || state.isSearchActive) return
 
         viewModelScope.launch {
             _uiState.value = state.copy(isLoadingMore = true)
@@ -153,10 +163,73 @@ class CloudViewModel(
         }
     }
 
-    // 以当前已加载的云盘歌曲为播放队列，从点击项开始播
+    // 搜索开关
+    fun toggleSearch() {
+        val state = _uiState.value as? CloudUiState.Success ?: return
+        val nextActive = !state.isSearchActive
+        _uiState.value = state.copy(
+            isSearchActive = nextActive,
+            searchQuery = if (nextActive) state.searchQuery else ""
+        )
+        if (nextActive && state.hasMore) {
+            fetchAllSongs()
+        }
+    }
+
+    // 更新搜索关键词
+    fun updateSearchQuery(query: String) {
+        val state = _uiState.value as? CloudUiState.Success ?: return
+        _uiState.value = state.copy(searchQuery = query)
+        if (query.isNotEmpty() && state.hasMore) {
+            fetchAllSongs()
+        }
+    }
+
+    // 全量拉取云盘歌曲
+    private fun fetchAllSongs() {
+        if (fetchAllSongsJob?.isActive == true) return
+        fetchAllSongsJob = viewModelScope.launch {
+            val initialState = _uiState.value as? CloudUiState.Success ?: return@launch
+            if (!initialState.hasMore) return@launch
+
+            _uiState.value = initialState.copy(isFetchingAll = true)
+
+            while (true) {
+                val currentState = _uiState.value as? CloudUiState.Success ?: break
+                if (!currentState.hasMore) break
+
+                val offset = currentState.songs.size
+                val result = cloudRepository.getCloudSongs(limit = BATCH_FETCH_SIZE, offset = offset).first()
+                if (result.isSuccess) {
+                    val page = result.getOrThrow()
+                    val latestState = _uiState.value as? CloudUiState.Success ?: break
+                    _uiState.value = latestState.copy(
+                        songs = latestState.songs + page.songs,
+                        quota = page.quota,
+                        hasMore = page.hasMore
+                    )
+                    if (!page.hasMore) break
+                } else {
+                    break
+                }
+            }
+
+            val finalState = _uiState.value as? CloudUiState.Success
+            if (finalState != null) {
+                _uiState.value = finalState.copy(isFetchingAll = false)
+            }
+        }
+    }
+
+    // 以当前可见列表为播放队列，从点击项开始播
     fun playSong(song: CloudSong) {
         val state = _uiState.value as? CloudUiState.Success ?: return
-        val queueItems = state.songs.map { item ->
+        val currentList = if (state.isSearchActive && state.searchQuery.isNotBlank()) {
+            state.filteredSongs
+        } else {
+            state.songs
+        }
+        val queueItems = currentList.map { item ->
             QueueItem(
                 songId = item.songId,
                 title = item.name,
@@ -164,7 +237,7 @@ class CloudViewModel(
                 coverUrl = item.coverUrl.orEmpty()
             )
         }
-        val startIndex = state.songs.indexOfFirst { it.songId == song.songId }.coerceAtLeast(0)
+        val startIndex = currentList.indexOfFirst { it.songId == song.songId }.coerceAtLeast(0)
         playerManager.playQueue(queueItems, startIndex, "我的云盘")
     }
 

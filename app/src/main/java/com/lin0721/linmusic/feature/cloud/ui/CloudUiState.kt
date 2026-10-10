@@ -12,8 +12,22 @@ sealed interface CloudUiState {
         val songs: List<CloudSong>,
         val quota: CloudQuota,
         val hasMore: Boolean,
-        val isLoadingMore: Boolean = false
-    ) : CloudUiState
+        val isLoadingMore: Boolean = false,
+        val isSearchActive: Boolean = false,
+        val searchQuery: String = "",
+        val isFetchingAll: Boolean = false
+    ) : CloudUiState {
+        val filteredSongs: List<CloudSong>
+            get() {
+                val query = searchQuery.trim()
+                if (!isSearchActive || query.isEmpty()) return songs
+                return songs.filter { song ->
+                    song.name.contains(query, ignoreCase = true) ||
+                        song.artist.contains(query, ignoreCase = true) ||
+                        song.album.contains(query, ignoreCase = true)
+                }
+            }
+    }
 
     data class Error(val message: String) : CloudUiState
 }
