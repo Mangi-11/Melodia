@@ -41,6 +41,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val carMode by viewModel.carMode.collectAsStateWithLifecycle()
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
     val bottomBarIconOnly by viewModel.bottomBarIconOnly.collectAsStateWithLifecycle()
+    val coldStartTab by viewModel.coldStartTab.collectAsStateWithLifecycle()
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
@@ -176,8 +177,10 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
             BottomBarCustomizationSheet(
                 layout = bottomBarLayout,
                 iconOnly = bottomBarIconOnly,
+                coldStartTab = coldStartTab,
                 onLayoutChange = { viewModel.updateBottomBarLayout(it) },
                 onIconOnlyChange = { viewModel.updateBottomBarIconOnly(it) },
+                onColdStartChange = { viewModel.updateColdStartTab(it) },
                 onDismiss = { showBottomBarSheet = false }
             )
         }
