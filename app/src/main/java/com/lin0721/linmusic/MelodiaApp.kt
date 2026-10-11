@@ -79,7 +79,6 @@ import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.update.UpdateManager
 import com.lin0721.linmusic.core.update.UpdateUiState
-import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -87,6 +86,7 @@ import com.lin0721.linmusic.feature.home.ui.HomeViewModel
 import com.lin0721.linmusic.feature.settings.ui.UpdateDialog
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
+import kotlinx.coroutines.flow.map
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import com.lin0721.linmusic.core.player.PlayerManager
@@ -131,6 +131,10 @@ fun MelodiaApp() {
     val showCreateEntry by settingsPreferences.showCreateEntry.collectAsStateWithLifecycle(initialValue = true)
     val bottomBarLayout by settingsPreferences.bottomBarLayout.collectAsStateWithLifecycle(initialValue = BottomBarLayout.DEFAULT)
     val bottomBarIconOnly by settingsPreferences.bottomBarIconOnly.collectAsStateWithLifecycle(initialValue = false)
+    // null 表示 DataStore 尚未读出，用于判断冷启动落地页设置是否已就绪
+    val coldStartTabFlow = remember(settingsPreferences) { settingsPreferences.coldStartTab.map { it as String? } }
+    val coldStartTab by coldStartTabFlow.collectAsStateWithLifecycle(initialValue = null)
+    val lastRootTab by settingsPreferences.lastRootTab.collectAsStateWithLifecycle(initialValue = null)
     val playerPageMode by settingsPreferences.playerPageMode
         .collectAsStateWithLifecycle(initialValue = SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
     val sidePlayerPinned by settingsPreferences.sidePlayerPinned.collectAsStateWithLifecycle(initialValue = true)
@@ -179,17 +183,26 @@ fun MelodiaApp() {
 
     // 动态同步底栏首个可用路由为首选根 Tab
     LaunchedEffect(bottomBarLayout) {
-        val firstRoute = bottomBarLayout.firstOrNull { it.visible && it.item.isRoute }
-        val rootScreen = when (firstRoute?.item) {
-            BottomBarItem.SEARCH -> Screen.Search
-            BottomBarItem.LIBRARY -> Screen.Library
-            BottomBarItem.LOCAL_MUSIC -> Screen.LocalMusic
-            BottomBarItem.DOWNLOADS -> Screen.Downloads
-            BottomBarItem.CLOUD -> Screen.Cloud
-            BottomBarItem.PROFILE -> Screen.MyProfile
+        navigation.updateDefaultRootTab(firstVisibleRootScreen(bottomBarLayout))
+    }
+
+    // 冷启动落地页：按设置（主页/第一页/上次所在页）决定启动时激活的根 tab，仅进程启动时生效一次
+    var coldStartApplied by remember { mutableStateOf(false) }
+    LaunchedEffect(coldStartTab, lastRootTab, bottomBarLayout) {
+        if (coldStartApplied || coldStartTab == null) return@LaunchedEffect
+        val target = when (coldStartTab) {
+            SettingsPreferences.COLD_START_FIRST -> firstVisibleRootScreen(bottomBarLayout)
+            SettingsPreferences.COLD_START_LAST -> rootScreenFromKey(lastRootTab) ?: Screen.Home
             else -> Screen.Home
         }
-        navigation.updateDefaultRootTab(rootScreen)
+        navigation.applyColdStartTab(target)
+        coldStartApplied = true
+    }
+
+    // 记录当前所在根 tab 供「上次关闭所在页」使用；冷启动落定前不写入，避免覆盖上次记录
+    LaunchedEffect(navigation.activeTab, coldStartApplied) {
+        if (!coldStartApplied) return@LaunchedEffect
+        navigation.activeTab.toRootTabKey()?.let { settingsPreferences.saveLastRootTab(it) }
     }
 
     var showCreateSheet by remember { mutableStateOf(false) }

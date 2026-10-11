@@ -114,6 +114,13 @@ class SettingsPreferences(
         private val KEY_BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
         // 底栏仅显示图标模式，默认 false
         private val KEY_BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
+        // 冷启动落地页：home 主页、first 底栏第一页、last 上次关闭所在页，默认 home
+        private val KEY_COLD_START_TAB = stringPreferencesKey("cold_start_tab")
+        // 上次关闭时所在的根 tab key，供冷启动 last 选项使用；未记录过为空
+        private val KEY_LAST_ROOT_TAB = stringPreferencesKey("last_root_tab")
+        const val COLD_START_HOME = "home"
+        const val COLD_START_FIRST = "first"
+        const val COLD_START_LAST = "last"
         // 启用 SuperLyric 实时歌词，默认 false
         private val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
         // 启用 LyricInfo 系统歌词注入，默认 true
@@ -382,6 +389,26 @@ class SettingsPreferences(
     suspend fun saveBottomBarIconOnly(iconOnly: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_BOTTOM_BAR_ICON_ONLY] = iconOnly
+        }
+    }
+
+    // 冷启动落地页 Flow
+    val coldStartTab: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_COLD_START_TAB] ?: COLD_START_HOME
+    }
+
+    suspend fun saveColdStartTab(value: String) {
+        dataStore.edit { prefs ->
+            prefs[KEY_COLD_START_TAB] = value
+        }
+    }
+
+    // 上次关闭时所在的根 tab Flow（未记录过为 null）
+    val lastRootTab: Flow<String?> = dataStore.data.map { it[KEY_LAST_ROOT_TAB] }
+
+    suspend fun saveLastRootTab(key: String?) {
+        dataStore.edit { prefs ->
+            if (key == null) prefs.remove(KEY_LAST_ROOT_TAB) else prefs[KEY_LAST_ROOT_TAB] = key
         }
     }
 

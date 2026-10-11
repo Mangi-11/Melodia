@@ -116,6 +116,9 @@ class SettingsViewModel(
 
     val bottomBarIconOnly = settingsPreferences.bottomBarIconOnly.asState(false)
 
+    // 冷启动落地页：home 主页、first 底栏第一页、last 上次关闭所在页
+    val coldStartTab = settingsPreferences.coldStartTab.asState(SettingsPreferences.COLD_START_HOME)
+
     val playerPageMode = settingsPreferences.playerPageMode.asState(SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
 
     val sidePlayerPinned = settingsPreferences.sidePlayerPinned.asState(true)
@@ -427,6 +430,8 @@ class SettingsViewModel(
     fun updateBottomBarIconOnly(iconOnly: Boolean) = launchSave {
         settingsPreferences.saveBottomBarIconOnly(iconOnly)
     }
+
+    fun updateColdStartTab(value: String) = launchSave { settingsPreferences.saveColdStartTab(value) }
 
     fun updatePlayerPageMode(mode: String) = launchSave { settingsPreferences.savePlayerPageMode(mode) }
 
