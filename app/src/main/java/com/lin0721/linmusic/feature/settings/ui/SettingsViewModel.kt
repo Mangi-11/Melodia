@@ -116,8 +116,8 @@ class SettingsViewModel(
 
     val bottomBarIconOnly = settingsPreferences.bottomBarIconOnly.asState(false)
 
-    // 冷启动落地页：home 主页、first 底栏第一页、last 上次关闭所在页
-    val coldStartTab = settingsPreferences.coldStartTab.asState(SettingsPreferences.COLD_START_HOME)
+    // 启动默认打开音乐库
+    val startInLibrary = settingsPreferences.startInLibrary.asState(false)
 
     val playerPageMode = settingsPreferences.playerPageMode.asState(SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
 
@@ -431,7 +431,7 @@ class SettingsViewModel(
         settingsPreferences.saveBottomBarIconOnly(iconOnly)
     }
 
-    fun updateColdStartTab(value: String) = launchSave { settingsPreferences.saveColdStartTab(value) }
+    fun updateStartInLibrary(enabled: Boolean) = launchSave { settingsPreferences.saveStartInLibrary(enabled) }
 
     fun updatePlayerPageMode(mode: String) = launchSave { settingsPreferences.savePlayerPageMode(mode) }
 

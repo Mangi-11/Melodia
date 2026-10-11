@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -43,30 +41,20 @@ import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
-import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.ui.components.MelodiaButton
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.MelodiaSwitch
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
-// 冷启动落地页选项
-private val ColdStartOptions = listOf(
-    SettingsPreferences.COLD_START_HOME to "主页",
-    SettingsPreferences.COLD_START_FIRST to "底栏首页",
-    SettingsPreferences.COLD_START_LAST to "上次使用"
-)
-
-// 底部导航栏自定义弹层：支持拖拽排序、显隐切换、数量限制拦截、仅图标模式与冷启动落地页
+// 底部导航栏自定义弹层：支持拖拽排序、显隐切换、数量限制拦截及仅图标模式
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomBarCustomizationSheet(
     layout: List<BottomBarItemSetting>,
     iconOnly: Boolean,
-    coldStartTab: String,
     onLayoutChange: (List<BottomBarItemSetting>) -> Unit,
     onIconOnlyChange: (Boolean) -> Unit,
-    onColdStartChange: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -171,46 +159,6 @@ fun BottomBarCustomizationSheet(
                 )
             }
 
-            // 冷启动落地页
-            Text(
-                text = "冷启动页面",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = MelodiaSpacing.sm)
-            )
-            Text(
-                text = "下次冷启动时默认打开的页面",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-            ColdStartOptions.forEach { (key, label) ->
-                val selected = coldStartTab == key
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onColdStartChange(key) }
-                        .padding(vertical = MelodiaSpacing.xs, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = label,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        fontSize = 15.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (selected) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-
             HorizontalDivider(
                 color = Color.White.copy(alpha = 0.08f),
                 modifier = Modifier.padding(vertical = MelodiaSpacing.xs)
@@ -261,10 +209,8 @@ fun BottomBarCustomizationSheet(
                     onClick = {
                         commit(BottomBarLayout.DEFAULT)
                         onIconOnlyChange(false)
-                        onColdStartChange(SettingsPreferences.COLD_START_HOME)
                     },
-                    enabled = draggedItem == null &&
-                        (items != BottomBarLayout.DEFAULT || iconOnly || coldStartTab != SettingsPreferences.COLD_START_HOME)
+                    enabled = draggedItem == null && (items != BottomBarLayout.DEFAULT || iconOnly)
                 ) {
                     Text("恢复默认")
                 }

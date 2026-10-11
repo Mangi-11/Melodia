@@ -154,17 +154,6 @@ class MelodiaNavigationState(
         defaultRootTab = screen
     }
 
-    // 冷启动落地页：按用户设置覆盖启动时激活的根 tab（仅在进程启动时调用一次，不影响后续返回逻辑）
-    fun applyColdStartTab(screen: Screen) {
-        if (!isTopLevelTab(screen)) return
-        resetStackToRoot(screen)
-        activeTab = screen
-        if (screen == Screen.Home) {
-            homeTab = TAB_ALL
-            showMusicNewWorks = false
-        }
-    }
-
     var activeTab by mutableStateOf(initialActiveTab)
         private set
 
