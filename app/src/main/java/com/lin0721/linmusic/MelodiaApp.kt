@@ -37,6 +37,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,14 +80,15 @@ import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.update.UpdateManager
 import com.lin0721.linmusic.core.update.UpdateUiState
-import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
+import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
 import com.lin0721.linmusic.feature.settings.ui.UpdateDialog
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
+import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import com.lin0721.linmusic.core.player.PlayerManager
@@ -190,6 +192,16 @@ fun MelodiaApp() {
             else -> Screen.Home
         }
         navigation.updateDefaultRootTab(rootScreen)
+    }
+
+    // 冷启动落地页：开启「启动默认打开音乐库」时落地音乐库，仅冷启动时生效一次
+    var coldStartApplied by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (coldStartApplied) return@LaunchedEffect
+        if (settingsPreferences.startInLibrary.first()) {
+            navigation.openTab(Screen.Library)
+        }
+        coldStartApplied = true
     }
 
     var showCreateSheet by remember { mutableStateOf(false) }

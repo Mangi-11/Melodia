@@ -116,6 +116,9 @@ class SettingsViewModel(
 
     val bottomBarIconOnly = settingsPreferences.bottomBarIconOnly.asState(false)
 
+    // 启动默认打开音乐库
+    val startInLibrary = settingsPreferences.startInLibrary.asState(false)
+
     val playerPageMode = settingsPreferences.playerPageMode.asState(SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
 
     val sidePlayerPinned = settingsPreferences.sidePlayerPinned.asState(true)
@@ -427,6 +430,8 @@ class SettingsViewModel(
     fun updateBottomBarIconOnly(iconOnly: Boolean) = launchSave {
         settingsPreferences.saveBottomBarIconOnly(iconOnly)
     }
+
+    fun updateStartInLibrary(enabled: Boolean) = launchSave { settingsPreferences.saveStartInLibrary(enabled) }
 
     fun updatePlayerPageMode(mode: String) = launchSave { settingsPreferences.savePlayerPageMode(mode) }
 
