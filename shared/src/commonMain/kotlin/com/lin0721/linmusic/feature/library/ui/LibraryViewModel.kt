@@ -23,6 +23,9 @@ import com.lin0721.linmusic.core.playlistmutation.PlaylistMutationEvent
 import com.lin0721.linmusic.core.network.OnlineStateProvider
 import com.lin0721.linmusic.core.network.ResourceProvider
 import com.lin0721.linmusic.core.network.toUserMessage
+import com.lin0721.linmusic.core.player.PlaySource
+import com.lin0721.linmusic.core.player.QueueItem
+import com.lin0721.linmusic.feature.playlist.domain.UpdatePlaylistCoverUseCase
 import com.lin0721.linmusic.feature.playlist.data.PlaylistRepository
 import com.lin0721.linmusic.feature.recent.data.RecentRepository
 import com.lin0721.linmusic.feature.artist.data.ArtistRepository
@@ -85,7 +88,8 @@ class LibraryViewModel(
     private val songDownloadManager: SongDownloader,
     private val recentRepository: RecentRepository,
     private val playbackRepository: PlaybackRepository,
-    private val onlineState: OnlineStateProvider
+    private val onlineState: OnlineStateProvider,
+    private val updatePlaylistCoverUseCase: UpdatePlaylistCoverUseCase
 ) : ViewModel() {
 
     private val _pinnedIds = MutableStateFlow<Set<String>>(getPinnedIdsFromPrefs())
@@ -165,6 +169,12 @@ class LibraryViewModel(
                     is PlaylistMutationEvent.CoverUpdated -> {
                         loadLibraryData()
                     }
+                    is PlaylistMutationEvent.Created -> {
+                        loadLibraryData()
+                    }
+                    is PlaylistMutationEvent.Subscribed -> {
+                        loadLibraryData()
+                    }
                 }
             }
         }
@@ -199,7 +209,7 @@ class LibraryViewModel(
 
     private fun getSortOrderFromPrefs(): LibrarySortOrder {
         val raw = libraryPreferences.sortOrderName()
-        return raw?.let { runCatching { LibrarySortOrder.valueOf(it) }.getOrNull() } ?: LibrarySortOrder.RECENTLY_PLAYED
+        return raw?.let { runCatching { LibrarySortOrder.valueOf(it) }.getOrNull() } ?: LibrarySortOrder.CUSTOM
     }
 
     private fun saveSortOrderToPrefs(order: LibrarySortOrder) {
@@ -259,6 +269,15 @@ class LibraryViewModel(
                 }
 
                 val playlists = playlistsDeferred.await()
+                if (playlists.isNotEmpty()) {
+                    saveCustomPlaylistOrderToPrefs(playlists.map { it.id.toString() })
+                    val cloudPinnedIds = playlists.filter { it.top }.map { it.id.toString() }.toSet()
+                    val ownedPlaylistIds = playlists.filter { it.userId == profile.uid || it.creator?.userId == profile.uid }.map { it.id.toString() }.toSet()
+                    val currentLocalPinned = getPinnedIdsFromPrefs()
+                    val updatedPinned = (currentLocalPinned - ownedPlaylistIds) + cloudPinnedIds
+                    _pinnedIds.value = updatedPinned
+                    savePinnedIdsToPrefs(updatedPinned)
+                }
                 val artistsResult = artistsDeferred.await()
                 val artists = artistsResult?.getOrNull() ?: emptyList()
                 val artistsError = artistsResult?.exceptionOrNull()
@@ -462,10 +481,54 @@ class LibraryViewModel(
         savePinnedIdsToPrefs(currentPinned)
         applyFilterAndSort()
 
-        val title = (_uiState.value as? LibraryUiState.Success)?.allItems?.firstOrNull { it.id == itemId }?.title
+        val item = (_uiState.value as? LibraryUiState.Success)?.allItems?.firstOrNull { it.id == itemId }
+        val title = item?.title
         if (title != null) {
             viewModelScope.launch {
                 _toastEvent.emit("已${if (willPin) "置顶" else "取消置顶"}: $title")
+            }
+        }
+
+        val playlistId = itemId.toLongOrNull()
+        if (playlistId != null && playlistId > 0 && item?.type == LibraryItemType.PLAYLIST) {
+            if (item.isOwnedByMe) {
+                viewModelScope.launch {
+                    userPlaylistRepository.setPlaylistTop(playlistId, willPin).collect { result ->
+                        result.onSuccess {
+                            syncPlaylistOrderToCloud()
+                        }.onFailure { e ->
+                            AppLogger.w(TAG, "云端歌单置顶状态同步失败", e)
+                            _toastEvent.emit(e.toUserMessage(resourceProvider))
+                        }
+                    }
+                }
+            } else {
+                syncPlaylistOrderToCloud()
+            }
+        }
+    }
+
+    private fun syncPlaylistOrderToCloud() {
+        val state = _uiState.value as? LibraryUiState.Success ?: return
+        val currentPinned = _pinnedIds.value
+        val allPlaylists = state.allItems.filter { it.type == LibraryItemType.PLAYLIST }
+        val customOrderMap = getCustomPlaylistOrderFromPrefs().mapIndexed { index, id -> id to index }.toMap()
+
+        val pinnedPlaylists = allPlaylists.filter { currentPinned.contains(it.id) }
+        val unpinnedPlaylists = allPlaylists.filter { !currentPinned.contains(it.id) }
+            .sortedWith(compareBy<LibraryItem> { customOrderMap[it.id] ?: -1 }.thenByDescending { it.updateTime })
+
+        val orderedPlaylists = pinnedPlaylists + unpinnedPlaylists
+        val validIds = orderedPlaylists.mapNotNull { it.id.toLongOrNull() }.filter { it > 0 }
+        if (validIds.isEmpty()) return
+
+        saveCustomPlaylistOrderToPrefs(orderedPlaylists.map { it.id })
+
+        viewModelScope.launch {
+            userPlaylistRepository.updatePlaylistOrder(validIds).collect { result ->
+                result.onFailure { e ->
+                    AppLogger.w(TAG, "同步歌单顺序至云端失败", e)
+                }
             }
         }
     }
@@ -475,6 +538,7 @@ class LibraryViewModel(
         viewModelScope.launch {
             createRepository.createPlaylist(name, playlistPrivacyOf(isPrivate)).collect { result ->
                 result.onSuccess { playlist ->
+                    playlistMutationBus.emit(PlaylistMutationEvent.Created(playlist.id))
                     loadLibraryData()
                     _toastEvent.emit("歌单创建成功！")
                     onCreated?.invoke(playlist.id, playlist.name)
@@ -529,8 +593,18 @@ class LibraryViewModel(
         _sortOrder.value = LibrarySortOrder.CUSTOM
         saveSortOrderToPrefs(LibrarySortOrder.CUSTOM)
         applyFilterAndSort()
+
+        val validPlaylistIds = playlistIds.mapNotNull { it.toLongOrNull() }.filter { it > 0 }
+        if (validPlaylistIds.isEmpty()) return
+
         viewModelScope.launch {
-            _toastEvent.emit("歌单排序已保存")
+            userPlaylistRepository.updatePlaylistOrder(validPlaylistIds).collect { result ->
+                result.onSuccess {
+                    _toastEvent.emit("歌单排序已保存")
+                }.onFailure { e ->
+                    _toastEvent.emit(e.toUserMessage(resourceProvider))
+                }
+            }
         }
     }
 
@@ -563,6 +637,7 @@ class LibraryViewModel(
             playlistRepository.subscribePlaylist(playlistId, subscribe = false).collect { result ->
                 result.onSuccess {
                     _toastEvent.emit("已取消收藏歌单")
+                    playlistMutationBus.emit(PlaylistMutationEvent.Subscribed(playlistId, false))
                     loadLibraryData()
                 }.onFailure { e ->
                     _toastEvent.emit(e.toUserMessage(resourceProvider))
@@ -637,6 +712,174 @@ class LibraryViewModel(
                 }.onFailure { e ->
                     _toastEvent.emit(e.toUserMessage(resourceProvider))
                 }
+            }
+        }
+    }
+
+    // 播放媒体库条目（歌单、专辑或艺人热门曲）
+    fun playLibraryItem(item: LibraryItem) {
+        val id = item.id.toLongOrNull()
+        if (id == null) {
+            viewModelScope.launch { _toastEvent.emit("数据信息不完整，无法播放") }
+            return
+        }
+        viewModelScope.launch {
+            when (item.type) {
+                LibraryItemType.PLAYLIST, LibraryItemType.ALBUM -> {
+                    val isAlbum = item.type == LibraryItemType.ALBUM
+                    val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
+                    val detail = detailFlow.first().getOrElse {
+                        _toastEvent.emit(it.toUserMessage(resourceProvider))
+                        return@launch
+                    }
+                    val tracks = if (!isAlbum && detail.trackIds.size > detail.tracks.size) {
+                        playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
+                    } else {
+                        detail.tracks
+                    }
+                    if (tracks.isEmpty()) {
+                        _toastEvent.emit(if (isAlbum) "该专辑没有可播放的歌曲" else "该歌单没有可播放的歌曲")
+                        return@launch
+                    }
+                    val queueItems = tracks.map { QueueItem(it.id, it.name, it.ar.joinToString("/") { ar -> ar.name }, it.al.picUrl) }
+                    val kind = if (isAlbum) PlaySource.Kind.ALBUM else PlaySource.Kind.PLAYLIST
+                    playerManager.playQueue(queueItems, 0, detail.name, PlaySource(kind, detail.id, detail.name, detail.coverImgUrl))
+                }
+                LibraryItemType.ARTIST -> {
+                    artistRepository.getArtistTopSongs(id).first().onSuccess { songs ->
+                        if (songs.isEmpty()) {
+                            _toastEvent.emit("该歌手暂无热门歌曲")
+                            return@launch
+                        }
+                        val queueItems = songs.map { QueueItem(it.id, it.name, it.ar.joinToString("/") { ar -> ar.name }, it.al.picUrl) }
+                        playerManager.playQueue(queueItems, 0, item.title)
+                    }.onFailure { e ->
+                        _toastEvent.emit(e.toUserMessage(resourceProvider))
+                    }
+                }
+            }
+        }
+    }
+
+    // 全部加入下一首播放
+    fun addLibraryItemToPlayNext(item: LibraryItem) {
+        val id = item.id.toLongOrNull()
+        if (id == null) {
+            viewModelScope.launch { _toastEvent.emit("数据信息不完整，无法添加到下一首") }
+            return
+        }
+        viewModelScope.launch {
+            when (item.type) {
+                LibraryItemType.PLAYLIST, LibraryItemType.ALBUM -> {
+                    val isAlbum = item.type == LibraryItemType.ALBUM
+                    val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
+                    val detail = detailFlow.first().getOrElse {
+                        _toastEvent.emit(it.toUserMessage(resourceProvider))
+                        return@launch
+                    }
+                    val tracks = if (!isAlbum && detail.trackIds.size > detail.tracks.size) {
+                        playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
+                    } else {
+                        detail.tracks
+                    }
+                    if (tracks.isEmpty()) {
+                        _toastEvent.emit(if (isAlbum) "该专辑没有可播放的歌曲" else "该歌单没有可播放的歌曲")
+                        return@launch
+                    }
+                    val queueItems = tracks.map { QueueItem(it.id, it.name, it.ar.joinToString("/") { ar -> ar.name }, it.al.picUrl) }
+                    playerManager.addToPlayNext(queueItems)
+                    _toastEvent.emit("已添加到下一首播放")
+                }
+                LibraryItemType.ARTIST -> {
+                    artistRepository.getArtistTopSongs(id).first().onSuccess { songs ->
+                        if (songs.isEmpty()) {
+                            _toastEvent.emit("该歌手暂无热门歌曲")
+                            return@launch
+                        }
+                        val queueItems = songs.map { QueueItem(it.id, it.name, it.ar.joinToString("/") { ar -> ar.name }, it.al.picUrl) }
+                        playerManager.addToPlayNext(queueItems)
+                        _toastEvent.emit("已添加到下一首播放")
+                    }.onFailure { e ->
+                        _toastEvent.emit(e.toUserMessage(resourceProvider))
+                    }
+                }
+            }
+        }
+    }
+
+    // 更新自建歌单信息
+    fun updatePlaylistInfo(
+        id: Long,
+        originalName: String,
+        newName: String,
+        originalDesc: String?,
+        newDesc: String,
+        coverBytes: ByteArray?,
+        onComplete: (Boolean) -> Unit
+    ) {
+        val nameChanged = newName.isNotBlank() && newName != originalName
+        val descChanged = newDesc != (originalDesc ?: "")
+
+        if (!nameChanged && !descChanged && coverBytes == null) {
+            onComplete(true)
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                if (coverBytes != null) {
+                    val newCoverUrl = updatePlaylistCoverUseCase(id, coverBytes).getOrElse { e ->
+                        _toastEvent.emit(e.toUserMessage(resourceProvider))
+                        onComplete(false)
+                        return@launch
+                    }
+                    playlistMutationBus.emit(PlaylistMutationEvent.CoverUpdated(id, newCoverUrl))
+                    if (!nameChanged && !descChanged) {
+                        _toastEvent.emit("封面已更新")
+                        onComplete(true)
+                        return@launch
+                    }
+                }
+
+                val nameDeferred = if (nameChanged) {
+                    async { playlistRepository.renamePlaylist(id, newName).first() }
+                } else null
+
+                val descDeferred = if (descChanged) {
+                    async { playlistRepository.updateDescription(id, newDesc).first() }
+                } else null
+
+                val nameResult = nameDeferred?.await()
+                val descResult = descDeferred?.await()
+
+                val nameFailed = nameResult?.isFailure == true
+                val descFailed = descResult?.isFailure == true
+
+                when {
+                    nameFailed && descFailed -> {
+                        _toastEvent.emit("修改歌单名称和简介失败")
+                        onComplete(false)
+                    }
+                    nameFailed -> {
+                        descResult?.getOrNull()?.let { playlistMutationBus.emit(PlaylistMutationEvent.DescriptionUpdated(id, newDesc)) }
+                        _toastEvent.emit("修改歌单名称失败")
+                        onComplete(false)
+                    }
+                    descFailed -> {
+                        nameResult?.getOrNull()?.let { playlistMutationBus.emit(PlaylistMutationEvent.Renamed(id, newName)) }
+                        _toastEvent.emit("修改歌单简介失败")
+                        onComplete(false)
+                    }
+                    else -> {
+                        if (nameChanged) playlistMutationBus.emit(PlaylistMutationEvent.Renamed(id, newName))
+                        if (descChanged) playlistMutationBus.emit(PlaylistMutationEvent.DescriptionUpdated(id, newDesc))
+                        _toastEvent.emit("歌单信息已更新")
+                        onComplete(true)
+                    }
+                }
+            } catch (e: Exception) {
+                _toastEvent.emit(e.toUserMessage(resourceProvider))
+                onComplete(false)
             }
         }
     }

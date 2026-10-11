@@ -49,7 +49,10 @@ fun LibraryRail(
             hoverIcon = Icons.Rounded.KeyboardDoubleArrowRight,
             hint = "展开音乐库",
             showTitle = false
-        ) { onModeChange(LibraryMode.DEFAULT) }
+        ) {
+            viewModel.loadLibraryData()
+            onModeChange(LibraryMode.DEFAULT)
+        }
         if (!isLoggedIn) return@Column
         Spacer(Modifier.height(12.dp))
         LibraryCreateButton(viewModel, pill = false)

@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +60,7 @@ fun FullPlayerCoverArt(
     // 平板常驻面板用：侧栏与全屏互切，为 null 时不显示该按钮
     onToggleSidebarFullscreen: (() -> Unit)? = null,
     isSidebarFullscreen: Boolean = false,
+    onPlaylistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onCancelSwipe: () -> Boolean = { false }
 ) {
@@ -74,6 +77,7 @@ fun FullPlayerCoverArt(
             onMoreClick = onMoreClick,
             onToggleSidebarFullscreen = onToggleSidebarFullscreen,
             isSidebarFullscreen = isSidebarFullscreen,
+            onPlaylistClick = onPlaylistClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = MelodiaSpacing.lg)
@@ -109,6 +113,7 @@ fun FullPlayerSourceBar(
     isSidebarFullscreen: Boolean,
     onFullscreenLyricsClick: (() -> Unit)? = null,
     podcastRadioName: String = "",
+    onPlaylistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -177,7 +182,13 @@ fun FullPlayerSourceBar(
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
+                modifier = if (onPlaylistClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onPlaylistClick)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                } else Modifier
             ) {
                 Text(
                     text = sourceText,

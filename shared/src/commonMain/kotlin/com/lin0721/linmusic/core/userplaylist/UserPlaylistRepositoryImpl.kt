@@ -18,4 +18,32 @@ class UserPlaylistRepositoryImpl(
                 transform = { it.playlist }
             )
         }
+
+    override fun updatePlaylistOrder(playlistIds: List<Long>): Flow<Result<Unit>> = apiFlow(
+        request = {
+            apiService.updatePlaylistOrder(
+                PlaylistOrderUpdateRequest(
+                    ids = playlistIds.joinToString(separator = ",", prefix = "[", postfix = "]") { "$it" }
+                )
+            )
+        },
+        isSuccess = { it.isSuccess },
+        code = { it.code },
+        msg = { it.message },
+        transform = { Unit }
+    )
+
+    override fun setPlaylistTop(playlistId: Long, top: Boolean): Flow<Result<Unit>> = apiFlow(
+        request = {
+            if (top) {
+                apiService.topPlaylist(PlaylistTopRequest(id = playlistId))
+            } else {
+                apiService.cancelTopPlaylist(PlaylistTopRequest(id = playlistId))
+            }
+        },
+        isSuccess = { it.isSuccess },
+        code = { it.code },
+        msg = { it.message },
+        transform = { Unit }
+    )
 }

@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 sealed interface PlaylistMutationEvent {
+    data class Created(val playlistId: Long) : PlaylistMutationEvent
+    data class Subscribed(val playlistId: Long, val isSubscribed: Boolean) : PlaylistMutationEvent
     data class Renamed(val playlistId: Long, val newName: String) : PlaylistMutationEvent
     data class DescriptionUpdated(val playlistId: Long, val newDesc: String) : PlaylistMutationEvent
     data class Deleted(val playlistId: Long) : PlaylistMutationEvent

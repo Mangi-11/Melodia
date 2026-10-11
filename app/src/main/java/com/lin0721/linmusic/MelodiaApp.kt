@@ -80,6 +80,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.update.UpdateManager
 import com.lin0721.linmusic.core.update.UpdateUiState
 import com.lin0721.linmusic.core.preferences.BottomBarItem
+import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
@@ -125,6 +126,7 @@ private class PanelRevealShape(
 @Composable
 fun MelodiaApp() {
     val viewModel: HomeViewModel = koinViewModel()
+    val libraryViewModel: LibraryViewModel = koinViewModel()
     val settingsPreferences: SettingsPreferences = koinInject()
     val showCreateEntry by settingsPreferences.showCreateEntry.collectAsStateWithLifecycle(initialValue = true)
     val bottomBarLayout by settingsPreferences.bottomBarLayout.collectAsStateWithLifecycle(initialValue = BottomBarLayout.DEFAULT)
@@ -526,7 +528,12 @@ fun MelodiaApp() {
                             onMiniPlayerLikeClick = onMiniPlayerLikeClick,
                             miniPlayerLikeMode = miniPlayerLikeMode,
                             onCreateDismiss = { showCreateSheet = false },
-                            onNavigate = { navigation.openTab(it) },
+                            onNavigate = { screen ->
+                                navigation.openTab(screen)
+                                if (screen == Screen.Library) {
+                                    libraryViewModel.loadLibraryData()
+                                }
+                            },
                             onCreateClick = { showCreateSheet = !showCreateSheet },
                             showCreateEntry = showCreateEntry,
                             bottomBarLayout = bottomBarLayout,
@@ -627,6 +634,10 @@ fun MelodiaApp() {
                             isPanelFullscreen = false
                             navigation.openPlaylist(albumId, isAlbum = true)
                         },
+                        onPlaylistClick = { playlistId ->
+                            isPanelFullscreen = false
+                            navigation.openPlaylist(playlistId, isAlbum = false)
+                        },
                         onNavigateToProfile = { uid ->
                             isPanelFullscreen = false
                             navigation.openProfile(uid)
@@ -669,6 +680,12 @@ fun MelodiaApp() {
             onAlbumClick = { albumId ->
                 navigation.navigateFromPlayer(currentTrack?.mediaId) {
                     navigation.openPlaylist(albumId, isAlbum = true)
+                }
+                playerSheet.animateTo(false, 0f)
+            },
+            onPlaylistClick = { playlistId ->
+                navigation.navigateFromPlayer(currentTrack?.mediaId) {
+                    navigation.openPlaylist(playlistId, isAlbum = false)
                 }
                 playerSheet.animateTo(false, 0f)
             },

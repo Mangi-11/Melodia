@@ -59,6 +59,9 @@ fun LazyListScope.fullPlayerPlaybackSection(
     onMoreClick: () -> Unit,
     onToggleLike: () -> Unit,
     onArtistClick: () -> Unit,
+    onAlbumClick: (() -> Unit)? = null,
+    onPlaylistClick: (() -> Unit)? = null,
+    onMiniLyricClick: (() -> Unit)? = null,
     onSeek: (Long) -> Unit,
     onTogglePlay: () -> Unit,
     onPlayNext: () -> Unit,
@@ -103,6 +106,7 @@ fun LazyListScope.fullPlayerPlaybackSection(
                 baseCoverPadding = baseCoverPadding,
                 onToggleSidebarFullscreen = onToggleSidebarFullscreen,
                 isSidebarFullscreen = isSidebarFullscreen,
+                onPlaylistClick = onPlaylistClick,
                 onCancelSwipe = onCancelSwipe
             )
         }
@@ -117,6 +121,7 @@ fun LazyListScope.fullPlayerPlaybackSection(
             isLiked = songState.isLiked,
             onToggleLike = onToggleLike,
             onArtistClick = onArtistClick,
+            onAlbumClick = onAlbumClick,
             podcast = podcast,
             onToggleSubscribe = onToggleSubscribe
         )
@@ -139,7 +144,8 @@ fun LazyListScope.fullPlayerPlaybackSection(
             MiniLyricLine(
                 lyrics = songState.lyrics,
                 currentLyricIndex = currentLyricIndex,
-                isPlaying = isPlaying
+                isPlaying = isPlaying,
+                onClick = onMiniLyricClick
             )
         }
     }

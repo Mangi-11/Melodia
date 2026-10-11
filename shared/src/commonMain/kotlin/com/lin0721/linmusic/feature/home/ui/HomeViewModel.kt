@@ -38,6 +38,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.lin0721.linmusic.core.download.DownloadTrackInfo
+import com.lin0721.linmusic.core.download.SongDownloader
+import com.lin0721.linmusic.core.download.toToastMessage
+import com.lin0721.linmusic.core.download.yearFromEpochMillis
+import com.lin0721.linmusic.core.playlistmutation.PlaylistMutationBus
+import com.lin0721.linmusic.core.playlistmutation.PlaylistMutationEvent
+import com.lin0721.linmusic.core.userplaylist.UserPlaylistRepository
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.PlaySource
@@ -60,7 +67,10 @@ class HomeViewModel(
     private val songCollectDelegate: SongCollectDelegate,
     private val podcastPlayer: PodcastPlayerController,
     private val playlistRepository: PlaylistRepository,
-    private val onlineState: OnlineStateProvider
+    private val onlineState: OnlineStateProvider,
+    private val userPlaylistRepository: UserPlaylistRepository,
+    private val songDownloadManager: SongDownloader,
+    private val playlistMutationBus: PlaylistMutationBus
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -82,6 +92,10 @@ class HomeViewModel(
 
     // 迷你条的播客订阅按钮，状态与全屏播放页共用
     val podcastState: StateFlow<PodcastPlayerState> = podcastPlayer.state
+
+    // 用户已创建与已收藏的歌单 ID 集合，供首页推荐卡片和最近播放判断是否展示“收藏歌单”
+    private val _subscribedPlaylistIds = MutableStateFlow<Set<Long>>(emptySet())
+    val subscribedPlaylistIds: StateFlow<Set<Long>> = _subscribedPlaylistIds.asStateFlow()
 
     fun toggleSubscribe() = podcastPlayer.toggleSubscribe { _toastEvent.emit(it) }
 
@@ -107,6 +121,13 @@ class HomeViewModel(
             userProfile.collect { profile ->
                 if (profile != null) {
                     loadLikedSongIdsUseCase()
+                    userPlaylistRepository.getUserPlaylists(profile.uid).collect { result ->
+                        result.getOrNull()?.let { list ->
+                            _subscribedPlaylistIds.value = list.map { it.id }.toSet()
+                        }
+                    }
+                } else {
+                    _subscribedPlaylistIds.value = emptySet()
                 }
             }
         }
@@ -301,6 +322,78 @@ class HomeViewModel(
         }
     }
 
+    // 歌单或专辑全部加入下一首播放
+    fun addCollectionToPlayNext(id: Long, isAlbum: Boolean) {
+        viewModelScope.launch {
+            val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
+            val detail = detailFlow.first().getOrElse {
+                _toastEvent.emit(it.toUserMessage(resourceProvider))
+                return@launch
+            }
+            val tracks = if (isAlbum) {
+                detail.tracks
+            } else {
+                playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
+            }
+            if (tracks.isEmpty()) {
+                _toastEvent.emit("暂无可播放的歌曲")
+                return@launch
+            }
+            val queueItems = tracks.map { QueueItem(it.id, it.name, it.ar.joinToString { ar -> ar.name }, it.al.picUrl) }
+            playerManager.addToPlayNext(queueItems)
+            _toastEvent.emit("已添加至下一首播放")
+        }
+    }
+
+    // 批量下载歌单或专辑
+    fun downloadCollection(id: Long, isAlbum: Boolean, level: String) {
+        viewModelScope.launch {
+            val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
+            val detail = detailFlow.first().getOrElse {
+                _toastEvent.emit(it.toUserMessage(resourceProvider))
+                return@launch
+            }
+            val tracks = if (isAlbum) {
+                detail.tracks
+            } else {
+                playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
+            }
+            if (tracks.isEmpty()) {
+                _toastEvent.emit(if (isAlbum) "该专辑没有可下载的歌曲" else "该歌单没有可下载的歌曲")
+                return@launch
+            }
+            val downloadTracks = tracks.map { track ->
+                DownloadTrackInfo(
+                    track.id, track.name, track.ar.joinToString("/") { it.name },
+                    track.al.name, track.al.picUrl.takeIf { it.isNotBlank() },
+                    yearFromEpochMillis(track.publishTime)
+                )
+            }
+            val enqueueResult = songDownloadManager.enqueueBatch(
+                downloadTracks, level, batchTag = "home_collection_$id", batchLabel = detail.name
+            )
+            _toastEvent.emit(enqueueResult.toToastMessage())
+        }
+    }
+
+    // 收藏歌单
+    fun subscribePlaylist(playlistId: Long) {
+        viewModelScope.launch {
+            playlistRepository.subscribePlaylist(playlistId, subscribe = true).collect { result ->
+                result.fold(
+                    onSuccess = {
+                        _subscribedPlaylistIds.value = _subscribedPlaylistIds.value + playlistId
+                        playlistMutationBus.emit(PlaylistMutationEvent.Subscribed(playlistId, true))
+                        _toastEvent.emit("已收藏歌单")
+                    },
+                    onFailure = {
+                        _toastEvent.emit(it.toUserMessage(resourceProvider))
+                    }
+                )
+            }
+        }
+    }
+
     // 播放货架里的单曲，队列取同一货架内的全部歌曲卡片，播完能自动接续下一首
     fun playShelfSong(shelfTitle: String, songs: List<HomeCard.Song>, song: HomeCard.Song) {
         val queueItems = songs.map { QueueItem(it.id, it.title, "", it.coverUrl) }
@@ -308,10 +401,20 @@ class HomeViewModel(
         playerManager.playQueue(queueItems, startIndex, playContext = shelfTitle)
     }
 
+    fun addShelfSongToPlayNext(song: HomeCard.Song) {
+        playerManager.addToPlayNext(listOf(QueueItem(song.id, song.title, "", song.coverUrl)))
+        viewModelScope.launch { _toastEvent.emit("已添加至下一首播放") }
+    }
+
     fun playShelfVoice(shelfTitle: String, voices: List<HomeCard.Voice>, voice: HomeCard.Voice) {
         val queueItems = voices.map { QueueItem(it.songId, it.title, it.caption, it.coverUrl) }
         val startIndex = voices.indexOf(voice).coerceAtLeast(0)
         playerManager.playQueue(queueItems, startIndex, playContext = shelfTitle)
+    }
+
+    fun addShelfVoiceToPlayNext(voice: HomeCard.Voice) {
+        playerManager.addToPlayNext(listOf(QueueItem(voice.songId, voice.title, voice.caption, voice.coverUrl)))
+        viewModelScope.launch { _toastEvent.emit("已添加至下一首播放") }
     }
 
     fun togglePlayPause() {

@@ -29,6 +29,7 @@ fun SongInfo(
     isLiked: Boolean,
     onToggleLike: () -> Unit,
     onArtistClick: (() -> Unit)? = null,
+    onAlbumClick: (() -> Unit)? = null,
     // 播客节目：♡ 直接订阅所属电台
     podcast: PodcastPlayerState = PodcastPlayerState(),
     onToggleSubscribe: () -> Unit = {}
@@ -48,7 +49,9 @@ fun SongInfo(
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
-                modifier = Modifier.basicMarquee()
+                modifier = Modifier
+                    .basicMarquee()
+                    .then(if (onAlbumClick != null) Modifier.clickable(onClick = onAlbumClick) else Modifier)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(

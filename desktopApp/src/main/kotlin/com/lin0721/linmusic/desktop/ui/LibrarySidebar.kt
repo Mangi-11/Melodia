@@ -124,13 +124,14 @@ fun LibrarySidebar(
     val paneHover = remember { MutableInteractionSource() }
     val paneHovered by paneHover.collectIsHoveredAsState()
     Column(modifier.fillMaxSize().hoverable(paneHover).padding(top = 12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             LibraryTitleToggle(
                 baseIcon = null,
                 hoverIcon = Icons.Rounded.KeyboardDoubleArrowLeft,
                 hint = "收起音乐库",
                 showTitle = true,
-                iconRevealed = paneHovered
+                iconRevealed = paneHovered,
+                onTitleClick = { viewModel.loadLibraryData() }
             ) { onModeChange(LibraryMode.RAIL) }
             Spacer(Modifier.weight(1f))
             if (isLoggedIn) {
@@ -586,30 +587,52 @@ internal fun LibraryTitleToggle(
     hint: String,
     showTitle: Boolean,
     iconRevealed: Boolean = true,
+    onTitleClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
-    DesktopTooltip(hint, side = TooltipSide.Right) {
-        Row(
-            Modifier.clip(RoundedCornerShape(20.dp)).hoverable(source).pointerHoverIcon(PointerIcon.Hand)
-                .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val tint = if (hovered) DesktopColors.TextPrimary else DesktopColors.TextGray
-            // 图标默认隐藏，面板悬停时出现并把标题推开；图标自身悬停时换成收起/展开图标
-            HoverReveal(revealed = iconRevealed, reserveSpace = false) {
-                Box(Modifier.padding(end = if (showTitle) 8.dp else 0.dp).size(24.dp), contentAlignment = Alignment.Center) {
-                    if (baseIcon != null) {
-                        HoverReveal(revealed = !hovered) { Icon(baseIcon, null, tint = tint) }
-                        HoverReveal(revealed = hovered) { Icon(hoverIcon, null, tint = tint) }
-                    } else {
-                        Icon(hoverIcon, null, tint = tint)
+    val tint = if (hovered) DesktopColors.TextPrimary else DesktopColors.TextGray
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 图标默认隐藏，面板悬停时出现并把标题推开；图标自身悬停时换成收起/展开图标
+        HoverReveal(revealed = iconRevealed, reserveSpace = false) {
+            DesktopTooltip(hint, side = TooltipSide.Right) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(20.dp)).hoverable(source).pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.padding(end = if (showTitle) 4.dp else 0.dp).size(24.dp), contentAlignment = Alignment.Center) {
+                        if (baseIcon != null) {
+                            HoverReveal(revealed = !hovered) { Icon(baseIcon, null, tint = tint) }
+                            HoverReveal(revealed = hovered) { Icon(hoverIcon, null, tint = tint) }
+                        } else {
+                            Icon(hoverIcon, null, tint = tint)
+                        }
                     }
                 }
             }
-            if (showTitle) {
-                Text("音乐库", color = tint, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        if (showTitle) {
+            val titleSource = remember { MutableInteractionSource() }
+            val titleHovered by titleSource.collectIsHoveredAsState()
+            val titleTint = if (titleHovered) DesktopColors.TextPrimary else DesktopColors.TextGray
+            DesktopTooltip("刷新音乐库", side = TooltipSide.Bottom) {
+                Text(
+                    text = "音乐库",
+                    color = titleTint,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .hoverable(titleSource)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable { onTitleClick?.invoke() ?: onClick() }
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                )
             }
         }
     }

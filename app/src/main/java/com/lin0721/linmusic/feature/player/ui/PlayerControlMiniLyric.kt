@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -32,7 +33,8 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 fun MiniLyricLine(
     lyrics: List<LyricLine>,
     currentLyricIndex: Int,
-    isPlaying: Boolean
+    isPlaying: Boolean,
+    onClick: (() -> Unit)? = null
 ) {
     val isPureMusic = lyrics.size == 1 && lyrics[0].text == "纯音乐"
     val currentText = when {
@@ -45,6 +47,7 @@ fun MiniLyricLine(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = MelodiaSpacing.lg)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.CenterStart
     ) {

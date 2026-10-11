@@ -687,6 +687,9 @@ class PlaylistViewModel(
                     _uiState.update { state ->
                         if (state is PlaylistUiState.Success) state.copy(isSubscribed = targetSubscribe) else state
                     }
+                    if (!isAlbumMode) {
+                        playlistMutationBus.emit(PlaylistMutationEvent.Subscribed(id, targetSubscribe))
+                    }
                     _toastEvent.emit(if (targetSubscribe) "已收藏$resourceLabel" else "已取消收藏$resourceLabel")
                 }.onFailure { e ->
                     _toastEvent.emit(e.toUserMessage(resourceProvider))

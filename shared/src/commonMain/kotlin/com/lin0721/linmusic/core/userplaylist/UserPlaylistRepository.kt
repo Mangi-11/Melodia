@@ -6,4 +6,10 @@ import kotlinx.coroutines.flow.Flow
 interface UserPlaylistRepository {
 
     fun getUserPlaylists(uid: Long, limit: Int = 1000): Flow<Result<List<UserPlaylist>>>
+
+    // 更新用户歌单顺序并同步至云端
+    fun updatePlaylistOrder(playlistIds: List<Long>): Flow<Result<Unit>>
+
+    // 置顶或取消置顶自建歌单并同步至云端
+    fun setPlaylistTop(playlistId: Long, top: Boolean): Flow<Result<Unit>>
 }

@@ -21,6 +21,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
@@ -60,6 +61,8 @@ import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.melodiaNavigationBarBottomPadding
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaOrientationClass
+import com.lin0721.linmusic.core.player.PlaySource
+import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -87,6 +90,7 @@ fun FullPlayerScreen(
     isPlayerOpen: Boolean,
     onArtistClick: (Long) -> Unit,
     onAlbumClick: (Long) -> Unit,
+    onPlaylistClick: (Long) -> Unit = {},
     onNavigateToProfile: (Long) -> Unit = {},
     onDragClose: (Float, Float) -> Unit = { _, _ -> },
     // 手机全屏：封面按可用高度收缩，快捷操作行需让开导航栏
@@ -127,6 +131,7 @@ fun FullPlayerScreen(
     val currentLyricIndex by viewModel.currentLyricIndex.collectAsStateWithLifecycle()
     val activeLyricIndices by viewModel.activeLyricIndices.collectAsStateWithLifecycle()
     val playContext by viewModel.playerManager.playContext.collectAsStateWithLifecycle()
+    val playSource by viewModel.playerManager.playSource.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
     val commentsState by viewModel.commentsState.collectAsStateWithLifecycle()
     val activeQuality by viewModel.activeQuality.collectAsStateWithLifecycle()
@@ -183,6 +188,19 @@ fun FullPlayerScreen(
             1 -> onArtistClick(artists.first().id)
             else -> artistPickerEntries = artists
         }
+    }
+    val openSongAlbum: () -> Unit = {
+        val albumId = songDetail?.al?.id ?: 0L
+        if (albumId > 0L) {
+            onAlbumClick(albumId)
+        } else {
+            ToastManager.showToast("未找到专辑信息")
+        }
+    }
+    val openPlaylistSource: (() -> Unit)? = if (playSource?.kind == PlaySource.Kind.PLAYLIST && (playSource?.id ?: 0L) > 0L) {
+        { onPlaylistClick(playSource!!.id) }
+    } else {
+        null
     }
     val podcast by viewModel.podcastState.collectAsStateWithLifecycle()
     // 播客节目没有歌词、歌曲评论与歌手专辑信息，信息卡与小歌词整体不展示
@@ -380,6 +398,34 @@ fun FullPlayerScreen(
         label = "item_gap"
     )
 
+    val scrollToLyricsCard: () -> Unit = {
+        val visible = visibleInfoCards(songDetailState, commentsState, cardLayout)
+        val lyricCardIndex = visible.cards.indexOf(FullPlayerCard.LYRICS)
+        if (lyricCardIndex >= 0) {
+            val fallbackIndex = 6 + lyricCardIndex
+            coroutineScope.launch {
+                val layoutInfo = listState.layoutInfo
+                val visibleItem = layoutInfo.visibleItemsInfo.find { it.key == FullPlayerCard.LYRICS.key }
+                val targetIndex = visibleItem?.index ?: fallbackIndex
+                val cardHeightPx = visibleItem?.size ?: with(density) { 300.dp.roundToPx() }
+                val bottomReservePx = with(density) { (80.dp + navigationBarBottomPadding).roundToPx() }
+                val desiredTopPx = (layoutInfo.viewportSize.height - cardHeightPx - bottomReservePx).coerceAtLeast(0)
+
+                if (visibleItem != null) {
+                    val deltaToScroll = (visibleItem.offset - desiredTopPx).toFloat()
+                    if (kotlin.math.abs(deltaToScroll) > 1f) {
+                        listState.animateScrollBy(deltaToScroll)
+                    }
+                } else {
+                    listState.animateScrollToItem(
+                        index = targetIndex,
+                        scrollOffset = -desiredTopPx
+                    )
+                }
+            }
+        }
+    }
+
     val isLandscape = rememberMelodiaOrientationClass() == MelodiaOrientationClass.Landscape
     val fullscreenProgress: () -> Float = { sidebarFullscreenProgress?.invoke()?.coerceIn(0f, 1f) ?: 0f }
     val canUseWideLayout = sidebarFullscreenProgress != null && isLandscape && fullscreenContentWidth.isSpecified
@@ -553,6 +599,9 @@ fun FullPlayerScreen(
                         onMoreClick = { showMoreOptionsSheet = true },
                         onToggleLike = viewModel::toggleLike,
                         onArtistClick = openSongArtist,
+                        onAlbumClick = openSongAlbum,
+                        onPlaylistClick = openPlaylistSource,
+                        onMiniLyricClick = scrollToLyricsCard,
                         onSeek = viewModel::seekToTime,
                         onTogglePlay = onTogglePlay,
                         onPlayNext = viewModel.playerManager::playNext,
@@ -643,6 +692,7 @@ fun FullPlayerScreen(
                         onToggleSidebarFullscreen = onToggleSidebarFullscreen,
                         isSidebarFullscreen = isSidebarFullscreen,
                         onFullscreenLyricsClick = { isLyricsFullScreen = true },
+                        onPlaylistClick = openPlaylistSource,
                         modifier = barModifier
                     )
                 },
@@ -670,6 +720,7 @@ fun FullPlayerScreen(
                         isLiked = songDetailState.isLiked,
                         onToggleLike = viewModel::toggleLike,
                         onArtistClick = openSongArtist,
+                        onAlbumClick = openSongAlbum,
                         podcast = podcast,
                         onToggleSubscribe = viewModel::toggleSubscribe
                     )
@@ -804,13 +855,8 @@ fun FullPlayerScreen(
             onQueueDismiss = { showQueueSheet = false },
             onToggleLike = viewModel::toggleLike,
             onAlbumClick = {
-                val albumId = songDetail?.al?.id ?: 0L
-                if (albumId > 0L) {
-                    showMoreOptionsSheet = false
-                    onAlbumClick(albumId)
-                } else {
-                    ToastManager.showToast("未找到专辑信息")
-                }
+                showMoreOptionsSheet = false
+                openSongAlbum()
             },
             onArtistClick = {
                 showMoreOptionsSheet = false
