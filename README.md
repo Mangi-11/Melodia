@@ -52,17 +52,17 @@
 
 | 模块 | 类型 | 职责 |
 |---|---|---|
-| `shared` | Kotlin Multiplatform（Android + 桌面 JVM） | 数据模型、网络与原生加密、各业务域 `data` / `domain`、跨平台 ViewModel、播放器抽象 `PlaybackController` |
+| `shared` | Kotlin Multiplatform（Android + 桌面 JVM） | 数据模型、网络与原生加密、各业务域 `data` / `domain`、跨平台 ViewModel 与展示逻辑、播放器抽象 `PlaybackController` |
 | `app` | Android 应用 | Jetpack Compose 界面、Media3 播放、下载、本地音乐、识曲、悬浮与系统歌词等 Android 专属能力 |
-| `desktopApp` | Compose Desktop 应用（Windows） | 桌面窗口与界面、libmpv 播放、托盘、系统媒体控制（SMTC）与全局快捷键、桌面歌词 |
+| `desktopApp` | Compose Desktop 应用（Windows） | 桌面窗口与界面、libmpv 播放、托盘、系统媒体控制（SMTC）与全局快捷键、桌面歌词；系统能力经平台接口接入 |
 
 代码按**业务域 (Feature-Driven)** 组织：`core` 承载全局共享基础设施与通用能力，`feature` 下每个业务域自持 `data` / `domain` / `ui` 结构。依赖方向单向收敛——`feature` 依赖 `core`，`core` 不反向依赖 `feature`，各业务域之间解耦无循环依赖；`app` 与 `desktopApp` 都依赖 `shared`，两者互不依赖。
 
 ```text
 shared/src/
 ├── commonMain/kotlin/com/lin0721/linmusic/
-│   ├── core/                    # api、auth、network、model、preferences、player 抽象等共享基础能力
-│   ├── feature/                 # 各业务域的 data / domain，以及已迁入的跨平台 ViewModel
+│   ├── core/                    # api、auth、network、model、preferences、player 抽象、format 格式化等共享基础能力
+│   ├── feature/                 # 各业务域的 data / domain、跨平台 ViewModel（ui）与展示逻辑（presentation）
 │   └── di/                      # 网络与仓储的 Koin 模块，两端共用
 ├── androidMain/                 # Context 相关实现（DataStore 落盘、网络状态、音乐库偏好等）
 └── desktopMain/                 # 桌面 JVM 平台实现（日志、设备信息等）
@@ -82,13 +82,24 @@ app/src/main/java/com/lin0721/linmusic/
 
 desktopApp/src/main/kotlin/com/lin0721/linmusic/desktop/
 ├── Main.kt                      # 应用入口：Koin 初始化、主窗口、托盘、全局快捷键与桌面歌词窗口
-├── di/                          # 桌面平台实现与 ViewModel 注册
-├── platform/                    # 数据目录、偏好存储、Win32 热键、SMTC 桥接与窗口样式等平台适配
+├── di/                          # Koin 模块、按系统选择平台实现、构造界面所需的依赖集合
+├── app/                         # 启动基础设施：日志、崩溃处理、单实例、数据目录、缓存迁移、窗口位置
+├── data/                        # 桌面偏好、音乐库偏好、下载、图片加载等数据层实现
+├── platform/                    # 系统能力接口（媒体会话、全局热键、开机自启、窗口效果、浏览器查找）
+│   ├── windows/                 # Windows 实现：Win32 热键、SMTC 桥接、DWM 窗口样式、注册表
+│   └── fallback/                # 尚未适配系统的空实现，界面据此隐藏对应入口
 ├── player/                      # libmpv 的 JNA 绑定与 PlaybackController 实现
-└── ui/                          # 三栏布局、标题栏、首页、歌单、歌手、搜索、浏览、设置、播放条与歌词
+└── ui/
+    ├── shell/                   # 应用壳：界面状态、两侧栏布局、路由到页面的注册表、标题栏与播放栏接线
+    ├── navigation/              # 浏览器式返回栈与按栈帧保存页面现场
+    ├── components/ · track/     # 通用组件与歌曲行、歌曲操作
+    ├── home/ · playlist/ · …    # 按功能分包的页面（歌手、搜索、播客、个人主页、音乐库、设置等）
+    └── player/ · nowplaying/ · lyricsview/  # 播放条与队列、正在播放侧栏、全屏歌词
 
 desktopApp/native-src/smtc/      # SMTC 桥接 DLL 源码（C++/WinRT，CMake 构建）
 ```
+
+桌面端界面只依赖平台接口与 `shared` 中的 ViewModel：依赖在 `Main.kt` 构造一次后显式向下传递，界面层不直接访问 Koin；接入新的桌面系统时，只需在 `platform/` 下补一套接口实现并在 `di/PlatformModule.kt` 中按系统选择。
 
 ---
 
@@ -122,7 +133,7 @@ Repository 边界统一产出 Kotlin `Result<T>`，异常类型抽象为领域�
   ```
 - **运行单元测试**（`shared` 的测试跑在桌面 JVM 目标上）：
   ```bash
-  ./gradlew :app:testDebugUnitTest :shared:desktopTest
+  ./gradlew :app:testDebugUnitTest :shared:desktopTest :desktopApp:test
   ```
 - **构建 Android Release 安装包**：
   ```bash
