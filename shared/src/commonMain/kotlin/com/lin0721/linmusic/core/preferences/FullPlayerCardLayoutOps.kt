@@ -1,14 +1,11 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.core.preferences
 
-import com.lin0721.linmusic.core.preferences.FullPlayerCard
-import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
-
-// 设置页只编辑桌面端已实现的卡片，其余卡片（如评论）保持原位与原显隐。
+// 设置页只编辑当前端已实现的卡片（supported），其余卡片保持原位与原显隐。
 // ordered 是已实现卡片调序后的结果，按它依次填回完整配置里属于已实现卡片的位置
 fun mergeSupportedOrder(
     full: List<FullPlayerCardSetting>,
     ordered: List<FullPlayerCardSetting>,
-    supported: Set<FullPlayerCard> = SupportedInfoCards
+    supported: Set<FullPlayerCard>
 ): List<FullPlayerCardSetting> {
     if (ordered.size != full.count { it.card in supported }) return full
     val iterator = ordered.iterator()

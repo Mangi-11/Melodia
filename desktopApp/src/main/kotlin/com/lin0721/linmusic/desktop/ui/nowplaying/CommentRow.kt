@@ -51,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.comment.presentation.quotedReplyText
+import com.lin0721.linmusic.core.comment.presentation.formatLikedCount
 import com.lin0721.linmusic.core.model.CommentItem
 import com.lin0721.linmusic.desktop.ui.Cover
 import com.lin0721.linmusic.desktop.ui.DesktopMenu

@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.format.formatDuration
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.desktop.ui.icons.PlayerBarIcons
@@ -345,7 +346,7 @@ private fun ProgressRow(position: Long, duration: Long, enabled: Boolean, onSeek
             enabled = enabled,
             // 轨道两端已内缩半个滑块，与时间之间的间距靠它，不再额外加
             modifier = Modifier.weight(1f),
-            previewLabel = { formatTime((it * duration).toLong()) }
+            previewLabel = { formatDuration((it * duration).toLong()) }
         )
         TimeLabel(duration, TextAlign.Start)
     }
@@ -355,18 +356,13 @@ private fun ProgressRow(position: Long, duration: Long, enabled: Boolean, onSeek
 private fun TimeLabel(ms: Long, align: TextAlign) {
     // 时间贴着轨道一侧对齐：已播放右对齐，总时长左对齐
     Text(
-        formatTime(ms),
+        formatDuration(ms),
         color = DesktopColors.TextGray,
         fontSize = 11.sp,
         textAlign = align,
         maxLines = 1,
         modifier = Modifier.width(40.dp)
     )
-}
-
-private fun formatTime(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }
 
 @Composable

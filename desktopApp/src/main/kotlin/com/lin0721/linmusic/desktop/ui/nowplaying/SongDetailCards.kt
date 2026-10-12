@@ -36,6 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.feature.player.presentation.DetailAction
+import com.lin0721.linmusic.feature.player.presentation.DetailRow
+import com.lin0721.linmusic.feature.player.presentation.songDetailRows
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.desktop.ui.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.DesktopDialog

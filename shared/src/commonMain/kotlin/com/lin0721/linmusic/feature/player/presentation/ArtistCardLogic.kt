@@ -1,7 +1,6 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.feature.player.presentation
 
 import com.lin0721.linmusic.feature.player.ui.ArtistCardItem
-import java.util.Locale
 
 private const val DESC_PREVIEW_LENGTH = 95
 
@@ -11,13 +10,6 @@ fun validAboutArtists(artists: List<ArtistCardItem>): List<ArtistCardItem> =
         val detail = item.artistDetail
         detail != null && (detail.cover.isNotBlank() || detail.avatar.isNotBlank())
     }
-
-// 粉丝数超过一万时折算为“万”，整数不带小数位
-fun formatFansCount(count: Long): String {
-    if (count < 10_000) return count.toString()
-    val formatted = String.format(Locale.US, "%.1f", count / 10_000.0)
-    return (if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted) + "万"
-}
 
 // 简介折叠态的显示：超过阈值时截断，展开态显示全文；canToggle 表示是否可展开/收起
 data class DescPreview(val text: String, val canToggle: Boolean)
@@ -33,3 +25,7 @@ fun initialAboutPage(valid: List<ArtistCardItem>, all: List<ArtistCardItem>, sel
     val selectedId = all.getOrNull(selectedIndex)?.artistId
     return valid.indexOfFirst { it.artistId == selectedId }.coerceAtLeast(0)
 }
+
+// 更多专辑卡片标题，歌手名缺失时用通用标题
+fun artistAlbumsTitle(artistName: String?): String =
+    if (artistName.isNullOrBlank()) "更多专辑" else "${artistName}的更多专辑"

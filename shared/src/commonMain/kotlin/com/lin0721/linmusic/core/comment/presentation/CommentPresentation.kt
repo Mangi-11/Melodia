@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.core.comment.presentation
 
 import com.lin0721.linmusic.core.comment.ui.CommentsState
 import com.lin0721.linmusic.core.model.BeRepliedComment

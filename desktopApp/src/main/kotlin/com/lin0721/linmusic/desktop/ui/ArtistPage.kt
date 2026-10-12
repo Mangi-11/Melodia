@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lin0721.linmusic.core.format.formatCompactCount
 import com.lin0721.linmusic.core.model.ArtistAlbum
 import com.lin0721.linmusic.core.model.ArtistInfo
 import com.lin0721.linmusic.core.model.Track
@@ -416,7 +417,7 @@ private fun ArtistHeader(
                 val subtitle = listOfNotNull(
                     artist.trans?.takeIf { it.isNotBlank() },
                     artist.alias?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(" / "),
-                    state.fansCount.takeIf { it > 0 }?.let { "${formatCount(it)} 粉丝" }
+                    state.fansCount.takeIf { it > 0 }?.let { "${formatCompactCount(it)} 粉丝" }
                 ).joinToString(" · ")
                 if (subtitle.isNotBlank()) {
                     Text(subtitle, color = DesktopColors.TextGray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -554,10 +555,4 @@ private fun SimilarArtistCard(artist: ArtistInfo, size: Dp, onClick: () -> Unit)
             modifier = Modifier.padding(top = 8.dp)
         )
     }
-}
-
-private fun formatCount(count: Long): String = when {
-    count >= 100_000_000 -> "%.1f 亿".format(count / 100_000_000.0)
-    count >= 10_000 -> "%.1f 万".format(count / 10_000.0)
-    else -> count.toString()
 }

@@ -69,6 +69,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.format.formatDuration
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -400,9 +401,4 @@ private fun albumLink(track: Track, onClick: (Long, String) -> Unit): AnnotatedS
     } else {
         append(track.al.name)
     }
-}
-
-fun formatDuration(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }

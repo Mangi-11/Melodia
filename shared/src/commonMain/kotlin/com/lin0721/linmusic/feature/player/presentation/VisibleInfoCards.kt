@@ -1,27 +1,17 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.feature.player.presentation
 
 import com.lin0721.linmusic.core.comment.ui.CommentsState
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.feature.player.ui.PlayerSongDetailState
 
-// 已在桌面端实现的卡片；未实现的卡片不参与出现顺序，避免它们的加载状态挡住后面的卡片
-val SupportedInfoCards: Set<FullPlayerCard> = setOf(
-    FullPlayerCard.LYRICS,
-    FullPlayerCard.COMMENTS_PREVIEW,
-    FullPlayerCard.SONG_DETAIL,
-    FullPlayerCard.MUSIC_MEMORY,
-    FullPlayerCard.ABOUT_ARTIST,
-    FullPlayerCard.ARTIST_ALBUMS,
-    FullPlayerCard.SIMILAR_ARTISTS
-)
-
 // 按用户配置的顺序与显隐算出当前要展示的卡片：前一张可见卡片还没出结论（在加载中）时，
-// 后面的卡片哪怕数据先到也一律不展示，避免顺序被网络到达时机打乱、插到已展示内容上方
+// 后面的卡片哪怕数据先到也一律不展示，避免顺序被网络到达时机打乱、插到已展示内容上方。
+// supported 为当前端已实现的卡片，未实现的卡片不参与出现顺序，避免它们的加载状态挡住后面的卡片
 fun visibleInfoCards(
     songState: PlayerSongDetailState,
     cardLayout: List<FullPlayerCardSetting>,
-    supported: Set<FullPlayerCard> = SupportedInfoCards,
+    supported: Set<FullPlayerCard> = FullPlayerCard.entries.toSet(),
     commentsState: CommentsState = CommentsState.Success(emptyList(), emptyList(), 0)
 ): List<FullPlayerCard> {
     val lyrics = songState.lyrics

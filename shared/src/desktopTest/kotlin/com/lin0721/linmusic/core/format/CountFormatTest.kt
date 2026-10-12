@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui
+package com.lin0721.linmusic.core.format
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

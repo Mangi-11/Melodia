@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
+import com.lin0721.linmusic.feature.player.presentation.visibleInfoCards
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.player.NowPlaying
 import com.lin0721.linmusic.core.player.PlaySource
@@ -61,7 +63,6 @@ import com.lin0721.linmusic.desktop.ui.nowplaying.MusicMemoryCard
 import com.lin0721.linmusic.desktop.ui.nowplaying.SimilarArtistsCard
 import com.lin0721.linmusic.desktop.ui.nowplaying.SongDetailCard
 import com.lin0721.linmusic.desktop.ui.nowplaying.rememberCoverBase
-import com.lin0721.linmusic.desktop.ui.nowplaying.visibleInfoCards
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
@@ -112,7 +113,7 @@ fun NowPlayingPanel(
             NowPlayingArtists(track, playerViewModel, 14.sp)
             if (!podcast.isPodcast) {
                 val cards = remember(detailState, cardLayout, commentsState) {
-                    visibleInfoCards(detailState, cardLayout, commentsState = commentsState)
+                    visibleInfoCards(detailState, cardLayout, SupportedInfoCards, commentsState)
                 }
                 for (card in cards) {
                     key(card) {

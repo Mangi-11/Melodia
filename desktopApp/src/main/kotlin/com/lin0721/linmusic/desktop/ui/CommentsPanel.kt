@@ -40,13 +40,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.comment.presentation.allComments
 import com.lin0721.linmusic.core.comment.data.CommentSortType
 import com.lin0721.linmusic.core.comment.domain.CommentFloorState
 import com.lin0721.linmusic.core.comment.ui.CommentsState
 import com.lin0721.linmusic.core.model.CommentItem
 import com.lin0721.linmusic.desktop.ui.nowplaying.CommentInputBar
 import com.lin0721.linmusic.desktop.ui.nowplaying.CommentRow
-import com.lin0721.linmusic.desktop.ui.nowplaying.allComments
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 
 private const val FLOOR_FADE_MS = 150

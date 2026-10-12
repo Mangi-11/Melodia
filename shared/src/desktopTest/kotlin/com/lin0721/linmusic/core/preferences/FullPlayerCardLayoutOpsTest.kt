@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.core.preferences
 
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.FullPlayerCard.ABOUT_ARTIST

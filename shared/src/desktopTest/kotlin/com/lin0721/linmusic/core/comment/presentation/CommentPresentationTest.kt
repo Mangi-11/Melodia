@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.core.comment.presentation
 
 import com.lin0721.linmusic.core.comment.ui.CommentsState
 import com.lin0721.linmusic.core.model.BeRepliedComment
@@ -6,6 +6,7 @@ import com.lin0721.linmusic.core.model.CommentItem
 import com.lin0721.linmusic.core.model.CommentUser
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
+import com.lin0721.linmusic.feature.player.presentation.visibleInfoCards
 import com.lin0721.linmusic.feature.player.ui.PlayerSongDetailState
 import org.junit.Assert.assertEquals
 import org.junit.Test

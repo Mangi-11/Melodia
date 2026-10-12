@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui.lyricsview
+package com.lin0721.linmusic.feature.player.presentation
 
 import com.lin0721.linmusic.core.player.domain.LyricAlignment
 import com.lin0721.linmusic.core.player.domain.LyricLine

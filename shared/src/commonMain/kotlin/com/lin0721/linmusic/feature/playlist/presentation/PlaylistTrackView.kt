@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui
+package com.lin0721.linmusic.feature.playlist.presentation
 
 import com.lin0721.linmusic.core.model.Track
 import java.text.Collator

@@ -69,6 +69,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.lin0721.linmusic.feature.player.presentation.isActiveLine
+import com.lin0721.linmusic.feature.player.presentation.secondaryText
+import com.lin0721.linmusic.feature.player.presentation.LyricsPlaceholder
+import com.lin0721.linmusic.feature.player.presentation.lyricsPlaceholder
 import com.lin0721.linmusic.core.model.Album
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.player.NowPlaying

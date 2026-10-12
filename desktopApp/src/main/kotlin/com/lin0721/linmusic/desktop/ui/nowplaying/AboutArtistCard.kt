@@ -45,6 +45,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
+import com.lin0721.linmusic.feature.player.presentation.initialAboutPage
+import com.lin0721.linmusic.feature.player.presentation.descPreview
+import com.lin0721.linmusic.feature.player.presentation.validAboutArtists
+import com.lin0721.linmusic.core.format.formatCompactCount
 import com.lin0721.linmusic.desktop.ui.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.sizedCoverUrl
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -161,7 +165,7 @@ private fun ArtistPage(item: ArtistCardItem, onToggleFollow: (Long) -> Unit, mod
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        item.fansCount?.let { "${formatFansCount(it)}粉丝" } ?: "--粉丝",
+                        item.fansCount?.let { "${formatCompactCount(it)}粉丝" } ?: "--粉丝",
                         color = DesktopColors.TextGray,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 2.dp)

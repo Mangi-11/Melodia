@@ -35,10 +35,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.lin0721.linmusic.core.preferences.setCardVisible
+import com.lin0721.linmusic.core.preferences.mergeSupportedOrder
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
-import com.lin0721.linmusic.desktop.ui.nowplaying.mergeSupportedOrder
-import com.lin0721.linmusic.desktop.ui.nowplaying.setCardVisible
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 
 private val EditorRowHeight = 48.dp
@@ -74,7 +74,7 @@ internal fun CardLayoutEditor(layout: List<FullPlayerCardSetting>, onChange: (Li
             val drag by rememberUpdatedState({ delta: Float -> reorder.drag(index, delta) })
             val endDrag by rememberUpdatedState({
                 reorder.end(index, scope)
-                currentOnChange(mergeSupportedOrder(currentLayout, working))
+                currentOnChange(mergeSupportedOrder(currentLayout, working, SupportedInfoCards))
             })
             Row(
                 Modifier.fillMaxWidth().height(EditorRowHeight)

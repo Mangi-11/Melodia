@@ -1,4 +1,4 @@
-package com.lin0721.linmusic.desktop.ui.nowplaying
+package com.lin0721.linmusic.feature.player.presentation
 
 import com.lin0721.linmusic.core.model.ArtistDetailInfo
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
@@ -28,14 +28,6 @@ class ArtistCardLogicTest {
             artist(4, cover = "c", withDetail = false)
         )
         assertEquals(listOf(1L, 2L), validAboutArtists(artists).map { it.artistId })
-    }
-
-    @Test
-    fun `粉丝数超过一万折算为万并去掉整数小数位`() {
-        assertEquals("9999", formatFansCount(9_999))
-        assertEquals("1万", formatFansCount(10_000))
-        assertEquals("1.2万", formatFansCount(12_345))
-        assertEquals("0", formatFansCount(0))
     }
 
     @Test

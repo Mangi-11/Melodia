@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.feature.player.presentation.artistAlbumsTitle
 import com.lin0721.linmusic.core.model.ArtistAlbum
 import com.lin0721.linmusic.core.model.ArtistInfo
 import com.lin0721.linmusic.desktop.ui.Cover
@@ -44,9 +45,6 @@ private val ArtistWidth = 80.dp
 private val ArtistAvatarSize = 64.dp
 private const val SCROLL_FRACTION = 0.8f
 private const val SCROLL_MS = 300
-
-fun artistAlbumsTitle(artistName: String?): String =
-    if (artistName.isNullOrBlank()) "更多专辑" else "${artistName}的更多专辑"
 
 // 艺人的更多专辑：横向列表，点击进入专辑
 @Composable

@@ -61,6 +61,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.desktop.platform.CloseAction
@@ -201,12 +202,12 @@ fun SettingsPage(
                         desktop.trimAudioCache(size)
                     }
                 }
-                SettingRow("图片缓存", subtitle = "${formatBytes(imageCacheBytes)} / ${formatBytes(desktop.imageCacheMaxBytes)}") {
+                SettingRow("图片缓存", subtitle = "${formatFileSize(imageCacheBytes)} / ${formatFileSize(desktop.imageCacheMaxBytes)}") {
                     TextButton(onClick = desktop::clearImageCache) {
                         Text("清除图片缓存", color = DesktopColors.Accent)
                     }
                 }
-                SettingRow("已用空间", subtitle = formatBytes(cacheUsedBytes)) {
+                SettingRow("已用空间", subtitle = formatFileSize(cacheUsedBytes)) {
                     TextButton(onClick = desktop::clearAudioCache) {
                         Text("清除缓存", color = DesktopColors.Accent)
                     }
@@ -272,7 +273,7 @@ fun SettingsPage(
                 SettingRow("日志级别", subtitle = "越详细越利于排查问题，立即生效") {
                     LogLevelSelector(logLevelName, common::updateLogLevel)
                 }
-                SettingRow("日志文件", subtitle = "${formatBytes(logBytes)} · ${desktop.logDir.absolutePath}") {
+                SettingRow("日志文件", subtitle = "${formatFileSize(logBytes)} · ${desktop.logDir.absolutePath}") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             if (!openDirectory(desktop.logDir)) navigator.showMessage("无法打开日志目录")
@@ -409,13 +410,13 @@ private fun CacheSizeSelector(currentBytes: Long, onSelect: (Long) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { expanded = true }) {
-            Text(formatBytes(currentBytes), color = DesktopColors.TextPrimary)
+            Text(formatFileSize(currentBytes), color = DesktopColors.TextPrimary)
             Icon(Icons.Rounded.ArrowDropDown, null, tint = DesktopColors.TextGray)
         }
         DesktopMenu(expanded = expanded, onDismiss = { expanded = false }, width = 168.dp) {
             CacheSizeOptions.forEach { value ->
                 SimpleMenuItem(
-                    text = formatBytes(value),
+                    text = formatFileSize(value),
                     trailing = if (value == currentBytes) {
                         { Icon(Icons.Rounded.Check, null, tint = DesktopColors.Accent, modifier = Modifier.size(16.dp)) }
                     } else {
@@ -428,15 +429,6 @@ private fun CacheSizeSelector(currentBytes: Long, onSelect: (Long) -> Unit) {
                 )
             }
         }
-    }
-}
-
-private fun formatBytes(bytes: Long): String {
-    val mb = bytes / (1024.0 * 1024.0)
-    return when {
-        mb >= 1024 -> "%.1f GB".format(java.util.Locale.ROOT, mb / 1024)
-        mb >= 1 -> "%.0f MB".format(java.util.Locale.ROOT, mb)
-        else -> "%.0f KB".format(java.util.Locale.ROOT, bytes / 1024.0)
     }
 }
 
