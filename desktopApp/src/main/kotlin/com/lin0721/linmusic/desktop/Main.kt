@@ -33,6 +33,7 @@ import androidx.compose.ui.input.key.type
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
 import com.lin0721.linmusic.desktop.ui.rememberFullscreenState
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.desktop.di.desktopAppDependencies
 import com.lin0721.linmusic.desktop.di.desktopPlatformModule
 import com.lin0721.linmusic.desktop.di.platformModuleFor
 import com.lin0721.linmusic.desktop.di.desktopViewModelModule
@@ -117,6 +118,7 @@ fun main() {
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     val settingsPreferences = koin.get<SettingsPreferences>()
     val playerViewModel = koin.get<PlayerViewModel>()
+    val appDependencies = koin.desktopAppDependencies()
     val desktopPreferences = koin.get<DesktopPreferences>()
     val hotkeys = koin.get<GlobalHotkeyService>()
     val mediaSession = koin.get<MediaSessionService>()
@@ -320,6 +322,7 @@ fun main() {
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
             MelodiaDesktopTheme {
                 MelodiaDesktopApp(
+                    deps = appDependencies,
                     windowState = windowState,
                     fullscreen = fullscreen,
                     lyricsView = lyricsView,

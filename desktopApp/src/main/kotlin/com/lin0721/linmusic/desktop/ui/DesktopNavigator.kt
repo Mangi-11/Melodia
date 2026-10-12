@@ -21,6 +21,8 @@ class DesktopNavigator(
     val openLogin: () -> Unit,
     // 下载音质跟随播放音质设置
     val downloadLevel: String,
+    // 新建歌单对话框里隐私开关的初始值
+    val defaultPlaylistPrivate: Boolean,
     val downloadTrack: (Track) -> Unit,
     val showMessage: (String) -> Unit,
     val goBack: () -> Unit,

@@ -67,11 +67,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.desktop.platform.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.library.ui.LibrarySortOrder
-import org.koin.core.context.GlobalContext
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 
 private const val PLAYLIST_NAME_MAX_LENGTH = 40
@@ -289,8 +287,7 @@ internal fun CreatePlaylistDialog(
     // 仅创建后顺带加歌的入口不支持隐私选项
     showPrivacy: Boolean = true
 ) {
-    val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
-    val defaultPrivate by settingsPreferences.defaultPlaylistPrivate.collectAsState(initial = false)
+    val defaultPrivate = LocalDesktopNavigator.current.defaultPlaylistPrivate
     var name by remember { mutableStateOf("") }
     var isPrivate by remember(defaultPrivate) { mutableStateOf(defaultPrivate) }
     val focusRequester = remember { FocusRequester() }

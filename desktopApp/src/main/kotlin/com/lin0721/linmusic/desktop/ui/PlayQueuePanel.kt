@@ -54,10 +54,7 @@ import androidx.compose.ui.awt.awtEventOrNull
 import com.lin0721.linmusic.core.model.Album
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.model.Track
-import com.lin0721.linmusic.core.songlike.SongLikeRepository
-import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
 import kotlinx.coroutines.launch
-import org.koin.core.context.GlobalContext
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import androidx.compose.ui.draw.clip
@@ -77,6 +74,7 @@ import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.SimilarRoamingController
+import com.lin0721.linmusic.desktop.ui.shell.SongActionSources
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 
 private val HeaderButtonSize = 32.dp
@@ -88,6 +86,7 @@ private val DragHandleWidth = 20.dp
 @Composable
 fun PlayQueuePanel(
     controller: PlaybackController,
+    songActions: SongActionSources,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -136,8 +135,8 @@ fun PlayQueuePanel(
     }
 
     val navigator = LocalDesktopNavigator.current
-    val songCollectDelegate = remember { GlobalContext.get().get<SongCollectDelegate>() }
-    val songLikeRepository = remember { GlobalContext.get().get<SongLikeRepository>() }
+    val songCollectDelegate = songActions.collect
+    val songLikeRepository = songActions.likes
     val likedSongIds by songLikeRepository.likedSongIds.collectAsState()
     val collectState by songCollectDelegate.state.collectAsState()
 

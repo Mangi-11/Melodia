@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.desktop.platform.download.DesktopSongDownloader
 import com.lin0721.linmusic.desktop.player.AudioOutputControl
+import com.lin0721.linmusic.desktop.ui.shell.SongActionSources
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
@@ -124,7 +125,7 @@ fun NowPlayingDock(
     open: Boolean,
     overlay: DockOverlay?,
     audioOutput: AudioOutputControl?,
-    downloader: DesktopSongDownloader?,
+    downloader: DesktopSongDownloader,
     onCloseOverlay: () -> Unit,
     onOpenComments: () -> Unit,
     playlistComments: CommentsHost?,
@@ -133,6 +134,7 @@ fun NowPlayingDock(
     onOpenChange: (Boolean) -> Unit,
     controller: PlaybackController,
     playerViewModel: PlayerViewModel,
+    songActions: SongActionSources,
     onResizeStart: () -> Unit,
     onResize: (delta: Dp) -> Unit,
     onResizeEnd: () -> Unit
@@ -206,17 +208,15 @@ fun NowPlayingDock(
                         }
                     }
                     OverlayLayer(visible = open && overlay == DockOverlay.Queue) { modifier ->
-                        PlayQueuePanel(controller = controller, onClose = onCloseOverlay, modifier = modifier)
+                        PlayQueuePanel(controller = controller, songActions = songActions, onClose = onCloseOverlay, modifier = modifier)
                     }
                     if (audioOutput != null) {
                         OverlayLayer(visible = open && overlay == DockOverlay.Devices) { modifier ->
                             AudioDevicePanel(control = audioOutput, onClose = onCloseOverlay, modifier = modifier)
                         }
                     }
-                    if (downloader != null) {
-                        OverlayLayer(visible = open && overlay == DockOverlay.Downloads) { modifier ->
-                            DownloadsPanel(downloader = downloader, onClose = onCloseOverlay, modifier = modifier)
-                        }
+                    OverlayLayer(visible = open && overlay == DockOverlay.Downloads) { modifier ->
+                        DownloadsPanel(downloader = downloader, onClose = onCloseOverlay, modifier = modifier)
                     }
                 }
                 if (collapsed) {
@@ -257,9 +257,10 @@ fun FloatingDockPanel(
     overlay: DockOverlay,
     controller: PlaybackController,
     playerViewModel: PlayerViewModel,
+    songActions: SongActionSources,
     playlistComments: CommentsHost?,
     audioOutput: AudioOutputControl?,
-    downloader: DesktopSongDownloader?,
+    downloader: DesktopSongDownloader,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -269,9 +270,9 @@ fun FloatingDockPanel(
         when (overlay) {
             DockOverlay.Comments -> CommentsPanel(host = playerCommentsHost, onClose = onClose)
             DockOverlay.PlaylistComments -> playlistComments?.let { CommentsPanel(host = it, onClose = onClose) }
-            DockOverlay.Queue -> PlayQueuePanel(controller = controller, onClose = onClose)
+            DockOverlay.Queue -> PlayQueuePanel(controller = controller, songActions = songActions, onClose = onClose)
             DockOverlay.Devices -> audioOutput?.let { AudioDevicePanel(control = it, onClose = onClose) }
-            DockOverlay.Downloads -> downloader?.let { DownloadsPanel(downloader = it, onClose = onClose) }
+            DockOverlay.Downloads -> DownloadsPanel(downloader = downloader, onClose = onClose)
         }
     }
 }
