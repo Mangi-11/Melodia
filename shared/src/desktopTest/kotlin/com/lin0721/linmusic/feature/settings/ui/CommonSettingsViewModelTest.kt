@@ -9,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -21,10 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import java.io.File
-import java.io.IOException
 import java.nio.file.Files
-
-private const val READ_RETRIES = 5L
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommonSettingsViewModelTest {
@@ -50,12 +46,10 @@ class CommonSettingsViewModelTest {
         dir.deleteRecursively()
     }
 
-    // 写入在 DataStore 自己的线程完成，等到读回期望值为止；
-    // Windows 上替换文件的瞬间去读会偶发找不到文件，重试即可
+    // 写入在 DataStore 自己的线程完成，等到读回期望值为止
     private fun <T> Flow<T>.awaitValue(expected: T) = runBlocking {
-        val reads = retry(READ_RETRIES) { it is IOException }
-        withTimeoutOrNull(5_000) { reads.first { it == expected } }
-            ?: assertEquals(expected, reads.first())
+        withTimeoutOrNull(5_000) { first { it == expected } }
+            ?: assertEquals(expected, first())
     }
 
     @Test
