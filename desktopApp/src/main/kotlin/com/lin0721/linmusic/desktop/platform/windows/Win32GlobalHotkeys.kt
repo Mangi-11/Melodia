@@ -1,9 +1,9 @@
-package com.lin0721.linmusic.desktop.platform
+package com.lin0721.linmusic.desktop.platform.windows
 
 import com.lin0721.linmusic.core.log.AppLogger
-import com.lin0721.linmusic.desktop.platform.win.Kernel32
-import com.lin0721.linmusic.desktop.platform.win.Msg
-import com.lin0721.linmusic.desktop.platform.win.User32
+import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
+import com.lin0721.linmusic.desktop.platform.HotkeyAction
+import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,21 +33,22 @@ private val mediaBindings = listOf(
 )
 
 // 热键注册与 WM_HOTKEY 必须在同一线程，因此独占一条线程跑消息循环；配置变更通过线程消息通知重新注册
-class GlobalHotkeys {
+internal class Win32GlobalHotkeys : GlobalHotkeyService {
 
-    @Volatile var onAction: ((HotkeyAction) -> Unit)? = null
+    override val isSupported: Boolean = true
+
+    @Volatile override var onAction: ((HotkeyAction) -> Unit)? = null
 
     @Volatile private var customConfig: Map<HotkeyAction, HotkeyCombo?> = HotkeyCombo.defaults
     @Volatile private var mediaKeysEnabled = true
 
-    // 注册失败（多为被其他程序占用）的自定义快捷键
     private val _failed = MutableStateFlow<Set<HotkeyAction>>(emptySet())
-    val failed: StateFlow<Set<HotkeyAction>> = _failed.asStateFlow()
+    override val failed: StateFlow<Set<HotkeyAction>> = _failed.asStateFlow()
 
     @Volatile private var threadId = 0
     private var thread: Thread? = null
 
-    fun start() {
+    override fun start() {
         if (thread != null) return
         val ready = CountDownLatch(1)
         thread = Thread({ runLoop(ready) }, "global-hotkeys").apply {
@@ -57,22 +58,21 @@ class GlobalHotkeys {
         ready.await()
     }
 
-    fun stop() {
+    override fun stop() {
         post(User32.WM_QUIT)
         thread?.join(1000)
         thread = null
     }
 
-    fun apply(custom: Map<HotkeyAction, HotkeyCombo?>, mediaKeys: Boolean) {
+    override fun apply(custom: Map<HotkeyAction, HotkeyCombo?>, mediaKeys: Boolean) {
         customConfig = custom
         mediaKeysEnabled = mediaKeys
         post(MSG_RELOAD)
     }
 
-    // 录制新组合期间暂停，避免按键被已注册的热键拦截
-    fun pause() = post(MSG_PAUSE)
+    override fun pause() = post(MSG_PAUSE)
 
-    fun resume() = post(MSG_RESUME)
+    override fun resume() = post(MSG_RESUME)
 
     private fun post(message: Int) {
         val id = threadId
@@ -123,7 +123,7 @@ class GlobalHotkeys {
         val desired = buildList {
             if (mediaKeysEnabled) addAll(mediaBindings)
             customConfig.forEach { (action, combo) ->
-                if (combo != null) add(Binding(CUSTOM_ID_BASE + action.ordinal, combo.modifiers, combo.vk, action, custom = true))
+                if (combo != null) add(Binding(CUSTOM_ID_BASE + action.ordinal, toWin32Modifiers(combo.modifiers), combo.vk, action, custom = true))
             }
         }
         val failedActions = mutableSetOf<HotkeyAction>()
@@ -144,4 +144,13 @@ class GlobalHotkeys {
     private fun unregister(user32: User32, bindings: List<Binding>) {
         bindings.forEach { user32.UnregisterHotKey(null, it.id) }
     }
+}
+
+// 组合键的键码本就按 Win32 虚拟键码取值，可直接注册；修饰键逐位转换
+internal fun toWin32Modifiers(modifiers: Int): Int {
+    var result = 0
+    if (modifiers and HotkeyCombo.MOD_CTRL != 0) result = result or User32.MOD_CONTROL
+    if (modifiers and HotkeyCombo.MOD_ALT != 0) result = result or User32.MOD_ALT
+    if (modifiers and HotkeyCombo.MOD_SHIFT != 0) result = result or User32.MOD_SHIFT
+    return result
 }

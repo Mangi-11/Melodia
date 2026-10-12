@@ -5,7 +5,6 @@ import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.core.player.NowPlaying
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaySource
-import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.PlaybackController.Companion.CONTEXT_INTELLIGENCE
 import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.player.PlaybackQueue
@@ -75,7 +74,7 @@ class MpvPlaybackController(
     // 仅测试用
     engineOptions: Map<String, String> = emptyMap(),
     private val audioCache: AudioCache? = null
-) : PlaybackController, AudioOutputControl, MpvEngine.Listener {
+) : DesktopPlaybackController, MpvEngine.Listener {
 
     private val playbackQueue = PlaybackQueue()
     private val stateStore = PlaybackStateStore(scope, preferences)
@@ -117,7 +116,7 @@ class MpvPlaybackController(
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val _volume = MutableStateFlow(100)
-    val volume: StateFlow<Int> = _volume.asStateFlow()
+    override val volume: StateFlow<Int> = _volume.asStateFlow()
 
     private val _audioDevices = MutableStateFlow<List<AudioDevice>>(emptyList())
     override val audioDevices: StateFlow<List<AudioDevice>> = _audioDevices.asStateFlow()
@@ -127,7 +126,9 @@ class MpvPlaybackController(
 
     // 桌面端专用提示（取地址失败等），由界面层弹出
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    override val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    override val unavailableReason: String? = null
 
     private var playJob: Job? = null
     private var consecutiveFailures = 0
@@ -427,14 +428,14 @@ class MpvPlaybackController(
         saveQueueState()
     }
 
-    fun setVolume(percent: Int) {
+    override fun setVolume(percent: Int) {
         val clamped = percent.coerceIn(0, 100)
         _volume.value = clamped
         engine.setVolume(clamped)
     }
 
     // 退出时同步落盘，异步写入来不及在进程结束前完成
-    fun release() {
+    override fun release() {
         playJob?.cancel()
         sleepTimer.cancel()
         roaming.cancel()

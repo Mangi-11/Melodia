@@ -3,7 +3,7 @@ package com.lin0721.linmusic.desktop.ui.theme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
-import com.lin0721.linmusic.desktop.platform.win.SystemAccent
+import com.lin0721.linmusic.desktop.platform.WindowEffects
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,8 +19,8 @@ object WindowBorder {
     private val _accentRgb = MutableStateFlow<Int?>(null)
     val accentRgb: StateFlow<Int?> = _accentRgb.asStateFlow()
 
-    suspend fun refresh() {
-        _accentRgb.value = withContext(Dispatchers.IO) { SystemAccent.windowBorderAccent() }
+    suspend fun refresh(effects: WindowEffects) {
+        _accentRgb.value = withContext(Dispatchers.IO) { effects.systemBorderAccent() }
     }
 
     // 系统边框不支持透明度，中性线按透明度预先混合到窗口底色上；失焦时 DWM 会把边框压暗到约 65%，需提前补偿

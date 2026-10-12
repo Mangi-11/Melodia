@@ -32,20 +32,21 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
 import com.lin0721.linmusic.desktop.ui.rememberFullscreenState
-import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.desktop.di.desktopPlatformModule
+import com.lin0721.linmusic.desktop.di.platformModuleFor
 import com.lin0721.linmusic.desktop.di.desktopViewModelModule
 import com.lin0721.linmusic.desktop.platform.CloseAction
 import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.platform.GlobalHotkeys
+import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.MIN_WINDOW_HEIGHT
 import com.lin0721.linmusic.desktop.platform.MIN_WINDOW_WIDTH
 import com.lin0721.linmusic.desktop.platform.WindowBounds
 import com.lin0721.linmusic.desktop.platform.currentScreenBounds
-import com.lin0721.linmusic.desktop.platform.smtc.SmtcSession
-import com.lin0721.linmusic.desktop.player.MpvPlaybackController
+import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.desktop.platform.WindowEffects
+import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.ui.MelodiaDesktopApp
 import com.lin0721.linmusic.desktop.ui.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.WindowChromeEffect
@@ -106,20 +107,23 @@ fun main() {
     // 须先于缓存对象创建
     DesktopCacheMigration.migrateAll()
     val koin = startKoin {
-        modules(desktopPlatformModule, networkModule, repositoryModule, sourceModule, desktopViewModelModule)
+        modules(
+            platformModuleFor(System.getProperty("os.name").orEmpty()),
+            desktopPlatformModule, networkModule, repositoryModule, sourceModule, desktopViewModelModule
+        )
     }.koin
-    val controller = koin.get<PlaybackController>()
+    val controller = koin.get<DesktopPlaybackController>()
     // 进程内常驻记录播客收听进度
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
-    val mpvController = controller as? MpvPlaybackController
     val settingsPreferences = koin.get<SettingsPreferences>()
     val playerViewModel = koin.get<PlayerViewModel>()
     val desktopPreferences = koin.get<DesktopPreferences>()
-    val hotkeys = koin.get<GlobalHotkeys>()
-    val smtc = koin.get<SmtcSession>()
+    val hotkeys = koin.get<GlobalHotkeyService>()
+    val mediaSession = koin.get<MediaSessionService>()
+    val windowEffects = koin.get<WindowEffects>()
     val searchFocusRequests = Channel<Unit>(Channel.CONFLATED)
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
-    val smtcActive = smtc.start()
+    val mediaSessionActive = mediaSession.start()
     val savedWindow = runBlocking { desktopPreferences.loadWindow() }
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
@@ -150,8 +154,8 @@ fun main() {
                 isMainVisible = false
                 scope.launch {
                     delay(EXIT_ANIMATION_MS)
-                    smtc.shutdown()
-                    mpvController?.release()
+                    mediaSession.shutdown()
+                    controller.release()
                     exitApplication()
                 }
             }
@@ -166,13 +170,20 @@ fun main() {
             for (request in activationRequests) showMainWindow()
         }
 
+        // 占位播放器没有音量，返回 false 让方向键留给页面
+        val adjustVolume: (Int) -> Boolean = { delta ->
+            val available = controller.unavailableReason == null
+            if (available) controller.setVolume(controller.volume.value + delta)
+            available
+        }
+
         hotkeys.onAction = { action ->
             when (action) {
                 HotkeyAction.PlayPause -> controller.togglePlayPause()
                 HotkeyAction.Previous -> controller.skipToPrevious()
                 HotkeyAction.Next -> controller.playNext()
-                HotkeyAction.VolumeUp -> mpvController?.let { it.setVolume(it.volume.value + VOLUME_STEP) }
-                HotkeyAction.VolumeDown -> mpvController?.let { it.setVolume(it.volume.value - VOLUME_STEP) }
+                HotkeyAction.VolumeUp -> adjustVolume(VOLUME_STEP)
+                HotkeyAction.VolumeDown -> adjustVolume(-VOLUME_STEP)
                 HotkeyAction.ToggleDesktopLyric -> setDesktopLyric(!showDesktopLyric)
             }
         }
@@ -183,12 +194,12 @@ fun main() {
         LaunchedEffect(Unit) {
             combine(desktopPreferences.hotkeys, desktopPreferences.mediaKeysEnabled, ::Pair)
                 .collect { (custom, mediaKeys) ->
-                    smtc.setEnabled(mediaKeys)
-                    hotkeys.apply(custom, mediaKeys && !smtcActive)
+                    mediaSession.setEnabled(mediaKeys)
+                    hotkeys.apply(custom, mediaKeys && !mediaSessionActive)
                 }
         }
         LaunchedEffect(Unit) {
-            smtc.bind(controller, playerViewModel)
+            mediaSession.bind(controller, playerViewModel)
         }
 
         val appIcon = remember { loadAppIcon() }
@@ -196,7 +207,7 @@ fun main() {
         TrayHost(
             tooltip = trackText?.let { "Melodia - $it" } ?: "Melodia",
             header = trackText?.let { "正在播放：$it" },
-            entries = listOf(
+            entries = listOfNotNull(
                 TrayMenuEntry.Action("显示主窗口", showMainWindow),
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Action(if (isPlaying) "暂停" else "播放", controller::togglePlayPause),
@@ -204,7 +215,8 @@ fun main() {
                 TrayMenuEntry.Action("下一首", controller::playNext),
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Toggle("桌面歌词", showDesktopLyric, setDesktopLyric),
-                TrayMenuEntry.Toggle("锁定桌面歌词", isLyricLocked) { isLyricLocked = it },
+                TrayMenuEntry.Toggle("锁定桌面歌词", isLyricLocked) { isLyricLocked = it }
+                    .takeIf { windowEffects.supportsClickThrough },
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Action("退出", exit)
             ),
@@ -235,8 +247,8 @@ fun main() {
                         controller.seekTo(if (duration > 0L) target.coerceAtMost(duration) else target)
                         true
                     }
-                    Key.DirectionUp -> mpvController?.let { it.setVolume(it.volume.value + VOLUME_STEP) } != null
-                    Key.DirectionDown -> mpvController?.let { it.setVolume(it.volume.value - VOLUME_STEP) } != null
+                    Key.DirectionUp -> adjustVolume(VOLUME_STEP)
+                    Key.DirectionDown -> adjustVolume(-VOLUME_STEP)
                     else -> false
                 }
             }
@@ -305,7 +317,7 @@ fun main() {
                 }
             }
             // 全屏与最大化一样不要圆角和边框线
-            WindowChromeEffect(maximized = windowState.placement != WindowPlacement.Floating)
+            WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
             MelodiaDesktopTheme {
                 MelodiaDesktopApp(
                     windowState = windowState,
@@ -323,6 +335,7 @@ fun main() {
             playerViewModel = playerViewModel,
             controller = controller,
             settingsPreferences = settingsPreferences,
+            windowEffects = windowEffects,
             onHide = { setDesktopLyric(false) }
         )
     }

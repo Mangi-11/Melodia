@@ -30,10 +30,11 @@ private const val MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7 P
 
 /**
  * 桌面端原生 WebView 登录管理器
- * 基于 Windows 系统内置 Edge 内核以独立 App 模式调起小尺寸窗口，
+ * 以独立 App 模式调起系统 Chromium 内核浏览器（Windows 上为 Edge）的小尺寸窗口，
  * 通过本地全局 CDP 协议监听 Storage.getCookies，检测到 MUSIC_U 后自动关闭并同步凭据。
  */
 class DesktopWebViewLoginManager(
+    private val browserLocator: BrowserLocator,
     private val onLoginSuccess: (String) -> Unit,
     private val onClosed: () -> Unit = {},
     private val onError: (String) -> Unit = {}
@@ -53,9 +54,9 @@ class DesktopWebViewLoginManager(
     private val pollCounter = AtomicInteger(0)
 
     fun start(): Boolean {
-        val edgeExe = findEdgeExecutable()
+        val edgeExe = browserLocator.findChromiumBrowser()
         if (edgeExe == null) {
-            val err = "未找到系统内置 Edge 浏览器，请检查系统环境"
+            val err = "未找到可用于网页登录的浏览器，请改用扫码登录"
             AppLogger.e(TAG, err)
             onError(err)
             return false
@@ -319,13 +320,4 @@ class DesktopWebViewLoginManager(
 
     private fun allocateAvailablePort(): Int =
         ServerSocket(0).use { it.localPort }
-
-    private fun findEdgeExecutable(): File? {
-        val candidates = listOf(
-            File(System.getenv("ProgramFiles(x86)") ?: "C:\\Program Files (x86)", "Microsoft\\Edge\\Application\\msedge.exe"),
-            File(System.getenv("ProgramFiles") ?: "C:\\Program Files", "Microsoft\\Edge\\Application\\msedge.exe"),
-            File(System.getenv("LOCALAPPDATA") ?: "", "Microsoft\\Edge\\Application\\msedge.exe")
-        )
-        return candidates.firstOrNull { it.exists() && it.canExecute() }
-    }
 }

@@ -1,9 +1,8 @@
-package com.lin0721.linmusic.desktop.platform
+package com.lin0721.linmusic.desktop.player
 
 import com.lin0721.linmusic.core.player.NowPlaying
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaySource
-import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.QueueItem
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,14 +12,25 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // libmpv 加载失败时的占位实现：只维护队列与曲目状态、不出声，每次尝试播放都给出提示
-class SilentPlaybackController : PlaybackController {
+class SilentPlaybackController : DesktopPlaybackController {
 
     companion object {
         const val UNAVAILABLE_MESSAGE = "播放组件加载失败，当前无法播放，详见日志"
     }
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    override val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    override val unavailableReason: String = UNAVAILABLE_MESSAGE
+
+    override val volume: StateFlow<Int> = MutableStateFlow(100).asStateFlow()
+    override val audioDevices: StateFlow<List<AudioDevice>> = MutableStateFlow(emptyList<AudioDevice>()).asStateFlow()
+    override val audioDevice: StateFlow<String> = MutableStateFlow(AUTO_AUDIO_DEVICE).asStateFlow()
+
+    override fun setVolume(percent: Int) = Unit
+    override fun refreshAudioDevices() = Unit
+    override fun setAudioDevice(name: String) = Unit
+    override fun release() = Unit
 
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()

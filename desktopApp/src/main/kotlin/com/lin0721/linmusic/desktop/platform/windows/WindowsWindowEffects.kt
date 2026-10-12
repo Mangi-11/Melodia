@@ -1,6 +1,7 @@
-package com.lin0721.linmusic.desktop.platform.win
+package com.lin0721.linmusic.desktop.platform.windows
 
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.sun.jna.Callback
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -8,7 +9,7 @@ import com.sun.jna.ptr.IntByReference
 import java.awt.Window
 import java.util.concurrent.ConcurrentHashMap
 
-private const val TAG = "WindowChrome"
+private const val TAG = "WindowsWindowEffects"
 
 // 窗口过程；须保持强引用，否则回收后原生侧回调会崩溃
 private interface WndProc : Callback {
@@ -18,14 +19,15 @@ private interface WndProc : Callback {
 private class Subclass(val previous: Pointer?, val proc: WndProc)
 
 // 无边框窗口的系统圆角、边框色与最小化/还原/显示/隐藏动画；非 Windows 11 上调用无副作用
-object WindowChrome {
+internal class WindowsWindowEffects : WindowEffects {
 
-    private val isWindows = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
     private val subclasses = ConcurrentHashMap<Long, Subclass>()
+
+    override val supportsClickThrough: Boolean = true
 
     // 系统只给带标题栏样式的窗口播放最小化/还原等动画：补齐样式后拦截 WM_NCCALCSIZE，
     // 让客户区占满整个窗口，外观仍是无边框
-    fun enableSystemAnimations(window: Window) = withHandle(window) { hwnd ->
+    override fun install(window: Window) = withHandle(window) { hwnd ->
         val key = Pointer.nativeValue(hwnd)
         if (subclasses.containsKey(key)) return@withHandle
         val user32 = User32.INSTANCE
@@ -58,7 +60,7 @@ object WindowChrome {
         setAttribute(hwnd, Dwmapi.DWMWA_TRANSITIONS_FORCEDISABLED, 0)
     }
 
-    fun restoreWindowProc(window: Window) = withHandle(window) { hwnd ->
+    override fun uninstall(window: Window) = withHandle(window) { hwnd ->
         val entry = subclasses.remove(Pointer.nativeValue(hwnd)) ?: return@withHandle
         User32.INSTANCE.SetWindowLongPtrW(hwnd, User32.GWLP_WNDPROC, entry.previous)
     }
@@ -84,14 +86,27 @@ object WindowChrome {
         }
     }
 
-    // 最大化时取消圆角与边框；borderRgb 为 0xRRGGBB
-    fun applyFrame(window: Window, maximized: Boolean, borderRgb: Int) = withHandle(window) { hwnd ->
+    override fun applyFrame(window: Window, maximized: Boolean, borderRgb: Int) = withHandle(window) { hwnd ->
         setAttribute(
             hwnd,
             Dwmapi.DWMWA_WINDOW_CORNER_PREFERENCE,
             if (maximized) Dwmapi.DWMWCP_DONOTROUND else Dwmapi.DWMWCP_ROUND
         )
         setAttribute(hwnd, Dwmapi.DWMWA_BORDER_COLOR, if (maximized) Dwmapi.DWMWA_COLOR_NONE else rgbToColorRef(borderRgb))
+    }
+
+    override fun systemBorderAccent(): Int? = SystemAccent.windowBorderAccent()
+
+    // 锁定后加 WS_EX_TRANSPARENT，鼠标事件直接穿透到下层窗口
+    override fun setClickThrough(window: Window, enabled: Boolean) = withHandle(window) { hwnd ->
+        val user32 = User32.INSTANCE
+        val style = user32.GetWindowLongPtrW(hwnd, User32.GWL_EXSTYLE)
+        val newStyle = if (enabled) {
+            style or User32.WS_EX_TRANSPARENT or User32.WS_EX_LAYERED
+        } else {
+            style and User32.WS_EX_TRANSPARENT.inv()
+        }
+        user32.SetWindowLongPtrW(hwnd, User32.GWL_EXSTYLE, newStyle)
     }
 
     // COLORREF 为 0x00BBGGRR
@@ -104,7 +119,7 @@ object WindowChrome {
     }
 
     private fun withHandle(window: Window, block: (Pointer) -> Unit) {
-        if (!isWindows || !window.isDisplayable) return
+        if (!window.isDisplayable) return
         try {
             block(Native.getWindowPointer(window) ?: return)
         } catch (e: RuntimeException) {

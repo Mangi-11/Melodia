@@ -19,6 +19,7 @@ import com.lin0721.linmusic.core.player.data.AmllLyricsClient
 import com.lin0721.linmusic.core.player.data.LyricsCache
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.player.MpvPlaybackController
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import kotlinx.coroutines.CoroutineScope
@@ -30,11 +31,9 @@ import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.desktop.platform.DesktopLibraryPreferences
 import com.lin0721.linmusic.desktop.platform.DesktopOnlineStateProvider
 import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.platform.GlobalHotkeys
-import com.lin0721.linmusic.desktop.platform.smtc.SmtcSession
 import com.lin0721.linmusic.desktop.platform.DesktopPaths
 import com.lin0721.linmusic.desktop.platform.DesktopResourceProvider
-import com.lin0721.linmusic.desktop.platform.SilentPlaybackController
+import com.lin0721.linmusic.desktop.player.SilentPlaybackController
 import com.lin0721.linmusic.desktop.platform.download.DesktopDownloadPreferences
 import com.lin0721.linmusic.desktop.platform.download.DesktopSongDownloader
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
@@ -76,7 +75,7 @@ private fun createPlaybackController(
     desktopPreferences: DesktopPreferences,
     downloadPreferences: DesktopDownloadPreferences,
     audioCache: AudioCache
-): PlaybackController = try {
+): DesktopPlaybackController = try {
     MpvPlaybackController(
         repository, settingsPreferences, playbackPreferences, desktopPreferences,
         localAudioOf = { songId -> downloadPreferences.findVerifiedRecord(songId)?.mediaStoreUri },
@@ -103,8 +102,6 @@ val desktopPlatformModule = module {
     single { PodcastProgressPreferences(store(PreferencesStores.PODCAST)) }
     single { PodcastSeenPreferences(store(PreferencesStores.PODCAST)) }
     single { DesktopPreferences(store(DesktopPreferences.STORE_NAME)) }
-    single { GlobalHotkeys() }
-    single { SmtcSession() }
     single<XeapiKeyStore> { XeapiKeyStoreImpl(store(PreferencesStores.XEAPI_KEY)) }
     single { ContentFilter(get()) }
     single<ResourceProvider> { DesktopResourceProvider() }
@@ -136,7 +133,8 @@ val desktopPlatformModule = module {
         )
     }
     single<SongDownloader> { get<DesktopSongDownloader>() }
-    single<PlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get()) }
+    single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get()) }
+    single<PlaybackController> { get<DesktopPlaybackController>() }
     single { AmllLyricsClient(LyricsCache(DesktopPaths.localCacheDir)) }
     // 桌面第一版没有本地音乐，只取在线歌词
     single {

@@ -31,11 +31,9 @@ import androidx.compose.ui.window.rememberWindowState
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.win.User32
-import com.sun.jna.Native
+import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import java.awt.Toolkit
-import java.awt.Window as AwtWindow
 
 private const val TAG = "DesktopLyric"
 
@@ -57,6 +55,7 @@ fun DesktopLyricWindow(
     playerViewModel: PlayerViewModel,
     controller: PlaybackController,
     settingsPreferences: SettingsPreferences,
+    windowEffects: WindowEffects,
     onHide: () -> Unit
 ) {
     // 默认放在屏幕下方约五分之四高度处，水平居中
@@ -81,7 +80,8 @@ fun DesktopLyricWindow(
         focusable = false,
         resizable = false
     ) {
-        LaunchedEffect(locked, visible) { if (visible) setClickThrough(window, locked) }
+        // 锁定后鼠标事件穿透到下层窗口
+        LaunchedEffect(locked, visible) { if (visible) windowEffects.setClickThrough(window, locked) }
 
         val nowPlaying by controller.nowPlaying.collectAsState()
         val detailState by playerViewModel.songDetailState.collectAsState()
@@ -123,21 +123,4 @@ private fun parseColor(hex: String): Color = try {
 } catch (e: NumberFormatException) {
     AppLogger.w(TAG, "桌面歌词颜色值非法: $hex，回退白色", e)
     Color.White
-}
-
-// 锁定后加 WS_EX_TRANSPARENT，鼠标事件直接穿透到下层窗口
-private fun setClickThrough(window: AwtWindow, enabled: Boolean) {
-    try {
-        val hwnd = Native.getWindowPointer(window) ?: return
-        val user32 = User32.INSTANCE
-        val style = user32.GetWindowLongPtrW(hwnd, User32.GWL_EXSTYLE)
-        val newStyle = if (enabled) {
-            style or User32.WS_EX_TRANSPARENT or User32.WS_EX_LAYERED
-        } else {
-            style and User32.WS_EX_TRANSPARENT.inv()
-        }
-        user32.SetWindowLongPtrW(hwnd, User32.GWL_EXSTYLE, newStyle)
-    } catch (e: UnsatisfiedLinkError) {
-        AppLogger.w(TAG, "设置桌面歌词穿透失败", e)
-    }
 }

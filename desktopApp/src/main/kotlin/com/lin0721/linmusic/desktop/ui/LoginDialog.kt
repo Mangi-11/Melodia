@@ -51,6 +51,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.zxing.common.BitMatrix
 import com.lin0721.linmusic.core.auth.LoginViewModel
 import com.lin0721.linmusic.core.auth.QrLoginState
+import com.lin0721.linmusic.desktop.platform.BrowserLocator
 import com.lin0721.linmusic.desktop.platform.DesktopWebViewLoginManager
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import java.awt.image.BufferedImage
@@ -64,6 +65,7 @@ private enum class LoginTab(val label: String) {
 @Composable
 fun LoginDialog(
     viewModel: LoginViewModel,
+    browserLocator: BrowserLocator,
     onLoginSuccess: (cookies: String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -101,7 +103,7 @@ fun LoginDialog(
                     small = true
                 )
                 when (tab) {
-                    LoginTab.WEB -> WebLogin(onLoginSuccess)
+                    LoginTab.WEB -> WebLogin(browserLocator, onLoginSuccess)
                     LoginTab.SCAN -> ScanLogin(viewModel, onLoginSuccess)
                     LoginTab.COOKIE -> CookieLogin(viewModel, onLoginSuccess)
                 }
@@ -115,12 +117,13 @@ fun LoginDialog(
 }
 
 @Composable
-private fun WebLogin(onLoginSuccess: (String) -> Unit) {
+private fun WebLogin(browserLocator: BrowserLocator, onLoginSuccess: (String) -> Unit) {
     var loginError by remember { mutableStateOf<String?>(null) }
     var retryTrigger by remember { mutableStateOf(0) }
 
     DisposableEffect(retryTrigger) {
         val manager = DesktopWebViewLoginManager(
+            browserLocator = browserLocator,
             onLoginSuccess = onLoginSuccess,
             onError = { loginError = it }
         )

@@ -66,17 +66,16 @@ import com.lin0721.linmusic.core.preferences.FullPlayerCardLayout
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.AutoStart
+import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.CloseAction
 import com.lin0721.linmusic.desktop.platform.DesktopImageLoader
 import com.lin0721.linmusic.desktop.platform.DesktopPaths
 import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.platform.GlobalHotkeys
+import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
-import com.lin0721.linmusic.desktop.platform.smtc.SmtcSession
+import com.lin0721.linmusic.desktop.platform.MediaSessionService
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
-import com.lin0721.linmusic.desktop.platform.win.User32
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -100,20 +99,17 @@ private val QualityOptions = listOf(
     "jymaster" to "超清母带"
 )
 
-// Win32 虚拟键码与 AWT 键码不一致的按键
-private const val WIN_VK_INSERT = 0x2D
-private const val WIN_VK_DELETE = 0x2E
-
 @Composable
 fun SettingsPage(modifier: Modifier = Modifier) {
     val koin = remember { GlobalContext.get() }
     val settingsPreferences = remember { koin.get<SettingsPreferences>() }
     val sourcePreferences = remember { koin.get<SourcePreferences>() }
     val desktopPreferences = remember { koin.get<DesktopPreferences>() }
-    val hotkeys = remember { koin.get<GlobalHotkeys>() }
+    val hotkeys = remember { koin.get<GlobalHotkeyService>() }
+    val autoStart = remember { koin.get<AutoStartService>() }
     val audioCache = remember { koin.get<AudioCache>() }
     val navigator = LocalDesktopNavigator.current
-    val smtc = remember { koin.get<SmtcSession>() }
+    val mediaSession = remember { koin.get<MediaSessionService>() }
     val scope = rememberCoroutineScope()
 
     val quality by settingsPreferences.wifiQuality.collectAsState(initial = "lossless")
@@ -142,7 +138,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
     val mediaKeysEnabled by desktopPreferences.mediaKeysEnabled.collectAsState(initial = true)
     val hotkeyMap by desktopPreferences.hotkeys.collectAsState(initial = HotkeyCombo.defaults)
     val failedHotkeys by hotkeys.failed.collectAsState()
-    val smtcAvailable by smtc.available.collectAsState()
+    val mediaSessionAvailable by mediaSession.available.collectAsState()
 
     val scrollState = rememberScrollState()
     HoverScrollbarBox(scrollState) {
@@ -298,7 +294,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                         }
                     }
                 }
-                AutoStartRow()
+                AutoStartRow(autoStart)
             }
 
             SettingsCard("日志") {
@@ -329,19 +325,21 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                 }
             }
 
-            SettingsCard("快捷键") {
-                SettingRow(
-                    title = "系统媒体控制（媒体键与系统播放卡片）",
-                    subtitle = if (smtcAvailable) null else "系统卡片不可用，已改用全局媒体键"
-                ) {
-                    SettingSwitch(mediaKeysEnabled) { scope.launch { desktopPreferences.saveMediaKeysEnabled(it) } }
+            if (hotkeys.isSupported) {
+                SettingsCard("快捷键") {
+                    SettingRow(
+                        title = "系统媒体控制（媒体键与系统播放卡片）",
+                        subtitle = if (mediaSessionAvailable) null else "系统卡片不可用，已改用全局媒体键"
+                    ) {
+                        SettingSwitch(mediaKeysEnabled) { scope.launch { desktopPreferences.saveMediaKeysEnabled(it) } }
+                    }
+                    HotkeyEditor(
+                        hotkeyMap = hotkeyMap,
+                        failed = failedHotkeys,
+                        hotkeys = hotkeys,
+                        onSave = { scope.launch { desktopPreferences.saveHotkeys(it) } }
+                    )
                 }
-                HotkeyEditor(
-                    hotkeyMap = hotkeyMap,
-                    failed = failedHotkeys,
-                    hotkeys = hotkeys,
-                    onSave = { scope.launch { desktopPreferences.saveHotkeys(it) } }
-                )
             }
         }
     }
@@ -553,24 +551,25 @@ private fun CloseOption(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AutoStartRow() {
+private fun AutoStartRow(autoStart: AutoStartService) {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
-    // null 表示尚未读到注册表状态
+    // null 表示尚未读到系统中的自启状态
     var enabled by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(Unit) {
-        enabled = withContext(Dispatchers.IO) { AutoStart.isEnabled() }
+        enabled = withContext(Dispatchers.IO) { autoStart.isEnabled() }
     }
+    val unavailableReason = autoStart.unavailableReason
     SettingRow(
         title = "开机自动启动",
-        subtitle = if (AutoStart.isSupported) null else "仅安装版可用"
+        subtitle = unavailableReason
     ) {
         SettingSwitch(
             checked = enabled == true,
-            enabled = AutoStart.isSupported && enabled != null
+            enabled = unavailableReason == null && enabled != null
         ) { target ->
             scope.launch {
-                val ok = withContext(Dispatchers.IO) { AutoStart.setEnabled(target) }
+                val ok = withContext(Dispatchers.IO) { autoStart.setEnabled(target) }
                 if (ok) enabled = target else navigator.showMessage("修改开机启动失败")
             }
         }
@@ -581,7 +580,7 @@ private fun AutoStartRow() {
 private fun HotkeyEditor(
     hotkeyMap: Map<HotkeyAction, HotkeyCombo?>,
     failed: Set<HotkeyAction>,
-    hotkeys: GlobalHotkeys,
+    hotkeys: GlobalHotkeyService,
     onSave: (Map<HotkeyAction, HotkeyCombo?>) -> Unit
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -681,15 +680,8 @@ private fun HotkeyRecorder(
                     AwtKeyEvent.VK_CONTROL, AwtKeyEvent.VK_ALT, AwtKeyEvent.VK_SHIFT, AwtKeyEvent.VK_WINDOWS,
                     AwtKeyEvent.VK_META, AwtKeyEvent.VK_ALT_GRAPH -> Unit
                     else -> {
-                        val vk = when (awtCode) {
-                            AwtKeyEvent.VK_INSERT -> WIN_VK_INSERT
-                            AwtKeyEvent.VK_DELETE -> WIN_VK_DELETE
-                            else -> awtCode
-                        }
-                        var modifiers = 0
-                        if (event.isCtrlPressed) modifiers = modifiers or User32.MOD_CONTROL
-                        if (event.isAltPressed) modifiers = modifiers or User32.MOD_ALT
-                        if (event.isShiftPressed) modifiers = modifiers or User32.MOD_SHIFT
+                        val vk = HotkeyCombo.keyCodeFromAwt(awtCode)
+                        val modifiers = HotkeyCombo.modifiersOf(event.isCtrlPressed, event.isAltPressed, event.isShiftPressed)
                         when {
                             !HotkeyCombo.isSupportedKey(vk) -> onInvalid("不支持该按键")
                             !HotkeyCombo.isValid(modifiers, vk) -> onInvalid("快捷键需要包含 Ctrl 或 Alt")

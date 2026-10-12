@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.WindowScope
-import com.lin0721.linmusic.desktop.platform.win.WindowChrome
+import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.ui.theme.WindowBorder
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -20,7 +20,7 @@ private const val DISPLAYABLE_POLL_MS = 50L
 
 // 主窗口的系统圆角与边框线；窗口未获焦点时强调色退为中性线
 @Composable
-fun WindowScope.WindowChromeEffect(maximized: Boolean) {
+fun WindowScope.WindowChromeEffect(effects: WindowEffects, maximized: Boolean) {
     var focused by remember(window) { mutableStateOf(window.isFocused) }
     val accent by WindowBorder.accentRgb.collectAsState()
 
@@ -38,18 +38,18 @@ fun WindowScope.WindowChromeEffect(maximized: Boolean) {
         onDispose { window.removeWindowFocusListener(listener) }
     }
     // 用户在系统设置里改色后，回到窗口时同步
-    LaunchedEffect(focused) { if (focused) WindowBorder.refresh() }
+    LaunchedEffect(focused) { if (focused) WindowBorder.refresh(effects) }
     LaunchedEffect(window) {
         while (!window.isDisplayable) delay(DISPLAYABLE_POLL_MS)
-        WindowChrome.enableSystemAnimations(window)
+        effects.install(window)
         try {
             awaitCancellation()
         } finally {
-            WindowChrome.restoreWindowProc(window)
+            effects.uninstall(window)
         }
     }
     LaunchedEffect(window, maximized, focused, accent) {
         while (!window.isDisplayable) delay(DISPLAYABLE_POLL_MS)
-        WindowChrome.applyFrame(window, maximized, WindowBorder.opaqueRgb(accent.takeIf { focused }, focused))
+        effects.applyFrame(window, maximized, WindowBorder.opaqueRgb(accent.takeIf { focused }, focused))
     }
 }

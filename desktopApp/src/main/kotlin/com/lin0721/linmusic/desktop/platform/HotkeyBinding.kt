@@ -1,6 +1,6 @@
 package com.lin0721.linmusic.desktop.platform
 
-import com.lin0721.linmusic.desktop.platform.win.User32
+import java.awt.event.KeyEvent as AwtKeyEvent
 
 enum class HotkeyAction(val label: String) {
     PlayPause("播放/暂停"),
@@ -11,20 +11,25 @@ enum class HotkeyAction(val label: String) {
     ToggleDesktopLyric("桌面歌词开关")
 }
 
-// modifiers 为 Win32 MOD_* 组合（不含 MOD_NOREPEAT），vk 为虚拟键码，与 AWT 键码在支持的按键范围内一致
+// 与平台无关的组合键；修饰键位与键码取值沿用 Win32 的 MOD_* 与虚拟键码，已保存的配置因此无需迁移，
+// 各平台实现自行转换成本平台的注册参数
 data class HotkeyCombo(val modifiers: Int, val vk: Int) {
 
     val label: String
         get() = buildList {
-            if (modifiers and User32.MOD_CONTROL != 0) add("Ctrl")
-            if (modifiers and User32.MOD_ALT != 0) add("Alt")
-            if (modifiers and User32.MOD_SHIFT != 0) add("Shift")
+            if (modifiers and MOD_CTRL != 0) add("Ctrl")
+            if (modifiers and MOD_ALT != 0) add("Alt")
+            if (modifiers and MOD_SHIFT != 0) add("Shift")
             add(keyName(vk) ?: "0x%02X".format(vk))
         }.joinToString("+")
 
     fun encode(): String = "$modifiers:$vk"
 
     companion object {
+        const val MOD_ALT = 0x0001
+        const val MOD_CTRL = 0x0002
+        const val MOD_SHIFT = 0x0004
+
         private const val VK_SPACE = 0x20
         private const val VK_PRIOR = 0x21
         private const val VK_NEXT = 0x22
@@ -54,7 +59,7 @@ data class HotkeyCombo(val modifiers: Int, val vk: Int) {
         )
 
         val defaults: Map<HotkeyAction, HotkeyCombo> = run {
-            val ctrlAlt = User32.MOD_CONTROL or User32.MOD_ALT
+            val ctrlAlt = MOD_CTRL or MOD_ALT
             mapOf(
                 HotkeyAction.PlayPause to HotkeyCombo(ctrlAlt, 'P'.code),
                 HotkeyAction.Previous to HotkeyCombo(ctrlAlt, VK_LEFT),
@@ -73,9 +78,24 @@ data class HotkeyCombo(val modifiers: Int, val vk: Int) {
 
         fun isSupportedKey(vk: Int): Boolean = keyName(vk) != null
 
+        // AWT 键码在支持范围内与本键码一致，只有 Insert、Delete 不同
+        fun keyCodeFromAwt(awtCode: Int): Int = when (awtCode) {
+            AwtKeyEvent.VK_INSERT -> VK_INSERT
+            AwtKeyEvent.VK_DELETE -> VK_DELETE
+            else -> awtCode
+        }
+
+        fun modifiersOf(ctrl: Boolean, alt: Boolean, shift: Boolean): Int {
+            var modifiers = 0
+            if (ctrl) modifiers = modifiers or MOD_CTRL
+            if (alt) modifiers = modifiers or MOD_ALT
+            if (shift) modifiers = modifiers or MOD_SHIFT
+            return modifiers
+        }
+
         // 全局热键必须带 Ctrl 或 Alt，避免单键误触
         fun isValid(modifiers: Int, vk: Int): Boolean =
-            modifiers and (User32.MOD_CONTROL or User32.MOD_ALT) != 0 && isSupportedKey(vk)
+            modifiers and (MOD_CTRL or MOD_ALT) != 0 && isSupportedKey(vk)
 
         fun decode(raw: String): HotkeyCombo? {
             val parts = raw.split(':')

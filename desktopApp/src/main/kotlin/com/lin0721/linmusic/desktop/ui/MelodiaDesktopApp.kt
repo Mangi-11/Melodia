@@ -50,7 +50,6 @@ import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.lin0721.linmusic.core.auth.LoginViewModel
 import com.lin0721.linmusic.core.auth.SessionMonitor
-import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.download.DownloadTrackInfo
 import com.lin0721.linmusic.core.download.SongDownloader
 import com.lin0721.linmusic.core.download.yearFromEpochMillis
@@ -88,8 +87,8 @@ import com.lin0721.linmusic.feature.podcast.ui.RadioDetailViewModel
 import com.lin0721.linmusic.feature.search.ui.DiscoveryUiState
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
-import com.lin0721.linmusic.desktop.platform.SilentPlaybackController
-import com.lin0721.linmusic.desktop.player.MpvPlaybackController
+import com.lin0721.linmusic.desktop.platform.BrowserLocator
+import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -123,7 +122,9 @@ fun WindowScope.MelodiaDesktopApp(
     val newWorksViewModel = remember { koin.get<NewWorksViewModel>() }
     val libraryViewModel = remember { koin.get<LibraryViewModel>() }
     val loginViewModel = remember { koin.get<LoginViewModel>() }
-    val playbackController = remember { koin.get<PlaybackController>() }
+    val playbackController = remember { koin.get<DesktopPlaybackController>() }
+    // 占位播放器没有音量与输出设备能力，界面隐藏对应入口
+    val audioOutput = playbackController.takeIf { it.unavailableReason == null }
     val playerViewModel = remember { koin.get<PlayerViewModel>() }
     val searchViewModel = remember { koin.get<SearchViewModel>() }
     val desktopPreferences = remember { koin.get<DesktopPreferences>() }
@@ -133,8 +134,6 @@ fun WindowScope.MelodiaDesktopApp(
     val downloadTasks = downloader?.tasks?.collectAsState()?.value.orEmpty()
     val downloadLevel by settingsPreferences.wifiQuality.collectAsState(initial = "standard")
     val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
-    val mpvController = playbackController as? MpvPlaybackController
-    val silentController = playbackController as? SilentPlaybackController
 
     val backStack = remember { BackStack(DesktopRoute.Home) }
     val userProfile by homeViewModel.userProfile.collectAsState()
@@ -291,12 +290,12 @@ fun WindowScope.MelodiaDesktopApp(
     }
 
     // 播放组件加载失败时启动就提示一次，之后每次尝试播放再提示
-    LaunchedEffect(silentController) {
-        if (silentController != null) snackbarHostState.showSnackbar(SilentPlaybackController.UNAVAILABLE_MESSAGE)
+    LaunchedEffect(Unit) {
+        playbackController.unavailableReason?.let { snackbarHostState.showSnackbar(it) }
     }
 
     LaunchedEffect(Unit) {
-        val playbackMessages = mpvController?.messages ?: silentController?.messages ?: emptyFlow()
+        val playbackMessages = playbackController.messages
         val downloadMessages = downloader?.messages ?: emptyFlow()
         merge(
             homeViewModel.toastEvent,
@@ -561,7 +560,7 @@ fun WindowScope.MelodiaDesktopApp(
                                 open = dockOpen,
                                 // 全屏歌词开着时面板改由上层的浮层承载
                                 overlay = if (lyricsView.isOpen) null else dockOverlay,
-                                audioOutput = mpvController,
+                                audioOutput = audioOutput,
                                 downloader = downloader,
                                 onCloseOverlay = { dockOverlay = null },
                                 onOpenComments = { toggleOverlay(DockOverlay.Comments) },
@@ -609,7 +608,7 @@ fun WindowScope.MelodiaDesktopApp(
                             controller = playbackController,
                             playerViewModel = playerViewModel,
                             playlistComments = playlistComments,
-                            audioOutput = mpvController,
+                            audioOutput = audioOutput,
                             downloader = downloader,
                             onClose = { dockOverlay = null },
                             modifier = Modifier.align(Alignment.CenterEnd).padding(DesktopDimens.PaneGap)
@@ -618,7 +617,7 @@ fun WindowScope.MelodiaDesktopApp(
                         )
                     }
                 }
-                val volume = mpvController?.volume?.collectAsState()?.value
+                val volume = playbackController.volume.collectAsState().value.takeIf { audioOutput != null }
                 AnimatedVisibility(
                     visible = !lyricsView.isImmersive,
                     enter = ChromeEnter,
@@ -627,7 +626,7 @@ fun WindowScope.MelodiaDesktopApp(
                     controller = playbackController,
                     playerViewModel = playerViewModel,
                     volume = volume,
-                    onVolumeChange = { mpvController?.setVolume(it) },
+                    onVolumeChange = playbackController::setVolume,
                     nowPlayingOpen = dockOpen && dockOverlay == null,
                     // 盖着覆盖面板时点封面是撤掉面板露出正在播放页，而不是收起右侧栏
                     onToggleNowPlaying = {
@@ -637,7 +636,7 @@ fun WindowScope.MelodiaDesktopApp(
                     onToggleQueue = { toggleOverlay(DockOverlay.Queue) },
                     devicesOpen = dockOpen && dockOverlay == DockOverlay.Devices,
                     // 占位播放器没有输出设备能力时不显示按钮
-                    onToggleDevices = mpvController?.let { { toggleOverlay(DockOverlay.Devices) } },
+                    onToggleDevices = audioOutput?.let { { toggleOverlay(DockOverlay.Devices) } },
                     isFullscreen = isFullscreen,
                     onToggleFullscreen = fullscreen::toggle,
                     lyricVisible = showDesktopLyric,
@@ -656,6 +655,7 @@ fun WindowScope.MelodiaDesktopApp(
     if (showLogin) {
         LoginDialog(
             viewModel = loginViewModel,
+            browserLocator = remember { koin.get<BrowserLocator>() },
             onLoginSuccess = { cookies ->
                 homeViewModel.handleLoginSuccess(cookies)
                 showLogin = false
