@@ -174,11 +174,14 @@ fun WindowScope.MelodiaDesktopApp(
     val setLibraryViewMode: (LibraryViewMode) -> Unit = { mode ->
         scope.launch { desktopPreferences.saveLibraryViewMode(mode) }
     }
-    // 音乐库展开时右侧栏先收成窄条，期间的开合只在本次展开内有效，不改保存的开关值；
-    // 手动打开右侧栏时音乐库保持展开，只是让出宽度
+    // 音乐库展开时右侧栏保持原状态（如果原本开着则继续展开，仅让出宽度），期间的开合只在本次展开内有效，不改保存的开关值
     val isLibraryExpanded = libraryMode == LibraryMode.EXPANDED
-    var expandedDockOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(isLibraryExpanded) { expandedDockOpen = false }
+    var expandedDockOpen by remember { mutableStateOf(nowPlayingOpen) }
+    LaunchedEffect(isLibraryExpanded) {
+        if (isLibraryExpanded) {
+            expandedDockOpen = nowPlayingOpen
+        }
+    }
     val dockOpen = if (isLibraryExpanded) expandedDockOpen else nowPlayingOpen
     val setDockOpen: (Boolean) -> Unit = { open ->
         if (isLibraryExpanded) expandedDockOpen = open else setNowPlayingOpen(open)
@@ -309,6 +312,9 @@ fun WindowScope.MelodiaDesktopApp(
     }
 
     val openLibraryItem: (LibraryItem) -> Unit = { item ->
+        if (libraryMode == LibraryMode.EXPANDED) {
+            setLibraryMode(LibraryMode.DEFAULT)
+        }
         item.id.toLongOrNull()?.let { id ->
             when (item.type) {
                 LibraryItemType.PLAYLIST -> backStack.navigate(DesktopRoute.Playlist(id, item.title))
