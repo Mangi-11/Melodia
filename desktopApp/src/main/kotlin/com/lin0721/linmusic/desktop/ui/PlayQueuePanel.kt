@@ -18,9 +18,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Icon
@@ -31,13 +35,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.awt.awtEventOrNull
+import com.lin0721.linmusic.core.model.Album
+import com.lin0721.linmusic.core.model.Artist
+import com.lin0721.linmusic.core.model.Track
+import com.lin0721.linmusic.core.songlike.SongLikeRepository
+import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
+import kotlinx.coroutines.launch
+import org.koin.core.context.GlobalContext
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
@@ -113,6 +135,49 @@ fun PlayQueuePanel(
         if (reorder.isDragging) reorder.runEdgeScroll()
     }
 
+    val navigator = LocalDesktopNavigator.current
+    val songCollectDelegate = remember { GlobalContext.get().get<SongCollectDelegate>() }
+    val songLikeRepository = remember { GlobalContext.get().get<SongLikeRepository>() }
+    val likedSongIds by songLikeRepository.likedSongIds.collectAsState()
+    val collectState by songCollectDelegate.state.collectAsState()
+
+    val actions = rememberTrackActions(
+        likedSongIds = likedSongIds,
+        collectState = collectState,
+        onToggleLike = { songId, like ->
+            scope.launch {
+                songLikeRepository.likeSong(songId, like).collect { result ->
+                    result.onFailure { navigator.showMessage("操作失败") }
+                }
+            }
+        },
+        onPlayNext = { track ->
+            controller.addToPlayNext(listOf(QueueItem(track.id, track.name, track.ar.joinToString("/") { it.name }, track.al.picUrl)))
+            navigator.showMessage("已添加至下一首播放")
+        },
+        onPrepareCollect = { songId ->
+            scope.launch {
+                songCollectDelegate.prepare(songId, songLikeRepository.likedSongIds.value) { navigator.showMessage(it) }
+            }
+        },
+        onSaveCollect = { songId, items ->
+            scope.launch {
+                songCollectDelegate.save(
+                    songId = songId,
+                    items = items,
+                    likedSongIds = songLikeRepository.likedSongIds.value,
+                    onToast = { navigator.showMessage(it) },
+                    onLikedChanged = { songLikeRepository.syncLikedSongIds(it) }
+                )
+            }
+        },
+        onCreateAndAdd = { name, songId ->
+            scope.launch {
+                songCollectDelegate.createAndAdd(name, songId, songLikeRepository.likedSongIds.value) { navigator.showMessage(it) }
+            }
+        }
+    )
+
     if (showClearConfirm) {
         DesktopDialog(
             title = "清空播放队列",
@@ -160,6 +225,11 @@ fun PlayQueuePanel(
                             dragging = false,
                             offsetY = 0f,
                             onPlay = { controller.playAtIndex(index) },
+                            onPlayNext = {
+                                controller.addToPlayNext(listOf(item))
+                                navigator.showMessage("已添加至下一首播放")
+                            },
+                            actions = actions,
                             onRemove = { controller.removeFromQueue(index) },
                             modifier = Modifier.animateItem()
                         )
@@ -169,8 +239,9 @@ fun PlayQueuePanel(
                 if (hasCurrent) {
                     item(key = "header_current") { SectionLabel("正在播放") }
                     item(key = "current_${queue[currentIndex].songId}") {
+                        val currentItem = queue[currentIndex]
                         QueueRow(
-                            item = queue[currentIndex],
+                            item = currentItem,
                             isCurrent = true,
                             isPlayed = false,
                             canDrag = false,
@@ -178,6 +249,11 @@ fun PlayQueuePanel(
                             dragging = false,
                             offsetY = 0f,
                             onPlay = { controller.playAtIndex(currentIndex) },
+                            onPlayNext = {
+                                controller.addToPlayNext(listOf(currentItem))
+                                navigator.showMessage("已添加至下一首播放")
+                            },
+                            actions = actions,
                             onRemove = { controller.removeFromQueue(currentIndex) }
                         )
                     }
@@ -205,6 +281,11 @@ fun PlayQueuePanel(
                             dragging = dragging,
                             offsetY = reorder.offsetOf(actualIndex),
                             onPlay = { controller.playAtIndex(actualIndex) },
+                            onPlayNext = {
+                                controller.addToPlayNext(listOf(item))
+                                navigator.showMessage("已添加至下一首播放")
+                            },
+                            actions = actions,
                             onRemove = { controller.removeFromQueue(actualIndex) },
                             onDragStart = { reorder.start(actualIndex) },
                             onDrag = { delta -> reorder.drag(actualIndex, delta) },
@@ -241,7 +322,14 @@ private fun SectionLabel(text: String) {
     Text(text, color = DesktopColors.TextGray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
 }
 
+private fun copySongLink(songId: Long): Boolean = runCatching {
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(
+        StringSelection("https://music.163.com/song?id=$songId"), null
+    )
+}.isSuccess
+
 // 双击跳播；悬停时显示拖动把手与移除按钮，拖动中保持显示
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun QueueRow(
     item: QueueItem,
@@ -252,6 +340,8 @@ private fun QueueRow(
     dragging: Boolean,
     offsetY: Float,
     onPlay: () -> Unit,
+    onPlayNext: () -> Unit,
+    actions: TrackActions?,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     onDragStart: () -> Unit = {},
@@ -266,70 +356,149 @@ private fun QueueRow(
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val lifted = dragging || offsetY != 0f
     val shape = RoundedCornerShape(4.dp)
+    val density = LocalDensity.current
+    var rowHeightPx by remember { mutableIntStateOf(0) }
+    var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
 
-    Row(
-        modifier.fillMaxWidth()
-            .then(
-                if (lifted) {
-                    Modifier.zIndex(1f).graphicsLayer { translationY = offsetY }
-                        .then(if (dragging) Modifier.shadow(8.dp, shape) else Modifier)
-                } else {
-                    Modifier
-                }
-            )
-            .clip(shape)
-            .background(
-                when {
-                    dragging -> DesktopColors.Surface
-                    revealed -> DesktopColors.PaneHover
-                    else -> Color.Transparent
-                }
-            )
-            .hoverable(hoverSource)
-            .onDoubleClick(onPlay)
-            .padding(horizontal = 4.dp, vertical = 6.dp)
-            .then(if (isPlayed) Modifier.alpha(0.5f) else Modifier),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(DragHandleWidth, RowButtonSize), contentAlignment = Alignment.Center) {
-            if (canDrag) {
-                HoverReveal(revealed = revealed) {
-                    Icon(
-                        Icons.Rounded.DragIndicator,
-                        "拖动排序",
-                        tint = DesktopColors.TextGray,
-                        modifier = Modifier.size(20.dp).pointerHoverIcon(PointerIcon.Hand).pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { currentOnDragStart() },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    currentOnDrag(amount.y)
-                                },
-                                onDragEnd = { currentOnDragEnd() },
-                                onDragCancel = { currentOnDragEnd() }
-                            )
+    Box(modifier = modifier) {
+        Row(
+            Modifier.fillMaxWidth()
+                .then(
+                    if (lifted) {
+                        Modifier.zIndex(1f).graphicsLayer { translationY = offsetY }
+                            .then(if (dragging) Modifier.shadow(8.dp, shape) else Modifier)
+                    } else {
+                        Modifier
+                    }
+                )
+                .clip(shape)
+                .background(
+                    when {
+                        dragging -> DesktopColors.Surface
+                        revealed || contextMenuOffset != null -> DesktopColors.PaneHover
+                        else -> Color.Transparent
+                    }
+                )
+                .hoverable(hoverSource)
+                .onSizeChanged { rowHeightPx = it.height }
+                .onPointerEvent(PointerEventType.Press) { event ->
+                    if (event.buttons.isSecondaryPressed) {
+                        val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                        contextMenuOffset = with(density) {
+                            DpOffset(position.x.toDp(), (position.y - rowHeightPx).toDp())
                         }
-                    )
+                    } else if (event.awtEventOrNull?.clickCount == 2) {
+                        onPlay()
+                    }
+                }
+                .padding(horizontal = 4.dp, vertical = 6.dp)
+                .then(if (isPlayed) Modifier.alpha(0.5f) else Modifier),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(DragHandleWidth, RowButtonSize), contentAlignment = Alignment.Center) {
+                if (canDrag) {
+                    HoverReveal(revealed = revealed) {
+                        Icon(
+                            Icons.Rounded.DragIndicator,
+                            "拖动排序",
+                            tint = DesktopColors.TextGray,
+                            modifier = Modifier.size(20.dp).pointerHoverIcon(PointerIcon.Hand).pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { currentOnDragStart() },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        currentOnDrag(amount.y)
+                                    },
+                                    onDragEnd = { currentOnDragEnd() },
+                                    onDragCancel = { currentOnDragEnd() }
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+            Cover(item.coverUrl, 40.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    item.title,
+                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(item.artist, color = DesktopColors.TextGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (canRemove) {
+                HoverReveal(revealed = revealed && !dragging) {
+                    IconButton(onClick = onRemove, modifier = Modifier.size(RowButtonSize)) {
+                        Icon(Icons.Rounded.Close, "从队列中移除", tint = DesktopColors.TextGray, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }
-        Cover(item.coverUrl, 40.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(
-                item.title,
-                color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(item.artist, color = DesktopColors.TextGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+        QueueItemMenu(
+            expanded = contextMenuOffset != null,
+            offset = contextMenuOffset ?: DpOffset.Zero,
+            item = item,
+            actions = actions,
+            canRemove = canRemove,
+            onPlayNext = onPlayNext,
+            onRemove = onRemove,
+            onDismiss = { contextMenuOffset = null }
+        )
+    }
+}
+
+@Composable
+private fun QueueItemMenu(
+    expanded: Boolean,
+    offset: DpOffset,
+    item: QueueItem,
+    actions: TrackActions?,
+    canRemove: Boolean,
+    onPlayNext: () -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val navigator = LocalDesktopNavigator.current
+    val track = remember(item) {
+        Track(
+            id = item.songId,
+            name = item.title,
+            ar = listOf(Artist(id = 0L, name = item.artist)),
+            al = Album(id = 0L, name = "", picUrl = item.coverUrl),
+            dt = 0L
+        )
+    }
+    DesktopMenu(expanded = expanded, onDismiss = onDismiss, offset = offset) {
+        MenuItem("下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+            onDismiss()
+            onPlayNext()
+        })
+        if (actions != null) {
+            if (navigator.isLoggedIn) {
+                SubMenuItem("添加到歌单", icon = Icons.AutoMirrored.Rounded.PlaylistAdd, onOpen = { actions.onPrepareCollect(track) }) {
+                    CollectSubmenuContent(track, actions, onDismiss)
+                }
+            } else {
+                MenuItem("添加到歌单", icon = Icons.AutoMirrored.Rounded.PlaylistAdd, onClick = {
+                    onDismiss()
+                    navigator.showMessage("请先登录账号")
+                })
+            }
         }
+        MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+            onDismiss()
+            val ok = copySongLink(item.songId)
+            navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+        })
         if (canRemove) {
-            HoverReveal(revealed = revealed && !dragging) {
-                IconButton(onClick = onRemove, modifier = Modifier.size(RowButtonSize)) {
-                    Icon(Icons.Rounded.Close, "从队列中移除", tint = DesktopColors.TextGray, modifier = Modifier.size(18.dp))
-                }
-            }
+            MenuDivider()
+            MenuItem("从队列中移除", icon = Icons.Rounded.Delete, danger = true, onClick = {
+                onDismiss()
+                onRemove()
+            })
         }
     }
 }

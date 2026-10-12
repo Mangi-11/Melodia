@@ -14,12 +14,15 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -269,6 +272,7 @@ fun TrackRow(
                         offset = DpOffset.Zero,
                         track = track,
                         actions = actions,
+                        onPlay = onPlay,
                         onDismiss = { moreMenuOpen = false }
                     )
                 }
@@ -280,11 +284,18 @@ fun TrackRow(
                 offset = contextMenuOffset ?: DpOffset.Zero,
                 track = track,
                 actions = actions,
+                onPlay = onPlay,
                 onDismiss = { contextMenuOffset = null }
             )
         }
     }
 }
+
+private fun copySongLink(songId: Long): Boolean = runCatching {
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(
+        StringSelection("https://music.163.com/song?id=$songId"), null
+    )
+}.isSuccess
 
 @Composable
 private fun TrackMenu(
@@ -292,12 +303,17 @@ private fun TrackMenu(
     offset: DpOffset,
     track: Track,
     actions: TrackActions,
+    onPlay: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val navigator = LocalDesktopNavigator.current
     val isLiked = track.id in actions.likedSongIds
     val artists = track.ar.filter { it.id > 0 }
     DesktopMenu(expanded = expanded, onDismiss = onDismiss, offset = offset) {
+        MenuItem("播放", icon = Icons.Rounded.PlayArrow, onClick = {
+            onDismiss()
+            onPlay()
+        })
         MenuItem("下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
             onDismiss()
             actions.onPlayNext(track)
@@ -344,6 +360,11 @@ private fun TrackMenu(
         MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
             onDismiss()
             actions.onDownload(track)
+        })
+        MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+            onDismiss()
+            val ok = copySongLink(track.id)
+            navigator.showMessage(if (ok) "已复制链接" else "复制失败")
         })
         actions.onRemove?.let { remove ->
             MenuDivider()

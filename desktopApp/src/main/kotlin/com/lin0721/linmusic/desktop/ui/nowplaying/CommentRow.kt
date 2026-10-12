@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,10 +42,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.model.CommentItem
@@ -73,11 +77,14 @@ fun CommentRow(
     onExpandFloor: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null
 ) {
+    val density = LocalDensity.current
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
+    var rowHeightPx by remember { mutableIntStateOf(0) }
+    var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    val revealed = interactive && (hovered || menuOpen)
+    val revealed = interactive && (hovered || menuOpen || contextMenuOffset != null)
     val navigator = if (interactive) LocalDesktopNavigator.current else null
     val userId = comment.user.userId
     val userClick = if (navigator != null && userId > 0) {
@@ -88,10 +95,16 @@ fun CommentRow(
 
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+            .onSizeChanged { rowHeightPx = it.height }
             .then(
                 if (interactive) {
                     Modifier.hoverable(hoverSource).onPointerEvent(PointerEventType.Press) { event ->
-                        if (event.buttons.isSecondaryPressed) menuOpen = true
+                        if (event.buttons.isSecondaryPressed) {
+                            val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                            contextMenuOffset = with(density) {
+                                DpOffset(position.x.toDp(), (position.y - rowHeightPx).toDp())
+                            }
+                        }
                     }
                 } else {
                     Modifier
@@ -128,6 +141,18 @@ fun CommentRow(
                             canReply = onReply != null,
                             canDelete = onDelete != null,
                             onDismiss = { menuOpen = false },
+                            onCopy = { clipboard.setText(AnnotatedString(comment.content)) },
+                            onReply = { onReply?.invoke() },
+                            onDelete = { onDelete?.invoke() }
+                        )
+                    }
+                    if (contextMenuOffset != null) {
+                        CommentMenu(
+                            expanded = true,
+                            offset = contextMenuOffset ?: DpOffset.Zero,
+                            canReply = onReply != null,
+                            canDelete = onDelete != null,
+                            onDismiss = { contextMenuOffset = null },
                             onCopy = { clipboard.setText(AnnotatedString(comment.content)) },
                             onReply = { onReply?.invoke() },
                             onDelete = { onDelete?.invoke() }
@@ -188,6 +213,7 @@ private fun LikeButton(comment: CommentItem, interactive: Boolean, onLike: () ->
 @Composable
 private fun CommentMenu(
     expanded: Boolean,
+    offset: DpOffset = DpOffset.Zero,
     canReply: Boolean,
     canDelete: Boolean,
     onDismiss: () -> Unit,
@@ -195,7 +221,7 @@ private fun CommentMenu(
     onReply: () -> Unit,
     onDelete: () -> Unit
 ) {
-    DesktopMenu(expanded = expanded, onDismiss = onDismiss, width = 160.dp) {
+    DesktopMenu(expanded = expanded, onDismiss = onDismiss, offset = offset, width = 160.dp) {
         SimpleMenuItem("复制", icon = Icons.Rounded.ContentCopy, onClick = { onDismiss(); onCopy() })
         if (canReply) SimpleMenuItem("回复", icon = Icons.AutoMirrored.Rounded.Reply, onClick = { onDismiss(); onReply() })
         if (canDelete) SimpleMenuItem("删除", icon = Icons.Rounded.Delete, danger = true, onClick = { onDismiss(); onDelete() })

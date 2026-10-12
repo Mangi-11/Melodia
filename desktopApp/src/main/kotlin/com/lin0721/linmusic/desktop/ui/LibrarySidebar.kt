@@ -38,12 +38,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloseFullscreen
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -57,10 +64,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -77,14 +86,22 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import com.lin0721.linmusic.desktop.platform.LibraryMode
 import com.lin0721.linmusic.desktop.platform.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -169,7 +186,19 @@ fun LibraryExpanded(
 ) {
     Column(modifier.fillMaxSize().padding(top = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("音乐库", color = DesktopColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            DesktopTooltip("刷新音乐库", side = TooltipSide.Bottom) {
+                Text(
+                    "音乐库",
+                    color = DesktopColors.TextPrimary,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable { viewModel.loadLibraryData() }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
             Spacer(Modifier.weight(1f))
             if (isLoggedIn) {
                 LibraryCreateButton(viewModel, pill = true)
@@ -385,6 +414,70 @@ private fun LibraryItems(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val query by viewModel.searchQuery.collectAsState()
+    var editingItem by remember { mutableStateOf<LibraryItem?>(null) }
+    var deletingItem by remember { mutableStateOf<LibraryItem?>(null) }
+    var isSavingEdit by remember { mutableStateOf(false) }
+
+    editingItem?.let { item ->
+        val id = item.id.toLongOrNull()
+        if (id != null) {
+            EditPlaylistDialog(
+                initialName = item.title,
+                initialDescription = "",
+                coverUrl = item.coverUrl,
+                isSaving = isSavingEdit,
+                onDismiss = { editingItem = null },
+                onConfirm = { name, desc, coverBytes ->
+                    isSavingEdit = true
+                    viewModel.updatePlaylistInfo(id, item.title, name, null, desc, coverBytes) { success ->
+                        isSavingEdit = false
+                        if (success) editingItem = null
+                    }
+                }
+            )
+        }
+    }
+
+    deletingItem?.let { item ->
+        val id = item.id.toLongOrNull()
+        if (id != null) {
+            AlertDialog(
+                onDismissRequest = { deletingItem = null },
+                title = { Text("删除歌单", color = DesktopColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                text = { Text("确定要删除歌单「${item.title}」吗？", color = DesktopColors.TextGray, fontSize = 13.sp) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.deletePlaylist(id)
+                        deletingItem = null
+                    }) {
+                        Text("删除", color = DangerColor)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deletingItem = null }) {
+                        Text("取消", color = DesktopColors.TextGray)
+                    }
+                },
+                shape = RoundedCornerShape(8.dp),
+                containerColor = DesktopColors.PopupSurface
+            )
+        }
+    }
+
+    val handleDelete: (LibraryItem) -> Unit = { item ->
+        if (item.isOwnedByMe && item.type == LibraryItemType.PLAYLIST) {
+            deletingItem = item
+        } else {
+            item.id.toLongOrNull()?.let { id ->
+                when (item.type) {
+                    LibraryItemType.PLAYLIST -> viewModel.unsubscribePlaylist(id)
+                    LibraryItemType.ALBUM -> viewModel.unsubscribeAlbum(id)
+                    LibraryItemType.ARTIST -> viewModel.unsubscribeArtist(id)
+                }
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         when (val state = uiState) {
             LibraryUiState.Loading -> CenteredBox { CircularProgressIndicator(color = DesktopColors.Accent) }
@@ -401,10 +494,10 @@ private fun LibraryItems(
             } else {
                 Crossfade(viewMode, animationSpec = tween(VIEW_SWITCH_MS), label = "libraryView") { mode ->
                     when (mode) {
-                        LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, compact = true)
-                        LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, compact = false)
-                        LibraryViewMode.SMALL_GRID -> LibraryGrid(state.filteredItems, onItemClick, edgePadding, smallTileMinWidth, small = true)
-                        LibraryViewMode.LARGE_GRID -> LibraryGrid(state.filteredItems, onItemClick, edgePadding, cardMinWidth, small = false)
+                        LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = true)
+                        LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = false)
+                        LibraryViewMode.SMALL_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, smallTileMinWidth, small = true)
+                        LibraryViewMode.LARGE_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, cardMinWidth, small = false)
                     }
                 }
             }
@@ -431,14 +524,23 @@ internal val LazyListState.isScrolled: Boolean get() = firstVisibleItemIndex > 0
 internal val LazyGridState.isScrolled: Boolean get() = firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0
 
 @Composable
-private fun LibraryList(items: List<LibraryItem>, onItemClick: (LibraryItem) -> Unit, compact: Boolean) {
+private fun LibraryList(
+    items: List<LibraryItem>,
+    onItemClick: (LibraryItem) -> Unit,
+    viewModel: LibraryViewModel,
+    onEdit: (LibraryItem) -> Unit,
+    onDelete: (LibraryItem) -> Unit,
+    compact: Boolean
+) {
     val listState = rememberLazyListState()
     val scrolled by remember { derivedStateOf { listState.isScrolled } }
     Box(Modifier.fillMaxSize()) {
         HoverScrollbarBox(listState) {
             LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 items(items, key = { it.id }) { item ->
-                    if (compact) LibraryCompactRow(item) { onItemClick(item) } else LibraryRow(item) { onItemClick(item) }
+                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
+                        if (compact) LibraryCompactRow(item) { onItemClick(item) } else LibraryRow(item) { onItemClick(item) }
+                    }
                 }
             }
         }
@@ -450,6 +552,9 @@ private fun LibraryList(items: List<LibraryItem>, onItemClick: (LibraryItem) -> 
 private fun LibraryGrid(
     items: List<LibraryItem>,
     onItemClick: (LibraryItem) -> Unit,
+    viewModel: LibraryViewModel,
+    onEdit: (LibraryItem) -> Unit,
+    onDelete: (LibraryItem) -> Unit,
     edgePadding: Dp,
     cardMinWidth: Dp,
     small: Boolean
@@ -467,11 +572,137 @@ private fun LibraryGrid(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(items, key = { it.id }) { item ->
-                    if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
+                        if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+                    }
                 }
             }
         }
         ListTopShadow(scrolled)
+    }
+}
+
+private fun copyLibraryItemLink(item: LibraryItem): Boolean {
+    val id = item.id.toLongOrNull() ?: return false
+    val path = when (item.type) {
+        LibraryItemType.PLAYLIST -> "playlist"
+        LibraryItemType.ALBUM -> "album"
+        LibraryItemType.ARTIST -> "artist"
+    }
+    return runCatching {
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(
+            StringSelection("https://music.163.com/$path?id=$id"), null
+        )
+    }.isSuccess
+}
+
+@Composable
+private fun LibraryItemMenu(
+    expanded: Boolean,
+    offset: DpOffset,
+    item: LibraryItem,
+    viewModel: LibraryViewModel,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val navigator = LocalDesktopNavigator.current
+    DesktopMenu(expanded = expanded, onDismiss = onDismiss, offset = offset) {
+        MenuItem("播放", icon = Icons.Rounded.PlayArrow, onClick = {
+            onDismiss()
+            viewModel.playLibraryItem(item)
+        })
+        MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+            onDismiss()
+            viewModel.addLibraryItemToPlayNext(item)
+        })
+        if (item.type != LibraryItemType.ARTIST) {
+            MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                onDismiss()
+                viewModel.downloadLibraryItem(item, navigator.downloadLevel)
+            })
+        }
+        if (item.isOwnedByMe && !item.isLikedSongs && item.type == LibraryItemType.PLAYLIST) {
+            MenuItem("编辑歌单信息", icon = Icons.Rounded.Edit, onClick = {
+                onDismiss()
+                onEdit()
+            })
+        }
+        MenuItem(
+            if (item.isPinned) "取消置顶" else "置顶歌单",
+            icon = Icons.Rounded.PushPin,
+            onClick = {
+                onDismiss()
+                viewModel.togglePin(item.id)
+            }
+        )
+        MenuItem(
+            when (item.type) {
+                LibraryItemType.PLAYLIST -> "复制歌单链接"
+                LibraryItemType.ALBUM -> "复制专辑链接"
+                LibraryItemType.ARTIST -> "复制歌手链接"
+            },
+            icon = Icons.Rounded.Link,
+            onClick = {
+                onDismiss()
+                val ok = copyLibraryItemLink(item)
+                navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+            }
+        )
+        if (!item.isLikedSongs) {
+            MenuDivider()
+            val isOwned = item.isOwnedByMe && item.type == LibraryItemType.PLAYLIST
+            MenuItem(
+                if (isOwned) "删除歌单" else "从音乐库移除",
+                icon = Icons.Rounded.Delete,
+                danger = true,
+                onClick = {
+                    onDismiss()
+                    onDelete()
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+internal fun LibraryContextMenuBox(
+    item: LibraryItem,
+    viewModel: LibraryViewModel,
+    onEdit: (LibraryItem) -> Unit,
+    onDelete: (LibraryItem) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val density = LocalDensity.current
+    var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
+    var heightPx by remember { mutableIntStateOf(0) }
+
+    Box(
+        modifier
+            .onSizeChanged { heightPx = it.height }
+            .onPointerEvent(PointerEventType.Press) { event ->
+                if (event.buttons.isSecondaryPressed) {
+                    val pos = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                    contextMenuOffset = with(density) {
+                        DpOffset(pos.x.toDp(), (pos.y - heightPx).toDp())
+                    }
+                }
+            }
+    ) {
+        content()
+        if (contextMenuOffset != null) {
+            LibraryItemMenu(
+                expanded = true,
+                offset = contextMenuOffset ?: DpOffset.Zero,
+                item = item,
+                viewModel = viewModel,
+                onEdit = { onEdit(item) },
+                onDelete = { onDelete(item) },
+                onDismiss = { contextMenuOffset = null }
+            )
+        }
     }
 }
 

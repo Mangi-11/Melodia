@@ -8,18 +8,29 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.lerp
 import com.lin0721.linmusic.desktop.ui.nowplaying.ScrollArrow
@@ -27,6 +38,8 @@ import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
 import com.lin0721.linmusic.feature.home.data.DailySong
 import com.lin0721.linmusic.feature.recent.domain.RecentPlaylist
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import androidx.compose.animation.animateContentSize
@@ -305,6 +318,7 @@ private fun LazyListScope.homeItems(
         item(key = "recent") {
             RecentGrid(
                 data = data,
+                viewModel = viewModel,
                 modifier = reflow(),
                 onClick = { id, title -> onPlaylistClick(id, title) },
                 onPlay = { id -> viewModel.playCollection(id, isAlbum = false) }
@@ -326,13 +340,45 @@ private fun LazyListScope.homeItems(
     if (data.shelves.isEmpty() && data.recommendPlaylists.isNotEmpty()) {
         item(key = "recommend") {
             Box(reflow()) {
+                val navigator = LocalDesktopNavigator.current
+                val subscribedPlaylistIds by viewModel.subscribedPlaylistIds.collectAsState()
                 ShelfRow("推荐歌单", data.recommendPlaylists) { playlist ->
+                    val isSubscribed = playlist.id in subscribedPlaylistIds
                     CardTile(
                         coverUrl = playlist.picUrl,
                         title = playlist.name,
                         caption = "",
                         typeLabel = "歌单",
-                        onPlay = { viewModel.playCollection(playlist.id, isAlbum = false) }
+                        onPlay = { viewModel.playCollection(playlist.id, isAlbum = false) },
+                        contextMenuContent = { onDismiss ->
+                            MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                                onDismiss()
+                                viewModel.playCollection(playlist.id, isAlbum = false)
+                            })
+                            MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                                onDismiss()
+                                viewModel.addCollectionToPlayNext(playlist.id, isAlbum = false)
+                            })
+                            if (!isSubscribed) {
+                                MenuItem("收藏歌单", icon = Icons.AutoMirrored.Rounded.PlaylistAdd, onClick = {
+                                    onDismiss()
+                                    if (navigator.isLoggedIn) {
+                                        viewModel.subscribePlaylist(playlist.id)
+                                    } else {
+                                        navigator.showMessage("请先登录账号")
+                                    }
+                                })
+                            }
+                            MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                                onDismiss()
+                                viewModel.downloadCollection(playlist.id, isAlbum = false, level = navigator.downloadLevel)
+                            })
+                            MenuItem("复制链接", icon = Icons.Rounded.Link, onClick = {
+                                onDismiss()
+                                val ok = copyLink("https://music.163.com/playlist?id=${playlist.id}")
+                                navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                            })
+                        }
                     ) { onPlaylistClick(playlist.id, playlist.name) }
                 }
             }
@@ -350,10 +396,17 @@ private fun LazyListScope.homeItems(
     }
 }
 
+private fun copyLink(url: String): Boolean = runCatching {
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(
+        StringSelection(url), null
+    )
+}.isSuccess
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RecentGrid(
     data: HomeFeedData,
+    viewModel: HomeViewModel,
     modifier: Modifier,
     onClick: (Long, String) -> Unit,
     onPlay: (Long) -> Unit
@@ -384,6 +437,7 @@ private fun RecentGrid(
                     key(playlist.id) {
                         RecentTile(
                             playlist = playlist,
+                            viewModel = viewModel,
                             height = tileHeight,
                             titleSize = titleSize,
                             modifier = Modifier.weight(1f),
@@ -399,42 +453,97 @@ private fun RecentGrid(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun RecentTile(
     playlist: RecentPlaylist,
+    viewModel: HomeViewModel,
     height: Dp,
     titleSize: TextUnit,
     modifier: Modifier,
     onClick: () -> Unit,
     onPlay: () -> Unit
 ) {
+    val navigator = LocalDesktopNavigator.current
+    val subscribedPlaylistIds by viewModel.subscribedPlaylistIds.collectAsState()
+    val isSubscribed = playlist.id in subscribedPlaylistIds
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val density = LocalDensity.current
+    var tileHeightPx by remember { mutableIntStateOf(0) }
+    var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
-        if (hovered) DesktopColors.SurfaceLight else DesktopColors.Surface,
+        if (hovered || contextMenuOffset != null) DesktopColors.SurfaceLight else DesktopColors.Surface,
         tween(HOVER_FADE_MS),
         label = "recentTileBg"
     )
-    Row(
-        modifier.height(height).homeReflowBounds().clip(RoundedCornerShape(TileRadius))
-            .background(background)
-            .hoverable(interaction)
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 尺寸随拖动连续变化，固定请求尺寸避免反复换缩略图
-        Cover(playlist.coverUrl, height, shape = RoundedCornerShape(0.dp), requestSize = RecentTileMaxHeight)
-        Text(
-            playlist.name,
-            color = DesktopColors.TextPrimary,
-            fontWeight = FontWeight.Bold,
-            fontSize = titleSize,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-        )
-        HoverReveal(revealed = hovered, modifier = Modifier.padding(end = 12.dp)) {
-            HomePlayButton(size = 32.dp, description = "播放${playlist.name}", onClick = onPlay)
+    Box(modifier = modifier) {
+        Row(
+            Modifier.fillMaxWidth().height(height).homeReflowBounds().clip(RoundedCornerShape(TileRadius))
+                .background(background)
+                .hoverable(interaction)
+                .onSizeChanged { tileHeightPx = it.height }
+                .onPointerEvent(PointerEventType.Press) { event ->
+                    if (event.buttons.isSecondaryPressed) {
+                        val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                        contextMenuOffset = with(density) {
+                            DpOffset(position.x.toDp(), (position.y - tileHeightPx).toDp())
+                        }
+                    }
+                }
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 尺寸随拖动连续变化，固定请求尺寸避免反复换缩略图
+            Cover(playlist.coverUrl, height, shape = RoundedCornerShape(0.dp), requestSize = RecentTileMaxHeight)
+            Text(
+                playlist.name,
+                color = DesktopColors.TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = titleSize,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+            )
+            HoverReveal(revealed = hovered, modifier = Modifier.padding(end = 12.dp)) {
+                HomePlayButton(size = 32.dp, description = "播放${playlist.name}", onClick = onPlay)
+            }
+        }
+
+        if (contextMenuOffset != null) {
+            DesktopMenu(
+                expanded = true,
+                offset = contextMenuOffset ?: DpOffset.Zero,
+                onDismiss = { contextMenuOffset = null }
+            ) {
+                MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                    contextMenuOffset = null
+                    onPlay()
+                })
+                MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                    contextMenuOffset = null
+                    viewModel.addCollectionToPlayNext(playlist.id, isAlbum = false)
+                })
+                if (!isSubscribed) {
+                    MenuItem("收藏歌单", icon = Icons.AutoMirrored.Rounded.PlaylistAdd, onClick = {
+                        contextMenuOffset = null
+                        if (navigator.isLoggedIn) {
+                            viewModel.subscribePlaylist(playlist.id)
+                        } else {
+                            navigator.showMessage("请先登录账号")
+                        }
+                    })
+                }
+                MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                    contextMenuOffset = null
+                    viewModel.downloadCollection(playlist.id, isAlbum = false, level = navigator.downloadLevel)
+                })
+                MenuItem("复制链接", icon = Icons.Rounded.Link, onClick = {
+                    contextMenuOffset = null
+                    val ok = copyLink("https://music.163.com/playlist?id=${playlist.id}")
+                    navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                })
+            }
         }
     }
 }
@@ -531,6 +640,7 @@ private fun ServerShelf(
     onPlaylistClick: (Long, String) -> Unit
 ) {
     val navigator = LocalDesktopNavigator.current
+    val subscribedPlaylistIds by viewModel.subscribedPlaylistIds.collectAsState()
     val songs = shelf.cards.filterIsInstance<HomeCard.Song>()
     val voices = shelf.cards.filterIsInstance<HomeCard.Voice>()
     ShelfRow(shelf.title, shelf.cards.withIndex().toList()) { (index, card) ->
@@ -542,12 +652,96 @@ private fun ServerShelf(
                 is HomeCard.Voice -> viewModel.playShelfVoice(shelf.title, voices, card)
             }
         }
+        val contextMenuContent: (@Composable MenuScope.(onDismiss: () -> Unit) -> Unit) = { onDismiss ->
+            when (card) {
+                is HomeCard.Playlist -> {
+                    val isSubscribed = card.id in subscribedPlaylistIds
+                    MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                        onDismiss()
+                        play()
+                    })
+                    MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                        onDismiss()
+                        viewModel.addCollectionToPlayNext(card.id, isAlbum = false)
+                    })
+                    if (!isSubscribed) {
+                        MenuItem("收藏歌单", icon = Icons.AutoMirrored.Rounded.PlaylistAdd, onClick = {
+                            onDismiss()
+                            if (navigator.isLoggedIn) {
+                                viewModel.subscribePlaylist(card.id)
+                            } else {
+                                navigator.showMessage("请先登录账号")
+                            }
+                        })
+                    }
+                    MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                        onDismiss()
+                        viewModel.downloadCollection(card.id, isAlbum = false, level = navigator.downloadLevel)
+                    })
+                    MenuItem("复制链接", icon = Icons.Rounded.Link, onClick = {
+                        onDismiss()
+                        val ok = copyLink("https://music.163.com/playlist?id=${card.id}")
+                        navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                    })
+                }
+                is HomeCard.Album -> {
+                    MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                        onDismiss()
+                        play()
+                    })
+                    MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                        onDismiss()
+                        viewModel.addCollectionToPlayNext(card.id, isAlbum = true)
+                    })
+                    MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                        onDismiss()
+                        viewModel.downloadCollection(card.id, isAlbum = true, level = navigator.downloadLevel)
+                    })
+                    MenuItem("复制链接", icon = Icons.Rounded.Link, onClick = {
+                        onDismiss()
+                        val ok = copyLink("https://music.163.com/album?id=${card.id}")
+                        navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                    })
+                }
+                is HomeCard.Song -> {
+                    MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                        onDismiss()
+                        play()
+                    })
+                    MenuItem("下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                        onDismiss()
+                        viewModel.addShelfSongToPlayNext(card)
+                    })
+                    MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+                        onDismiss()
+                        val ok = copyLink("https://music.163.com/song?id=${card.id}")
+                        navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                    })
+                }
+                is HomeCard.Voice -> {
+                    MenuItem("立即播放", icon = Icons.Rounded.PlayArrow, onClick = {
+                        onDismiss()
+                        play()
+                    })
+                    MenuItem("下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
+                        onDismiss()
+                        viewModel.addShelfVoiceToPlayNext(card)
+                    })
+                    MenuItem("复制节目链接", icon = Icons.Rounded.Link, onClick = {
+                        onDismiss()
+                        val ok = copyLink("https://music.163.com/program?id=${card.songId}")
+                        navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+                    })
+                }
+            }
+        }
         CardTile(
             coverUrl = card.coverUrl,
             title = card.title,
             caption = card.caption,
             typeLabel = if (shelf.showRank) "${card.typeLabel()} · ${index + 1}" else card.typeLabel(),
-            onPlay = play
+            onPlay = play,
+            contextMenuContent = contextMenuContent
         ) {
             when (card) {
                 is HomeCard.Playlist -> onPlaylistClick(card.id, card.title)
@@ -601,6 +795,7 @@ internal fun <T> ShelfRow(title: String, items: List<T>, itemContent: @Composabl
 }
 
 // 卡片自带内边距，悬停时整块衬底；外宽仍为 CardWidth，网格页的列宽计算不受影响
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun CardTile(
     coverUrl: String,
@@ -608,46 +803,76 @@ internal fun CardTile(
     caption: String,
     typeLabel: String? = null,
     onPlay: (() -> Unit)? = null,
+    contextMenuContent: (@Composable MenuScope.(onDismiss: () -> Unit) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val density = LocalDensity.current
+    var tileHeightPx by remember { mutableIntStateOf(0) }
+    var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
-        if (hovered) DesktopColors.CardSurface else Color.Transparent,
+        if (hovered || contextMenuOffset != null) DesktopColors.CardSurface else Color.Transparent,
         tween(HOVER_FADE_MS),
         label = "cardTileBg"
     )
-    Column(
-        Modifier.width(CardWidth).clip(RoundedCornerShape(TileRadius)).background(background)
-            .hoverable(interaction).clickable(onClick = onClick).padding(CardInnerPadding)
-    ) {
-        Box {
-            Cover(coverUrl, CardCoverSize, shape = RoundedCornerShape(TileRadius))
-            if (onPlay != null) {
-                HoverReveal(revealed = hovered, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
-                    HomePlayButton(size = 40.dp, description = "播放$title", onClick = onPlay)
+    Box {
+        Column(
+            Modifier.width(CardWidth).clip(RoundedCornerShape(TileRadius)).background(background)
+                .hoverable(interaction)
+                .onSizeChanged { tileHeightPx = it.height }
+                .then(
+                    if (contextMenuContent != null) {
+                        Modifier.onPointerEvent(PointerEventType.Press) { event ->
+                            if (event.buttons.isSecondaryPressed) {
+                                val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
+                                contextMenuOffset = with(density) {
+                                    DpOffset(position.x.toDp(), (position.y - tileHeightPx).toDp())
+                                }
+                            }
+                        }
+                    } else Modifier
+                )
+                .clickable(onClick = onClick).padding(CardInnerPadding)
+        ) {
+            Box {
+                Cover(coverUrl, CardCoverSize, shape = RoundedCornerShape(TileRadius))
+                if (onPlay != null) {
+                    HoverReveal(revealed = hovered, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
+                        HomePlayButton(size = 40.dp, description = "播放$title", onClick = onPlay)
+                    }
                 }
             }
-        }
-        if (typeLabel != null) {
+            if (typeLabel != null) {
+                Text(
+                    typeLabel,
+                    color = DesktopColors.TextGray,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
             Text(
-                typeLabel,
-                color = DesktopColors.TextGray,
-                fontSize = 12.sp,
-                maxLines = 1,
-                modifier = Modifier.padding(top = 8.dp)
+                title,
+                color = DesktopColors.TextPrimary,
+                fontSize = 14.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = if (typeLabel != null) 2.dp else 8.dp)
             )
+            if (caption.isNotBlank()) {
+                Text(caption, color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-        Text(
-            title,
-            color = DesktopColors.TextPrimary,
-            fontSize = 14.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = if (typeLabel != null) 2.dp else 8.dp)
-        )
-        if (caption.isNotBlank()) {
-            Text(caption, color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+        if (contextMenuContent != null && contextMenuOffset != null) {
+            DesktopMenu(
+                expanded = true,
+                offset = contextMenuOffset ?: DpOffset.Zero,
+                onDismiss = { contextMenuOffset = null }
+            ) {
+                contextMenuContent { contextMenuOffset = null }
+            }
         }
     }
 }
