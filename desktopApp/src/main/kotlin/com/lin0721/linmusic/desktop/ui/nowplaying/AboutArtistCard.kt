@@ -45,13 +45,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
-import com.lin0721.linmusic.feature.player.presentation.initialAboutPage
-import com.lin0721.linmusic.feature.player.presentation.descPreview
-import com.lin0721.linmusic.feature.player.presentation.validAboutArtists
 import com.lin0721.linmusic.core.format.formatCompactCount
-import com.lin0721.linmusic.desktop.ui.LocalDesktopNavigator
-import com.lin0721.linmusic.desktop.ui.sizedCoverUrl
+import com.lin0721.linmusic.desktop.ui.components.sizedCoverUrl
+import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.feature.player.presentation.descPreview
+import com.lin0721.linmusic.feature.player.presentation.initialAboutPage
+import com.lin0721.linmusic.feature.player.presentation.validAboutArtists
 import com.lin0721.linmusic.feature.player.ui.ArtistCardItem
 import kotlinx.coroutines.launch
 

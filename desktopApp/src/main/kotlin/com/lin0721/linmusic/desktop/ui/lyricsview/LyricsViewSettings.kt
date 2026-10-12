@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.player.domain.LyricAlignment
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import kotlinx.coroutines.launch
 
 val LyricsFontSizeRange = 24..72

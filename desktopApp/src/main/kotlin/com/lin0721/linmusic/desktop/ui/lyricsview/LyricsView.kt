@@ -69,10 +69,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.lin0721.linmusic.feature.player.presentation.isActiveLine
-import com.lin0721.linmusic.feature.player.presentation.secondaryText
-import com.lin0721.linmusic.feature.player.presentation.LyricsPlaceholder
-import com.lin0721.linmusic.feature.player.presentation.lyricsPlaceholder
 import com.lin0721.linmusic.core.model.Album
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.player.NowPlaying
@@ -80,16 +76,20 @@ import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.player.domain.lyricLineKey
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.ui.DesktopTooltip
-import com.lin0721.linmusic.desktop.ui.LocalDesktopNavigator
-import com.lin0721.linmusic.desktop.ui.artistLinks
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.nowplaying.rememberCoverBase
 import com.lin0721.linmusic.desktop.ui.nowplaying.verticalEdgeFade
 import com.lin0721.linmusic.desktop.ui.palette.darken
 import com.lin0721.linmusic.desktop.ui.palette.saturateIfChromatic
+import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
+import com.lin0721.linmusic.desktop.ui.track.artistLinks
+import com.lin0721.linmusic.feature.player.presentation.LyricsPlaceholder
+import com.lin0721.linmusic.feature.player.presentation.isActiveLine
+import com.lin0721.linmusic.feature.player.presentation.lyricsPlaceholder
+import com.lin0721.linmusic.feature.player.presentation.secondaryText
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.delay
 

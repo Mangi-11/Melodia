@@ -2,7 +2,7 @@ package com.lin0721.linmusic.desktop.ui.lyricsview
 
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
-import com.lin0721.linmusic.desktop.ui.FullscreenState
+import com.lin0721.linmusic.desktop.ui.shell.FullscreenState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -24,9 +24,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.linmusic.desktop.ui.PlayerSlider
-import com.lin0721.linmusic.desktop.ui.SettingSwitch
-import com.lin0721.linmusic.desktop.ui.TabBar
+import com.lin0721.linmusic.desktop.ui.artist.TabBar
+import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
+import com.lin0721.linmusic.desktop.ui.settings.SettingSwitch
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlin.math.roundToInt
 

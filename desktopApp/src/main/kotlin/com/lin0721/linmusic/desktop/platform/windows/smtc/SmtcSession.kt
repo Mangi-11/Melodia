@@ -4,7 +4,7 @@ import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
-import com.lin0721.linmusic.desktop.ui.sizedCoverUrl
+import com.lin0721.linmusic.desktop.ui.components.sizedCoverUrl
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import com.sun.jna.WString
 import kotlinx.coroutines.coroutineScope

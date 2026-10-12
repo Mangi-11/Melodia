@@ -2,8 +2,8 @@ package com.lin0721.linmusic.desktop.ui.shell
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.lin0721.linmusic.desktop.platform.LibraryMode
-import com.lin0721.linmusic.desktop.platform.LibraryViewMode
+import com.lin0721.linmusic.desktop.data.LibraryMode
+import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

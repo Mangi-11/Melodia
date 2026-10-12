@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.comment.presentation.previewComments
 import com.lin0721.linmusic.core.comment.ui.CommentsState
+import com.lin0721.linmusic.desktop.ui.comments.CommentRow
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 
 private const val PREVIEW_MAX_LINES = 3

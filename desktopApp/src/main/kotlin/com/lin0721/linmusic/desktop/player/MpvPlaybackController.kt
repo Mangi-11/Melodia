@@ -8,8 +8,6 @@ import com.lin0721.linmusic.core.player.PlaySource
 import com.lin0721.linmusic.core.player.PlaybackController.Companion.CONTEXT_INTELLIGENCE
 import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.player.PlaybackQueue
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.core.player.PlaybackState
 import com.lin0721.linmusic.core.player.PlaybackStateStore
 import com.lin0721.linmusic.core.player.QueueItem
@@ -17,6 +15,8 @@ import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.SleepTimer
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.desktop.player.mpv.MpvEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,10 +32,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
-import java.io.File
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 private const val TAG = "MpvPlayback"
 

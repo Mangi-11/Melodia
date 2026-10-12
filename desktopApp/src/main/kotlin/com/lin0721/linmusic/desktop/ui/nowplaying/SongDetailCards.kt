@@ -36,17 +36,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.linmusic.feature.player.presentation.DetailAction
-import com.lin0721.linmusic.feature.player.presentation.DetailRow
-import com.lin0721.linmusic.feature.player.presentation.songDetailRows
 import com.lin0721.linmusic.core.model.Track
-import com.lin0721.linmusic.desktop.ui.LocalDesktopNavigator
-import com.lin0721.linmusic.desktop.ui.DesktopDialog
-import com.lin0721.linmusic.desktop.ui.DialogButton
+import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
+import com.lin0721.linmusic.desktop.ui.components.DialogButton
+import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.player.domain.SongMusicMemory
 import com.lin0721.linmusic.feature.player.domain.SongWikiCreatorRole
 import com.lin0721.linmusic.feature.player.domain.SongWikiData
+import com.lin0721.linmusic.feature.player.presentation.DetailAction
+import com.lin0721.linmusic.feature.player.presentation.DetailRow
+import com.lin0721.linmusic.feature.player.presentation.songDetailRows
 
 private val LabelWidth = 70.dp
 private val LabelColor = DesktopColors.TextGray.copy(alpha = 0.6f)

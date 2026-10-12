@@ -5,19 +5,9 @@ import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.sun.net.httpserver.HttpServer
-import java.io.File
-import java.lang.reflect.Proxy
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.file.Files
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.PI
-import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -32,6 +22,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.lang.reflect.Proxy
+import java.net.InetSocketAddress
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.PI
+import kotlin.math.sin
 
 // 无声输出的真实 libmpv 端到端验证边播边存：落缓存、命中缓存、联网失败时兜底
 class MpvPlaybackControllerCacheTest {

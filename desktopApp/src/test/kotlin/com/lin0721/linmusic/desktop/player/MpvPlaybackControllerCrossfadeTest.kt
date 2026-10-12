@@ -5,15 +5,7 @@ import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import java.io.File
-import java.lang.reflect.Proxy
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.file.Files
-import java.util.concurrent.Executors
-import kotlin.math.PI
-import kotlin.math.sin
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -26,6 +18,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.lang.reflect.Proxy
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.util.concurrent.Executors
+import kotlin.math.PI
+import kotlin.math.sin
 
 // 无声输出的真实 libmpv 端到端验证交叉淡化的预载、触发与状态交接；缺少 DLL 时跳过
 class MpvPlaybackControllerCrossfadeTest {

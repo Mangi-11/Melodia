@@ -6,7 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.lin0721.linmusic.desktop.ui.FullscreenState
+import com.lin0721.linmusic.desktop.ui.shell.FullscreenState
 
 // 全屏歌词界面的开关，与窗口全屏联动：只有“全屏”入口把窗口带进全屏时，收起歌词界面才一并退出窗口全屏
 @Stable

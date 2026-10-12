@@ -2,7 +2,6 @@ package com.lin0721.linmusic.desktop.ui.shell
 
 import com.lin0721.linmusic.core.download.DownloadTrackInfo
 import com.lin0721.linmusic.core.download.yearFromEpochMillis
-import com.lin0721.linmusic.desktop.ui.DesktopNavigator
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 
 // 把应用状态与下载能力包装成页面使用的跳转与提示入口

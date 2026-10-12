@@ -2,15 +2,14 @@ package com.lin0721.linmusic.desktop.ui.shell
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
-import com.lin0721.linmusic.desktop.platform.LibraryMode
-import com.lin0721.linmusic.desktop.platform.LibraryViewMode
-import com.lin0721.linmusic.desktop.ui.CommentsHost
-import com.lin0721.linmusic.desktop.ui.DockOverlay
-import com.lin0721.linmusic.desktop.ui.FullscreenState
-import com.lin0721.linmusic.desktop.ui.HOME_TAB_ALL
-import com.lin0721.linmusic.desktop.ui.HOME_TAB_MUSIC
+import com.lin0721.linmusic.desktop.data.LibraryMode
+import com.lin0721.linmusic.desktop.data.LibraryViewMode
+import com.lin0721.linmusic.desktop.ui.comments.CommentsHost
+import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_ALL
+import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_MUSIC
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
+import com.lin0721.linmusic.desktop.ui.nowplaying.DockOverlay
 import com.lin0721.linmusic.feature.library.ui.LibraryItem
 import com.lin0721.linmusic.feature.library.ui.LibraryItemType
 import org.junit.Assert.assertEquals

@@ -9,9 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.platform.LibraryMode
-import com.lin0721.linmusic.desktop.platform.LibraryViewMode
+import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.LibraryMode
+import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
