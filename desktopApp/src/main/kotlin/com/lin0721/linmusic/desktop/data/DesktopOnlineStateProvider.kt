@@ -39,7 +39,7 @@ class DesktopOnlineStateProvider(
     private fun probe(): Boolean = try {
         val interfaces = NetworkInterface.getNetworkInterfaces() ?: return false
         interfaces.asSequence().any { nic ->
-            nic.isUp && !nic.isLoopback && !nic.isVirtual && !isVirtualAdapter(nic) &&
+            nic.isUp && !nic.isLoopback && !nic.isVirtual && !isVirtualAdapterName(nic.displayName) &&
                 nic.inetAddresses.asSequence().any(::isUsableAddress)
         }
     } catch (e: Exception) {
@@ -47,11 +47,12 @@ class DesktopOnlineStateProvider(
         true
     }
 
-    private fun isVirtualAdapter(nic: NetworkInterface): Boolean {
-        val name = nic.displayName.orEmpty().lowercase()
-        return VIRTUAL_ADAPTER_HINTS.any { name.contains(it) }
-    }
-
     private fun isUsableAddress(address: InetAddress): Boolean =
         !address.isLoopbackAddress && !address.isLinkLocalAddress && !address.isAnyLocalAddress
+}
+
+// 虚拟机、VPN、WSL 等虚拟网卡在没有真实网络时也处于启用状态，按显示名排除
+internal fun isVirtualAdapterName(displayName: String?): Boolean {
+    val name = displayName.orEmpty().lowercase()
+    return VIRTUAL_ADAPTER_HINTS.any { name.contains(it) }
 }

@@ -8,6 +8,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "DesktopWebViewLoginManager"
 private const val LOG_EVERY_POLLS = 5
+private const val NETEASE_DOMAIN = "163.com"
 private const val LOGIN_URL = "https://music.163.com/m/login"
 private const val MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
 
@@ -244,17 +249,7 @@ class DesktopWebViewLoginManager(
             }
             val result = root["result"]?.jsonObject ?: return
             val cookiesArray = result["cookies"]?.jsonArray ?: return
-
-            // 只取网易域名的 Cookie：浏览器里还可能有 Edge 自身或第三方域名的条目，混进请求头没有意义
-            val cookieMap = LinkedHashMap<String, String>()
-            for (c in cookiesArray) {
-                val obj = c.jsonObject
-                val domain = obj["domain"]?.jsonPrimitive?.content.orEmpty()
-                if (!domain.endsWith("163.com")) continue
-                val name = obj["name"]?.jsonPrimitive?.content ?: continue
-                val value = obj["value"]?.jsonPrimitive?.content ?: continue
-                cookieMap[name] = value
-            }
+            val cookieMap = neteaseCookiesOf(cookiesArray)
             if (pollCounter.incrementAndGet() % LOG_EVERY_POLLS == 1) {
                 AppLogger.i(TAG, "已读取 ${cookiesArray.size} 个 Cookie，网易域名 ${cookieMap.size} 个：${cookieMap.keys.joinToString()}")
             }
@@ -320,4 +315,19 @@ class DesktopWebViewLoginManager(
 
     private fun allocateAvailablePort(): Int =
         ServerSocket(0).use { it.localPort }
+}
+
+// 只取网易域名的 Cookie：浏览器里还可能有 Edge 自身或第三方域名的条目，混进请求头没有意义；
+// 按域名后缀匹配时要求以点分隔，避免 xx163.com 这类域名混入
+internal fun neteaseCookiesOf(cookies: JsonArray): LinkedHashMap<String, String> {
+    val result = LinkedHashMap<String, String>()
+    for (element in cookies) {
+        val obj = element as? JsonObject ?: continue
+        val domain = (obj["domain"] as? JsonPrimitive)?.contentOrNull?.trimStart('.').orEmpty()
+        if (domain != NETEASE_DOMAIN && !domain.endsWith(".$NETEASE_DOMAIN")) continue
+        val name = (obj["name"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: continue
+        val value = (obj["value"] as? JsonPrimitive)?.contentOrNull ?: continue
+        result[name] = value
+    }
+    return result
 }
