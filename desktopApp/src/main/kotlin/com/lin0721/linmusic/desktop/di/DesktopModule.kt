@@ -60,6 +60,8 @@ import com.lin0721.linmusic.feature.podcast.data.PodcastSeenPreferences
 import com.lin0721.linmusic.feature.search.data.SearchHistoryPreferences
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
+import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
+import com.lin0721.linmusic.desktop.ui.DesktopSettingsViewModel
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
@@ -186,4 +188,6 @@ val desktopViewModelModule = module {
     factoryOf(::PlaylistViewModel)
     singleOf(::PlayerViewModel)
     factoryOf(::ArtistViewModel)
+    singleOf(::CommonSettingsViewModel)
+    single { DesktopSettingsViewModel(get(), get(), get(), get(), get()) }
 }

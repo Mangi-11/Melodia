@@ -1,0 +1,241 @@
+package com.lin0721.linmusic.desktop.ui
+
+import com.lin0721.linmusic.core.player.PlaybackController
+import com.lin0721.linmusic.core.preferences.PreferencesStores
+import com.lin0721.linmusic.desktop.platform.AutoStartService
+import com.lin0721.linmusic.desktop.platform.CloseAction
+import com.lin0721.linmusic.desktop.platform.DesktopPreferences
+import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
+import com.lin0721.linmusic.desktop.platform.HotkeyAction
+import com.lin0721.linmusic.desktop.platform.HotkeyCombo
+import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.desktop.player.cache.AudioCache
+import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.retry
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+
+private const val READ_RETRIES = 5L
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class DesktopSettingsViewModelTest {
+
+    private class FakeHotkeys : GlobalHotkeyService {
+        var pauses = 0
+        var resumes = 0
+        override val isSupported = true
+        override var onAction: ((HotkeyAction) -> Unit)? = null
+        override val failed: StateFlow<Set<HotkeyAction>> = MutableStateFlow(setOf(HotkeyAction.Next))
+        override fun start() = Unit
+        override fun stop() = Unit
+        override fun apply(custom: Map<HotkeyAction, HotkeyCombo?>, mediaKeys: Boolean) = Unit
+        override fun pause() {
+            pauses++
+        }
+        override fun resume() {
+            resumes++
+        }
+    }
+
+    private class FakeMediaSession : MediaSessionService {
+        override val available: StateFlow<Boolean> = MutableStateFlow(true)
+        override fun start() = true
+        override fun setEnabled(value: Boolean) = Unit
+        override suspend fun bind(controller: PlaybackController, playerViewModel: PlayerViewModel) = Unit
+        override fun shutdown() = Unit
+    }
+
+    private class FakeAutoStart(override val unavailableReason: String? = null) : AutoStartService {
+        var enabled = false
+        var succeed = true
+        var setCalls = 0
+        override fun isEnabled() = enabled
+        override fun setEnabled(enabled: Boolean): Boolean {
+            setCalls++
+            if (succeed) this.enabled = enabled
+            return succeed
+        }
+    }
+
+    private lateinit var dir: File
+    private lateinit var cacheDir: File
+    private lateinit var preferences: DesktopPreferences
+    private val hotkeys = FakeHotkeys()
+    private var imageBytes = 300L
+    private var logBytes = 40L
+
+    private val storage = LocalStorageOps(
+        imageCacheSize = { imageBytes },
+        clearImageCache = { imageBytes = 0L },
+        logsSize = { logBytes },
+        clearLogs = { logBytes = 0L }
+    )
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        dir = Files.createTempDirectory("melodia-desktop-settings-test").toFile()
+        cacheDir = File(dir, "audio").apply { mkdirs() }
+        preferences = DesktopPreferences(PreferencesStores.get(File(dir, "desktop.preferences_pb")))
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+        dir.deleteRecursively()
+    }
+
+    private fun viewModel(autoStart: AutoStartService = FakeAutoStart()) = DesktopSettingsViewModel(
+        desktopPreferences = preferences,
+        hotkeys = hotkeys,
+        mediaSession = FakeMediaSession(),
+        autoStart = autoStart,
+        audioCache = AudioCache(cacheDir),
+        storage = storage,
+        ioDispatcher = UnconfinedTestDispatcher()
+    )
+
+    // 修改时间依次递增，淘汰时先删旧的
+    private fun cacheFile(songId: Long, size: Int, modified: Long) {
+        File(cacheDir, "${songId}_standard.mka").apply {
+            writeBytes(ByteArray(size))
+            setLastModified(modified)
+        }
+    }
+
+    // Windows 上替换文件的瞬间去读会偶发找不到文件，重试即可
+    private fun <T> Flow<T>.awaitValue(expected: T) = runBlocking {
+        val reads = retry(READ_RETRIES) { it is IOException }
+        withTimeoutOrNull(5_000) { reads.first { it == expected } }
+            ?: assertEquals(expected, reads.first())
+    }
+
+    @Test
+    fun refreshReadsStorageAndAutoStart() {
+        cacheFile(1, 100, 1_000_000L)
+        val autoStart = FakeAutoStart().apply { enabled = true }
+        val vm = viewModel(autoStart)
+        assertNull(vm.autoStartEnabled.value)
+
+        vm.refresh()
+
+        assertEquals(true, vm.autoStartEnabled.value)
+        assertEquals(100L, vm.audioCacheBytes.value)
+        assertEquals(300L, vm.imageCacheBytes.value)
+        assertEquals(40L, vm.logBytes.value)
+    }
+
+    @Test
+    fun trimAudioCacheEvictsOldestAndRefreshesSize() {
+        cacheFile(1, 100, 1_000_000L)
+        cacheFile(2, 100, 2_000_000L)
+        val vm = viewModel()
+
+        vm.trimAudioCache(150L)
+
+        assertEquals(100L, vm.audioCacheBytes.value)
+        assertFalse(File(cacheDir, "1_standard.mka").exists())
+        assertTrue(File(cacheDir, "2_standard.mka").exists())
+    }
+
+    @Test
+    fun clearActionsResetSizes() {
+        cacheFile(1, 100, 1_000_000L)
+        val vm = viewModel()
+        vm.refresh()
+
+        vm.clearAudioCache()
+        vm.clearImageCache()
+        vm.clearLogs()
+
+        assertEquals(0L, vm.audioCacheBytes.value)
+        assertEquals(0L, vm.imageCacheBytes.value)
+        assertEquals(0L, vm.logBytes.value)
+    }
+
+    @Test
+    fun autoStartFailureKeepsStateAndReportsMessage() = runBlocking {
+        val autoStart = FakeAutoStart().apply { succeed = false }
+        val vm = viewModel(autoStart)
+        vm.refresh()
+        val messages = mutableListOf<String>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.messages.collect { messages += it } }
+
+        vm.updateAutoStart(true)
+
+        assertEquals(false, vm.autoStartEnabled.value)
+        assertEquals(listOf("修改开机启动失败"), messages)
+        job.cancel()
+    }
+
+    @Test
+    fun autoStartSuccessUpdatesState() {
+        val autoStart = FakeAutoStart()
+        val vm = viewModel(autoStart)
+        vm.refresh()
+
+        vm.updateAutoStart(true)
+
+        assertEquals(true, vm.autoStartEnabled.value)
+        assertTrue(autoStart.enabled)
+    }
+
+    @Test
+    fun unavailableAutoStartIsNeverTouched() {
+        val autoStart = FakeAutoStart(unavailableReason = "仅安装版可用")
+        val vm = viewModel(autoStart)
+
+        vm.updateAutoStart(true)
+
+        assertEquals("仅安装版可用", vm.autoStartUnavailableReason)
+        assertEquals(0, autoStart.setCalls)
+    }
+
+    @Test
+    fun hotkeyRecordingPausesAndResumesService() {
+        val vm = viewModel()
+
+        vm.pauseHotkeys()
+        vm.resumeHotkeys()
+
+        assertEquals(1, hotkeys.pauses)
+        assertEquals(1, hotkeys.resumes)
+        assertEquals(setOf(HotkeyAction.Next), vm.failedHotkeys.value)
+        assertTrue(vm.hotkeysSupported)
+        assertTrue(vm.mediaSessionAvailable.value)
+    }
+
+    @Test
+    fun windowAndHotkeySettingsArePersisted() {
+        val vm = viewModel()
+        val custom = HotkeyCombo.defaults + (HotkeyAction.Next to null)
+
+        vm.updateCloseAction(CloseAction.EXIT)
+        vm.updateMediaKeysEnabled(false)
+        vm.updateHotkeys(custom)
+
+        preferences.closeAction.awaitValue(CloseAction.EXIT)
+        preferences.mediaKeysEnabled.awaitValue(false)
+        preferences.hotkeys.awaitValue(custom)
+    }
+}

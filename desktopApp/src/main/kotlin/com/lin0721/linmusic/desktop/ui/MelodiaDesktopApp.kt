@@ -85,6 +85,7 @@ import com.lin0721.linmusic.feature.podcast.ui.PodcastSubscribedViewModel
 import com.lin0721.linmusic.feature.podcast.ui.PodcastToplistViewModel
 import com.lin0721.linmusic.feature.podcast.ui.RadioDetailViewModel
 import com.lin0721.linmusic.feature.search.ui.DiscoveryUiState
+import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
 import com.lin0721.linmusic.desktop.platform.BrowserLocator
@@ -542,7 +543,10 @@ fun WindowScope.MelodiaDesktopApp(
                                                 mode = route.mode,
                                                 viewModel = frameHost.viewModelFor(entry.id, FollowListViewModel::class, { it.toastEvent }) { koin.get() }
                                             )
-                                            DesktopRoute.Settings -> SettingsPage()
+                                            DesktopRoute.Settings -> SettingsPage(
+                                                common = remember { koin.get<CommonSettingsViewModel>() },
+                                                desktop = remember { koin.get<DesktopSettingsViewModel>() }
+                                            )
                                             DesktopRoute.Search -> SearchPage(
                                                 viewModel = searchViewModel,
                                                 controller = playbackController,

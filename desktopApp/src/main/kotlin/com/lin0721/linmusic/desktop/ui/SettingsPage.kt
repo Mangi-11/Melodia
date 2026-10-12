@@ -31,7 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
-import com.lin0721.linmusic.core.source.SourcePreferences
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
@@ -62,25 +61,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.linmusic.core.preferences.FullPlayerCardLayout
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
-import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.CloseAction
-import com.lin0721.linmusic.desktop.platform.DesktopImageLoader
-import com.lin0721.linmusic.desktop.platform.DesktopPaths
-import com.lin0721.linmusic.desktop.platform.DesktopPreferences
-import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
+import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
-import com.lin0721.linmusic.desktop.platform.MediaSessionService
-import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.core.context.GlobalContext
 import java.awt.event.KeyEvent as AwtKeyEvent
 import java.awt.Desktop
 import java.io.File
@@ -100,45 +88,41 @@ private val QualityOptions = listOf(
 )
 
 @Composable
-fun SettingsPage(modifier: Modifier = Modifier) {
-    val koin = remember { GlobalContext.get() }
-    val settingsPreferences = remember { koin.get<SettingsPreferences>() }
-    val sourcePreferences = remember { koin.get<SourcePreferences>() }
-    val desktopPreferences = remember { koin.get<DesktopPreferences>() }
-    val hotkeys = remember { koin.get<GlobalHotkeyService>() }
-    val autoStart = remember { koin.get<AutoStartService>() }
-    val audioCache = remember { koin.get<AudioCache>() }
+fun SettingsPage(
+    common: CommonSettingsViewModel,
+    desktop: DesktopSettingsViewModel,
+    modifier: Modifier = Modifier
+) {
     val navigator = LocalDesktopNavigator.current
-    val mediaSession = remember { koin.get<MediaSessionService>() }
     val scope = rememberCoroutineScope()
 
-    val quality by settingsPreferences.wifiQuality.collectAsState(initial = "lossless")
-    val fallbackEnabled by sourcePreferences.fallbackEnabled.collectAsState(initial = false)
-    val communityPriority by sourcePreferences.communityPriority.collectAsState(initial = false)
-    val unmServerUrl by sourcePreferences.unmServerUrl.collectAsState(initial = "")
-    val unmRemoteFallbackEnabled by sourcePreferences.unmRemoteFallbackEnabled.collectAsState(initial = false)
-    val unmAutoMatch by sourcePreferences.unmAutoMatch.collectAsState(initial = true)
-    val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
-    val logLevelName by settingsPreferences.logLevel.collectAsState(initial = AppLogger.LogLevel.WARN.name)
-    var logBytes by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) { logBytes = withContext(Dispatchers.IO) { AppLogger.getLogsSize() } }
-    val streamCacheEnabled by settingsPreferences.streamCacheEnabled.collectAsState(initial = true)
-    val cacheMaxSize by settingsPreferences.audioCacheMaxSize.collectAsState(initial = CacheSizeOptions.first())
-    var cacheUsedBytes by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) { cacheUsedBytes = withContext(Dispatchers.IO) { audioCache.totalSize() } }
-    var imageCacheBytes by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) { imageCacheBytes = withContext(Dispatchers.IO) { DesktopImageLoader.diskCacheSize() } }
-    val crossfadeEnabled by settingsPreferences.crossfadeEnabled.collectAsState(initial = false)
-    val crossfadeDurationMs by settingsPreferences.crossfadeDurationMs.collectAsState(initial = CrossfadePolicy.DEFAULT_DURATION_MS)
-    val downloadFolder by settingsPreferences.downloadFolderUri.collectAsState(initial = null)
-    val downloadLyrics by settingsPreferences.downloadLyricsEnabled.collectAsState(initial = true)
-    val defaultPlaylistPrivate by settingsPreferences.defaultPlaylistPrivate.collectAsState(initial = false)
-    val cardLayout by settingsPreferences.fullPlayerCardLayout.collectAsState(initial = FullPlayerCardLayout.DEFAULT)
-    val closeAction by desktopPreferences.closeAction.collectAsState(initial = CloseAction.TRAY)
-    val mediaKeysEnabled by desktopPreferences.mediaKeysEnabled.collectAsState(initial = true)
-    val hotkeyMap by desktopPreferences.hotkeys.collectAsState(initial = HotkeyCombo.defaults)
-    val failedHotkeys by hotkeys.failed.collectAsState()
-    val mediaSessionAvailable by mediaSession.available.collectAsState()
+    LaunchedEffect(desktop) { desktop.refresh() }
+    LaunchedEffect(desktop) { desktop.messages.collect { navigator.showMessage(it) } }
+
+    val quality by common.wifiQuality.collectAsState()
+    val fallbackEnabled by common.fallbackEnabled.collectAsState()
+    val communityPriority by common.communityPriority.collectAsState()
+    val unmServerUrl by common.unmServerUrl.collectAsState()
+    val unmRemoteFallbackEnabled by common.unmRemoteFallbackEnabled.collectAsState()
+    val unmAutoMatch by common.unmAutoMatch.collectAsState()
+    val showDesktopLyric by common.showDesktopLrc.collectAsState()
+    val logLevelName by common.logLevel.collectAsState()
+    val logBytes by desktop.logBytes.collectAsState()
+    val streamCacheEnabled by common.streamCacheEnabled.collectAsState()
+    val cacheMaxSize by common.audioCacheMaxSize.collectAsState()
+    val cacheUsedBytes by desktop.audioCacheBytes.collectAsState()
+    val imageCacheBytes by desktop.imageCacheBytes.collectAsState()
+    val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
+    val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
+    val downloadFolder by common.downloadFolderUri.collectAsState()
+    val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
+    val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
+    val cardLayout by common.fullPlayerCardLayout.collectAsState()
+    val closeAction by desktop.closeAction.collectAsState()
+    val mediaKeysEnabled by desktop.mediaKeysEnabled.collectAsState()
+    val hotkeyMap by desktop.hotkeyMap.collectAsState()
+    val failedHotkeys by desktop.failedHotkeys.collectAsState()
+    val mediaSessionAvailable by desktop.mediaSessionAvailable.collectAsState()
 
     val scrollState = rememberScrollState()
     HoverScrollbarBox(scrollState) {
@@ -150,14 +134,14 @@ fun SettingsPage(modifier: Modifier = Modifier) {
 
             SettingsCard("播放") {
                 SettingRow("在线播放音质") {
-                    QualitySelector(quality) { scope.launch { settingsPreferences.saveWifiQuality(it) } }
+                    QualitySelector(quality, common::updateWifiQuality)
                 }
                 SettingRow("歌曲淡入淡出", subtitle = "自动切歌时前后两首交叉淡化，手动切歌不受影响") {
-                    SettingSwitch(crossfadeEnabled) { scope.launch { settingsPreferences.saveCrossfadeEnabled(it) } }
+                    SettingSwitch(crossfadeEnabled, onChange = common::updateCrossfadeEnabled)
                 }
                 if (crossfadeEnabled) {
                     SettingRow("淡化时长") {
-                        CrossfadeDurationSelector(crossfadeDurationMs) { scope.launch { settingsPreferences.saveCrossfadeDurationMs(it) } }
+                        CrossfadeDurationSelector(crossfadeDurationMs, common::updateCrossfadeDurationMs)
                     }
                 }
             }
@@ -167,7 +151,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                     title = "无版权/VIP 自动换源",
                     subtitle = "官方网易云音源不可用或仅为试听时，自动从可用音源解析完整播放直链"
                 ) {
-                    SettingSwitch(fallbackEnabled) { scope.launch { sourcePreferences.saveFallbackEnabled(it) } }
+                    SettingSwitch(fallbackEnabled, onChange = common::updateFallbackEnabled)
                 }
 
                 if (fallbackEnabled) {
@@ -175,7 +159,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                         title = "社区源优先",
                         subtitle = "开启后优先尝试通过 LX 插件脚本解析，失败后 fallback 到远程 UNM 服务；关闭则先尝试远程 UNM"
                     ) {
-                        SettingSwitch(communityPriority) { scope.launch { sourcePreferences.saveCommunityPriority(it) } }
+                        SettingSwitch(communityPriority, onChange = common::updateCommunityPriority)
                     }
                 }
 
@@ -183,7 +167,7 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                     title = "启用远程 UNM 服务",
                     subtitle = "向远程自建或第三方的 UNM（UnblockNeteaseMusic）服务器请求音频直链"
                 ) {
-                    SettingSwitch(unmRemoteFallbackEnabled) { scope.launch { sourcePreferences.saveUnmRemoteFallbackEnabled(it) } }
+                    SettingSwitch(unmRemoteFallbackEnabled, onChange = common::updateUnmRemoteFallbackEnabled)
                 }
 
                 if (unmRemoteFallbackEnabled) {
@@ -193,8 +177,8 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                     ) {
                         DesktopServerUrlInput(
                             currentUrl = unmServerUrl,
-                            onSave = { scope.launch { sourcePreferences.saveUnmServerUrl(it) } },
-                            onReset = { scope.launch { sourcePreferences.resetUnmServerUrl() } }
+                            onSave = common::updateUnmServerUrl,
+                            onReset = common::resetUnmServerUrl
                         )
                     }
 
@@ -202,41 +186,28 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                         title = "服务端自动选择模式",
                         subtitle = "由服务端自动轮询最优源匹配"
                     ) {
-                        SettingSwitch(unmAutoMatch) { scope.launch { sourcePreferences.saveUnmAutoMatch(it) } }
+                        SettingSwitch(unmAutoMatch, onChange = common::updateUnmAutoMatch)
                     }
                 }
             }
 
             SettingsCard("缓存") {
                 SettingRow("边听边存", subtitle = "在线播放完整听完的歌曲保存到本地，下次直接播放，离线时也可播放") {
-                    SettingSwitch(streamCacheEnabled) { scope.launch { settingsPreferences.saveStreamCacheEnabled(it) } }
+                    SettingSwitch(streamCacheEnabled, onChange = common::updateStreamCacheEnabled)
                 }
                 SettingRow("缓存容量上限") {
                     CacheSizeSelector(cacheMaxSize) { size ->
-                        scope.launch {
-                            settingsPreferences.saveAudioCacheMaxSize(size)
-                            withContext(Dispatchers.IO) { audioCache.evict(size) }
-                            cacheUsedBytes = withContext(Dispatchers.IO) { audioCache.totalSize() }
-                        }
+                        common.updateAudioCacheMaxSize(size)
+                        desktop.trimAudioCache(size)
                     }
                 }
-                SettingRow("图片缓存", subtitle = "${formatBytes(imageCacheBytes)} / ${formatBytes(DesktopImageLoader.DISK_CACHE_MAX_BYTES)}") {
-                    TextButton(onClick = {
-                        scope.launch {
-                            withContext(Dispatchers.IO) { DesktopImageLoader.clear() }
-                            imageCacheBytes = withContext(Dispatchers.IO) { DesktopImageLoader.diskCacheSize() }
-                        }
-                    }) {
+                SettingRow("图片缓存", subtitle = "${formatBytes(imageCacheBytes)} / ${formatBytes(desktop.imageCacheMaxBytes)}") {
+                    TextButton(onClick = desktop::clearImageCache) {
                         Text("清除图片缓存", color = DesktopColors.Accent)
                     }
                 }
                 SettingRow("已用空间", subtitle = formatBytes(cacheUsedBytes)) {
-                    TextButton(onClick = {
-                        scope.launch {
-                            withContext(Dispatchers.IO) { audioCache.clear() }
-                            cacheUsedBytes = withContext(Dispatchers.IO) { audioCache.totalSize() }
-                        }
-                    }) {
+                    TextButton(onClick = desktop::clearAudioCache) {
                         Text("清除缓存", color = DesktopColors.Accent)
                     }
                 }
@@ -244,17 +215,17 @@ fun SettingsPage(modifier: Modifier = Modifier) {
 
             SettingsCard("下载") {
                 val customFolder = downloadFolder?.takeIf { it.isNotBlank() }
-                SettingRow("下载目录", subtitle = customFolder ?: DesktopPaths.defaultDownloadDir.absolutePath) {
+                SettingRow("下载目录", subtitle = customFolder ?: desktop.defaultDownloadDir.absolutePath) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (customFolder != null) {
-                            TextButton(onClick = { scope.launch { settingsPreferences.saveDownloadFolderUri(null) } }) {
+                            TextButton(onClick = { common.updateDownloadFolderUri(null) }) {
                                 Text("恢复默认", color = DesktopColors.TextGray)
                             }
                         }
                         TextButton(onClick = {
                             scope.launch {
-                                val initial = File(customFolder ?: DesktopPaths.defaultDownloadDir.absolutePath)
-                                chooseDirectory(initial)?.let { settingsPreferences.saveDownloadFolderUri(it.absolutePath) }
+                                val initial = File(customFolder ?: desktop.defaultDownloadDir.absolutePath)
+                                chooseDirectory(initial)?.let { common.updateDownloadFolderUri(it.absolutePath) }
                             }
                         }) {
                             Text("更改", color = DesktopColors.Accent)
@@ -262,82 +233,73 @@ fun SettingsPage(modifier: Modifier = Modifier) {
                     }
                 }
                 SettingRow("内嵌歌词", subtitle = "下载时把歌词写入音频文件的标签") {
-                    SettingSwitch(downloadLyrics) { scope.launch { settingsPreferences.saveDownloadLyricsEnabled(it) } }
+                    SettingSwitch(downloadLyrics, onChange = common::updateDownloadLyricsEnabled)
                 }
             }
 
             SettingsCard("歌单") {
                 SettingRow("新建歌单默认设为隐私", subtitle = "创建歌单对话框中的隐私开关以此为初始值") {
-                    SettingSwitch(defaultPlaylistPrivate) { scope.launch { settingsPreferences.saveDefaultPlaylistPrivate(it) } }
+                    SettingSwitch(defaultPlaylistPrivate, onChange = common::updateDefaultPlaylistPrivate)
                 }
             }
 
             SettingsCard("桌面歌词") {
                 SettingRow("显示桌面歌词") {
-                    SettingSwitch(showDesktopLyric) { scope.launch { settingsPreferences.saveShowDesktopLrc(it) } }
+                    SettingSwitch(showDesktopLyric, onChange = common::updateShowDesktopLrc)
                 }
             }
 
             SettingsCard("正在播放面板") {
                 Text("拖动调整信息卡片的顺序，关闭开关可隐藏对应卡片", color = DesktopColors.TextGray, fontSize = 12.sp)
-                CardLayoutEditor(cardLayout) { scope.launch { settingsPreferences.saveFullPlayerCardLayout(it) } }
+                CardLayoutEditor(cardLayout, common::updateFullPlayerCardLayout)
             }
 
             SettingsCard("窗口") {
                 SettingRow("关闭主窗口时") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CloseOption("最小化到托盘", closeAction == CloseAction.TRAY) {
-                            scope.launch { desktopPreferences.saveCloseAction(CloseAction.TRAY) }
+                            desktop.updateCloseAction(CloseAction.TRAY)
                         }
                         CloseOption("直接退出", closeAction == CloseAction.EXIT) {
-                            scope.launch { desktopPreferences.saveCloseAction(CloseAction.EXIT) }
+                            desktop.updateCloseAction(CloseAction.EXIT)
                         }
                     }
                 }
-                AutoStartRow(autoStart)
+                AutoStartRow(desktop)
             }
 
             SettingsCard("日志") {
                 SettingRow("日志级别", subtitle = "越详细越利于排查问题，立即生效") {
-                    LogLevelSelector(logLevelName) { level ->
-                        scope.launch {
-                            settingsPreferences.saveLogLevel(level.name)
-                            AppLogger.setLevel(level)
-                        }
-                    }
+                    LogLevelSelector(logLevelName, common::updateLogLevel)
                 }
-                SettingRow("日志文件", subtitle = "${formatBytes(logBytes)} · ${DesktopPaths.logDir.absolutePath}") {
+                SettingRow("日志文件", subtitle = "${formatBytes(logBytes)} · ${desktop.logDir.absolutePath}") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
-                            if (!openDirectory(DesktopPaths.logDir)) navigator.showMessage("无法打开日志目录")
+                            if (!openDirectory(desktop.logDir)) navigator.showMessage("无法打开日志目录")
                         }) {
                             Text("打开目录", color = DesktopColors.Accent)
                         }
-                        TextButton(onClick = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) { AppLogger.clearLogs() }
-                                logBytes = withContext(Dispatchers.IO) { AppLogger.getLogsSize() }
-                            }
-                        }) {
+                        TextButton(onClick = desktop::clearLogs) {
                             Text("清除", color = DesktopColors.TextGray)
                         }
                     }
                 }
             }
 
-            if (hotkeys.isSupported) {
+            if (desktop.hotkeysSupported) {
                 SettingsCard("快捷键") {
                     SettingRow(
                         title = "系统媒体控制（媒体键与系统播放卡片）",
                         subtitle = if (mediaSessionAvailable) null else "系统卡片不可用，已改用全局媒体键"
                     ) {
-                        SettingSwitch(mediaKeysEnabled) { scope.launch { desktopPreferences.saveMediaKeysEnabled(it) } }
+                        SettingSwitch(mediaKeysEnabled, onChange = desktop::updateMediaKeysEnabled)
                     }
                     HotkeyEditor(
                         hotkeyMap = hotkeyMap,
                         failed = failedHotkeys,
-                        hotkeys = hotkeys,
-                        onSave = { scope.launch { desktopPreferences.saveHotkeys(it) } }
+                        onPause = desktop::pauseHotkeys,
+                        onResume = desktop::resumeHotkeys,
+                        onSave = desktop::updateHotkeys
                     )
                 }
             }
@@ -551,36 +513,28 @@ private fun CloseOption(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AutoStartRow(autoStart: AutoStartService) {
-    val navigator = LocalDesktopNavigator.current
-    val scope = rememberCoroutineScope()
-    // null 表示尚未读到系统中的自启状态
-    var enabled by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(Unit) {
-        enabled = withContext(Dispatchers.IO) { autoStart.isEnabled() }
-    }
-    val unavailableReason = autoStart.unavailableReason
+private fun AutoStartRow(desktop: DesktopSettingsViewModel) {
+    val enabled by desktop.autoStartEnabled.collectAsState()
+    val unavailableReason = desktop.autoStartUnavailableReason
     SettingRow(
         title = "开机自动启动",
         subtitle = unavailableReason
     ) {
         SettingSwitch(
             checked = enabled == true,
-            enabled = unavailableReason == null && enabled != null
-        ) { target ->
-            scope.launch {
-                val ok = withContext(Dispatchers.IO) { autoStart.setEnabled(target) }
-                if (ok) enabled = target else navigator.showMessage("修改开机启动失败")
-            }
-        }
+            enabled = unavailableReason == null && enabled != null,
+            onChange = desktop::updateAutoStart
+        )
     }
 }
 
+// 录制期间暂停全局热键，避免按下的组合被已注册的热键拦截
 @Composable
 private fun HotkeyEditor(
     hotkeyMap: Map<HotkeyAction, HotkeyCombo?>,
     failed: Set<HotkeyAction>,
-    hotkeys: GlobalHotkeyService,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
     onSave: (Map<HotkeyAction, HotkeyCombo?>) -> Unit
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -588,13 +542,13 @@ private fun HotkeyEditor(
 
     // 离开页面时若仍在录制，恢复热键
     DisposableEffect(Unit) {
-        onDispose { if (recording != null) hotkeys.resume() }
+        onDispose { if (recording != null) onResume() }
     }
 
     val stopRecording = {
         if (recording != null) {
             recording = null
-            hotkeys.resume()
+            onResume()
         }
     }
 
@@ -611,7 +565,7 @@ private fun HotkeyEditor(
                     combo = combo,
                     isRecording = recording == action,
                     onStart = {
-                        if (recording == null) hotkeys.pause()
+                        if (recording == null) onPause()
                         recording = action
                     },
                     onCancel = stopRecording,

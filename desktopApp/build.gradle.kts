@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.jna)
     implementation(libs.jaudiotagger)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 // 与 Android 端共用发版参数，保证两端版本号一致
