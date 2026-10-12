@@ -48,6 +48,23 @@ fun DesktopTooltip(
     side: TooltipSide = TooltipSide.Top,
     content: @Composable () -> Unit
 ) {
+    DesktopTooltip(
+        tooltipContent = { TooltipLabel(text) },
+        modifier = modifier,
+        side = side,
+        content = content
+    )
+}
+
+// 悬停提示：停留片刻后贴着锚点出现在指定一侧，不跟随鼠标；点击或移出即消失
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun DesktopTooltip(
+    tooltipContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    side: TooltipSide = TooltipSide.Top,
+    content: @Composable () -> Unit
+) {
     var hovered by remember { mutableStateOf(false) }
     var dismissed by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
@@ -69,12 +86,12 @@ fun DesktopTooltip(
             .onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { dismissed = true }
     ) {
         content()
-        if (visible) TooltipPopup(text, side)
+        if (visible) TooltipPopup(tooltipContent, side)
     }
 }
 
 @Composable
-private fun TooltipPopup(text: String, side: TooltipSide) {
+private fun TooltipPopup(tooltipContent: @Composable () -> Unit, side: TooltipSide) {
     val density = LocalDensity.current
     val provider = remember(side, density) {
         with(density) { TooltipPositionProvider(side, AnchorGap.roundToPx(), WindowMargin.roundToPx()) }
@@ -97,7 +114,7 @@ private fun TooltipPopup(text: String, side: TooltipSide) {
                 }
             }
         ) {
-            Box(Modifier.shadow(4.dp, RoundedCornerShape(6.dp))) { TooltipLabel(text) }
+            Box(Modifier.shadow(4.dp, RoundedCornerShape(6.dp))) { tooltipContent() }
         }
     }
 }

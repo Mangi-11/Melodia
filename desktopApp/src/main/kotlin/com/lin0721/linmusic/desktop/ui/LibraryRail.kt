@@ -150,7 +150,7 @@ fun LibraryRail(
                                 onEdit = { editingItem = it },
                                 onDelete = handleDelete
                             ) {
-                                DesktopTooltip(item.title, side = TooltipSide.Right) {
+                                DesktopTooltip(tooltipContent = { LibraryItemTooltipCard(item) }, side = TooltipSide.Right) {
                                     val shape = coverShape(item)
                                     Box(Modifier.clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable { onItemClick(item) }) {
                                         Cover(item.coverUrl, RailCoverSize, shape = shape)

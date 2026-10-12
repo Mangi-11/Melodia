@@ -98,6 +98,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.awt.Toolkit
@@ -757,10 +758,10 @@ private fun typeLabel(type: LibraryItemType): String = when (type) {
     LibraryItemType.ARTIST -> "艺人"
 }
 
-// 小网格：只有封面，悬停显示标题
+// 小网格：只有封面，悬停显示标题与副信息
 @Composable
 private fun LibraryCoverTile(item: LibraryItem, onClick: () -> Unit) {
-    DesktopTooltip(item.title, side = TooltipSide.Right) {
+    DesktopTooltip(tooltipContent = { LibraryItemTooltipCard(item) }, side = TooltipSide.Right) {
         val shape = coverShape(item)
         Box(Modifier.padding(SmallTileInset).clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -789,9 +790,33 @@ private fun LibraryCard(item: LibraryItem, onClick: () -> Unit) {
     }
 }
 
+// 侧边栏收起态与小网格悬停展示的富文本详情卡片，高与左侧封面 48.dp 保持一致
+@Composable
+internal fun LibraryItemTooltipCard(item: LibraryItem) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(DesktopColors.PopupSurface)
+            .height(48.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Text(
+            text = item.title,
+            color = DesktopColors.TextPrimary,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        LibrarySubtitle(item, lineHeight = 16.sp)
+    }
+}
+
 // 置顶项在副标题前显示置顶标记
 @Composable
-private fun LibrarySubtitle(item: LibraryItem) {
+internal fun LibrarySubtitle(item: LibraryItem, lineHeight: TextUnit = TextUnit.Unspecified) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (item.isPinned) {
             Icon(Icons.Rounded.PushPin, "已置顶", tint = DesktopColors.Accent, modifier = Modifier.size(13.dp))
@@ -800,7 +825,8 @@ private fun LibrarySubtitle(item: LibraryItem) {
         Text(
             item.subtitle,
             color = DesktopColors.TextGray,
-            fontSize = 13.sp,
+            fontSize = 12.sp,
+            lineHeight = lineHeight,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
