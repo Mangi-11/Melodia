@@ -3,7 +3,11 @@ package com.lin0721.linmusic.desktop.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 
 // 背景分三档：窗口与边框 WindowBackground、大背景 Pane、卡片 CardSurface；
@@ -42,18 +46,24 @@ object DesktopDimens {
 }
 
 @Composable
-fun MelodiaDesktopTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = DesktopColors.Accent,
-            background = DesktopColors.WindowBackground,
-            surface = DesktopColors.Pane,
-            surfaceVariant = DesktopColors.Surface,
-            onPrimary = DesktopColors.TextPrimary,
-            onBackground = DesktopColors.TextPrimary,
-            onSurface = DesktopColors.TextPrimary,
-            onSurfaceVariant = DesktopColors.TextGray
-        ),
-        content = content
-    )
+fun MelodiaDesktopTheme(uiScale: Float = 1f, content: @Composable () -> Unit) {
+    val baseDensity = LocalDensity.current
+    val scaledDensity = remember(baseDensity, uiScale) {
+        Density(baseDensity.density * uiScale, baseDensity.fontScale)
+    }
+    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+        MaterialTheme(
+            colorScheme = darkColorScheme(
+                primary = DesktopColors.Accent,
+                background = DesktopColors.WindowBackground,
+                surface = DesktopColors.Pane,
+                surfaceVariant = DesktopColors.Surface,
+                onPrimary = DesktopColors.TextPrimary,
+                onBackground = DesktopColors.TextPrimary,
+                onSurface = DesktopColors.TextPrimary,
+                onSurfaceVariant = DesktopColors.TextGray
+            ),
+            content = content
+        )
+    }
 }

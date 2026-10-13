@@ -93,4 +93,20 @@ class WindowBoundsTest {
         prefs.saveWindow(null, true)
         assertEquals(SavedWindow(bounds, true), prefs.loadWindow())
     }
+
+    @Test
+    fun scaledMinSizeGrowsWithScale() {
+        assertEquals(MIN_WINDOW_WIDTH to MIN_WINDOW_HEIGHT, scaledMinWindowSize(1f, 1920, 1080))
+        assertEquals(1440 to 900, scaledMinWindowSize(1.5f, 1920, 1080))
+    }
+
+    @Test
+    fun scaledMinSizeCappedByScreen() {
+        assertEquals(1920 to 1080, scaledMinWindowSize(2.5f, 1920, 1080))
+    }
+
+    @Test
+    fun scaledMinSizeNeverBelowBaseWhenScreenUnknown() {
+        assertEquals(MIN_WINDOW_WIDTH to MIN_WINDOW_HEIGHT, scaledMinWindowSize(2f, 0, 0))
+    }
 }

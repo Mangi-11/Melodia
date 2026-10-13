@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +62,9 @@ import kotlin.math.min
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+
+// 有效屏幕高度低于该值（dp）视为低高度屏幕
+private const val SHORT_SCREEN_HEIGHT_DP = 480
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -259,6 +263,9 @@ fun PlayQueueSheet(
         )
     }
 
+    // 车机横屏等低高度屏幕：占满可用高度并收紧头部，给列表留出空间
+    val isShortScreen = LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_HEIGHT_DP
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -269,10 +276,11 @@ fun PlayQueueSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.7f)
+                .fillMaxHeight(if (isShortScreen) 1f else 0.7f)
         ) {
             QueueHeader(
                 queueSize = queue.size,
+                compact = isShortScreen,
                 onClearClick = { showClearConfirmDialog = true },
                 onDismiss = onDismiss
             )
@@ -280,6 +288,7 @@ fun PlayQueueSheet(
             PlayModeInfoRow(
                 playMode = playMode,
                 playContext = playContext,
+                compact = isShortScreen,
                 onToggleShuffle = onToggleShuffle,
                 onDisableRoaming = onDisableRoaming,
                 onDisableIntelligence = onDisableIntelligence
@@ -525,13 +534,14 @@ fun PlayQueueSheet(
 @Composable
 private fun QueueHeader(
     queueSize: Int,
+    compact: Boolean,
     onClearClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = if (compact) 4.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -571,6 +581,7 @@ private fun QueueHeader(
 private fun PlayModeInfoRow(
     playMode: PlayMode,
     playContext: String?,
+    compact: Boolean,
     onToggleShuffle: () -> Unit,
     onDisableRoaming: () -> Unit,
     onDisableIntelligence: () -> Unit
@@ -578,7 +589,7 @@ private fun PlayModeInfoRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = MelodiaSpacing.sm),
+            .padding(horizontal = 20.dp, vertical = if (compact) 2.dp else MelodiaSpacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val isRoaming = playContext == "similar_roaming"

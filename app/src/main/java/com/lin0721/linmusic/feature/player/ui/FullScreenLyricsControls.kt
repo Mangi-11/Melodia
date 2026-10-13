@@ -160,9 +160,11 @@ fun LyricCapsuleSlider(
     valueRange: ClosedFloatingPointRange<Float> = 16f..32f,
     modifier: Modifier = Modifier,
     startLabel: String = "A",
-    endLabel: String = "A"
+    endLabel: String = "A",
+    onValueChangeFinished: (() -> Unit)? = null
 ) {
     var componentWidthPx by remember { mutableFloatStateOf(1f) }
+    val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
     val progressFraction = remember(value, valueRange) {
         ((value.toFloat() - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
     }
@@ -222,6 +224,7 @@ fun LyricCapsuleSlider(
                             updateValueFromPosition.value(pointerChange.position.x)
                         }
                     }
+                    currentOnValueChangeFinished?.invoke()
                 }
             }
     ) {

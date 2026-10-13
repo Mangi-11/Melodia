@@ -74,6 +74,8 @@ class SettingsPreferences(
         private val KEY_SIDE_PLAYER_PINNED = booleanPreferencesKey("side_player_pinned")
         // 平板全局沉浸，默认 false
         private val KEY_TABLET_IMMERSIVE_MODE = booleanPreferencesKey("tablet_immersive_mode")
+        // 界面缩放百分比，默认 100
+        private val KEY_UI_SCALE_PERCENT = intPreferencesKey("ui_scale_percent")
         const val PLAYER_PAGE_MODE_AUTO = "auto"
         const val PLAYER_PAGE_MODE_FULLSCREEN = "fullscreen"
         const val PLAYER_PAGE_MODE_SIDE = "side"
@@ -451,6 +453,17 @@ class SettingsPreferences(
 
     // 悬浮歌词字号 Flow
     val lyricTextSize: Flow<Int> = dataStore.data.map { prefs ->
+    // 界面缩放百分比 Flow
+    val uiScalePercent: Flow<Int> = dataStore.data.map { prefs ->
+        UiScale.normalizePercent(prefs[KEY_UI_SCALE_PERCENT] ?: UiScale.DEFAULT_PERCENT)
+    }
+
+    suspend fun saveUiScalePercent(percent: Int) {
+        dataStore.edit { prefs ->
+            prefs[KEY_UI_SCALE_PERCENT] = UiScale.normalizePercent(percent)
+        }
+    }
+
         prefs[KEY_LYRIC_TEXT_SIZE] ?: 14
     }
 

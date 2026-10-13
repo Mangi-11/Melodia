@@ -13,14 +13,18 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.lin0721.linmusic.core.player.FloatingLyricService
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.ui.theme.MelodiaTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
@@ -56,8 +60,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // 首帧即按已存缩放渲染，避免先以 100% 绘制再跳变
+        val initialUiScalePercent = runCatching {
+            runBlocking { settingsPreferences.uiScalePercent.first() }
+        }.getOrDefault(UiScale.DEFAULT_PERCENT)
+
         setContent {
-            MelodiaTheme {
+            val uiScalePercent by settingsPreferences.uiScalePercent.collectAsState(initial = initialUiScalePercent)
+            MelodiaTheme(uiScale = UiScale.toFactor(uiScalePercent)) {
                 MelodiaApp()
             }
         }

@@ -8,6 +8,7 @@ import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.auth.UserPreferences
 import com.lin0721.linmusic.feature.settings.data.UserBindingItem
 import com.lin0721.linmusic.feature.settings.data.UserLevelData
@@ -128,6 +129,8 @@ class SettingsViewModel(
     val tabletImmersiveMode = settingsPreferences.tabletImmersiveMode.asState(false)
 
     val lyricTextSize = settingsPreferences.lyricTextSize.asState(14)
+    val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
+
 
     val lyricTextColor = settingsPreferences.lyricTextColor.asState("#FFFFFF")
 
@@ -373,6 +376,8 @@ class SettingsViewModel(
     fun updateTabletImmersiveMode(enabled: Boolean) = launchSave { settingsPreferences.saveTabletImmersiveMode(enabled) }
 
     fun updateLyricTextSize(size: Int) = launchSave { settingsPreferences.saveLyricTextSize(size) }
+
+    fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
 
     fun updateLyricTextColor(color: String) = launchSave { settingsPreferences.saveLyricTextColor(color) }
 

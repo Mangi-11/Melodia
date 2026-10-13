@@ -64,6 +64,17 @@ class CommonSettingsViewModelTest {
     }
 
     @Test
+    fun uiScaleIsPersistedAndClamped() {
+        settings.uiScalePercent.awaitValue(100)
+
+        vm.updateUiScalePercent(225)
+        settings.uiScalePercent.awaitValue(225)
+
+        vm.updateUiScalePercent(900)
+        settings.uiScalePercent.awaitValue(250)
+    }
+
+    @Test
     fun sourceSettingsArePersisted() {
         vm.updateFallbackEnabled(true)
         vm.updateCommunityPriority(true)

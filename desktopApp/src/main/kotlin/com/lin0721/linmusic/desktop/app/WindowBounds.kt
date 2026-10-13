@@ -41,3 +41,10 @@ fun currentScreenBounds(): List<WindowBounds> = try {
 } catch (_: HeadlessException) {
     emptyList()
 }
+
+// 界面缩放后内容区的有效 dp 变小，窗口最小尺寸随之放大；上限为所在屏幕，避免窗口无法放进屏幕
+fun scaledMinWindowSize(scaleFactor: Float, screenWidth: Int, screenHeight: Int): Pair<Int, Int> {
+    val width = (MIN_WINDOW_WIDTH * scaleFactor).toInt().coerceAtLeast(MIN_WINDOW_WIDTH)
+    val height = (MIN_WINDOW_HEIGHT * scaleFactor).toInt().coerceAtLeast(MIN_WINDOW_HEIGHT)
+    return width.coerceAtMost(maxOf(screenWidth, MIN_WINDOW_WIDTH)) to height.coerceAtMost(maxOf(screenHeight, MIN_WINDOW_HEIGHT))
+}

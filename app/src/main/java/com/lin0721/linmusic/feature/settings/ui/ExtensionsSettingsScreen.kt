@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.LocalBottomOverlayInset
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.feature.player.ui.LyricCapsuleSlider
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
@@ -45,6 +47,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
+    val uiScalePercent by viewModel.uiScalePercent.collectAsStateWithLifecycle()
     val isExpanded = LocalMelodiaWindowSizeClass.current == MelodiaWindowSizeClass.Expanded
 
     var showBottomBarSheet by remember { mutableStateOf(false) }
@@ -126,6 +129,50 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                             subtitle = "隐藏系统状态栏与导航栏，边缘滑动呼出",
                             checked = tabletImmersiveMode,
                             onCheckedChange = { viewModel.updateTabletImmersiveMode(it) }
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsGroupCard(SettingsSubMenu.EXTENSIONS.sectionTitles[4]) {
+                    // 松手后才应用，避免拖动中界面缩放导致滑块在手指下移位
+                    var pendingPercent by remember { mutableStateOf<Int?>(null) }
+                    LaunchedEffect(uiScalePercent) { pendingPercent = null }
+                    val displayPercent = pendingPercent ?: uiScalePercent
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("界面缩放", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
+                            Text(
+                                text = "$displayPercent%",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "整体放大界面，松手后生效",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LyricCapsuleSlider(
+                            value = displayPercent,
+                            onValueChange = { pendingPercent = it },
+                            valueRange = UiScale.MIN_PERCENT.toFloat()..UiScale.MAX_PERCENT.toFloat(),
+                            startLabel = "${UiScale.MIN_PERCENT}%",
+                            endLabel = "${UiScale.MAX_PERCENT}%",
+                            onValueChangeFinished = {
+                                pendingPercent?.let { viewModel.updateUiScalePercent(it) }
+                            }
                         )
                     }
                 }

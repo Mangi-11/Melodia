@@ -31,11 +31,11 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
 import com.lin0721.linmusic.desktop.app.DesktopLogging
 import com.lin0721.linmusic.desktop.app.DesktopPaths
-import com.lin0721.linmusic.desktop.app.MIN_WINDOW_HEIGHT
-import com.lin0721.linmusic.desktop.app.MIN_WINDOW_WIDTH
+import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
 import com.lin0721.linmusic.desktop.app.SingleInstance
 import com.lin0721.linmusic.desktop.app.WindowBounds
 import com.lin0721.linmusic.desktop.app.currentScreenBounds
@@ -74,6 +74,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -127,6 +128,10 @@ fun main() {
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
     val savedWindow = runBlocking { desktopPreferences.loadWindow() }
+    // 首帧即按已存缩放渲染，避免先以 100% 绘制再跳变
+    val initialUiScalePercent = runCatching {
+        runBlocking { settingsPreferences.uiScalePercent.first() }
+    }.getOrDefault(UiScale.DEFAULT_PERCENT)
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
 
@@ -141,6 +146,8 @@ fun main() {
         }
         var isLyricLocked by remember { mutableStateOf(false) }
         val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
+        val uiScalePercent by settingsPreferences.uiScalePercent.collectAsState(initial = initialUiScalePercent)
+        val uiScaleFactor = UiScale.toFactor(uiScalePercent)
         val closeAction by desktopPreferences.closeAction.collectAsState(initial = CloseAction.TRAY)
         val isPlaying by controller.playWhenReady.collectAsState()
         val nowPlaying by controller.nowPlaying.collectAsState()
@@ -291,8 +298,10 @@ fun main() {
                 }
             }
         ) {
-            LaunchedEffect(Unit) {
-                window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+            LaunchedEffect(uiScaleFactor) {
+                val screen = window.graphicsConfiguration?.bounds
+                val (minWidth, minHeight) = scaledMinWindowSize(uiScaleFactor, screen?.width ?: 0, screen?.height ?: 0)
+                window.minimumSize = Dimension(minWidth, minHeight)
             }
             // 全屏不记；最小化时系统会把窗口挪到屏外，同样不记
             LaunchedEffect(windowState) {
@@ -320,7 +329,7 @@ fun main() {
             }
             // 全屏与最大化一样不要圆角和边框线
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
-            MelodiaDesktopTheme {
+            MelodiaDesktopTheme(uiScale = uiScaleFactor) {
                 MelodiaDesktopApp(
                     deps = appDependencies,
                     windowState = windowState,

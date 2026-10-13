@@ -73,14 +73,17 @@ import com.lin0721.linmusic.desktop.ui.components.DialogTextField
 import com.lin0721.linmusic.desktop.ui.components.HoldTextInputFocus
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
+import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.io.File
+import kotlin.math.roundToInt
 import javax.swing.JFileChooser
 import java.awt.event.KeyEvent as AwtKeyEvent
 
@@ -126,6 +129,7 @@ fun SettingsPage(
     val imageCacheBytes by desktop.imageCacheBytes.collectAsState()
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
+    val uiScalePercent by common.uiScalePercent.collectAsState()
     val downloadFolder by common.downloadFolderUri.collectAsState()
     val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
     val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
@@ -275,6 +279,10 @@ fun SettingsPage(
                 CardLayoutEditor(cardLayout, common::updateFullPlayerCardLayout)
             }
 
+            SettingsCard("显示") {
+                UiScaleSetting(uiScalePercent, common::updateUiScalePercent)
+            }
+
             SettingsCard("窗口") {
                 SettingRow("关闭主窗口时") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -376,6 +384,32 @@ internal fun SettingSwitch(checked: Boolean, enabled: Boolean = true, onChange: 
             uncheckedTrackColor = DesktopColors.SurfaceLight
         )
     )
+}
+
+// 松手后才应用，避免拖动中界面缩放导致滑块在指针下移位
+@Composable
+private fun UiScaleSetting(percent: Int, onCommit: (Int) -> Unit) {
+    var pending by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(percent) { pending = null }
+    val shown = pending ?: percent
+    val span = UiScale.MAX_PERCENT - UiScale.MIN_PERCENT
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("界面缩放", color = DesktopColors.TextPrimary, fontSize = 14.sp)
+                Text("整体放大界面，松手后生效", color = DesktopColors.TextGray, fontSize = 12.sp)
+            }
+            Text("$shown%", color = DesktopColors.TextGray, fontSize = 12.sp)
+        }
+        PlayerSlider(
+            value = (shown - UiScale.MIN_PERCENT).toFloat() / span,
+            onValueChange = { fraction ->
+                pending = UiScale.normalizePercent((UiScale.MIN_PERCENT + fraction * span).roundToInt())
+            },
+            onValueChangeFinished = { pending?.let(onCommit) },
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
 }
 
 @Composable
