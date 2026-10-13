@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
@@ -76,6 +77,8 @@ import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
+import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
+import com.lin0721.linmusic.desktop.ui.components.songInfoText
 import com.lin0721.linmusic.desktop.ui.components.detectLongPressReorder
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -374,6 +377,11 @@ private fun TrackMenu(
             onDismiss()
             val ok = copySongLink(track.id)
             navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+        })
+        MenuItem("复制歌曲信息", icon = Icons.Rounded.ContentCopy, onClick = {
+            onDismiss()
+            val ok = copyTextToClipboard(songInfoText(track.name, track.ar.joinToString(" / ") { it.name }))
+            navigator.showMessage(if (ok) "已复制歌曲信息" else "复制失败")
         })
         actions.onRemove?.let { remove ->
             MenuDivider()

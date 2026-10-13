@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
@@ -81,6 +82,8 @@ import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.OverlayPanelHeader
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
+import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
+import com.lin0721.linmusic.desktop.ui.components.songInfoText
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.shell.SongActionSources
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -501,10 +504,18 @@ private fun QueueItemMenu(
                 })
             }
         }
-        MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+        // 外部平台歌曲的负数 id 没有对应的网易云链接
+        if (item.songId > 0) {
+            MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+                onDismiss()
+                val ok = copySongLink(item.songId)
+                navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+            })
+        }
+        MenuItem("复制歌曲信息", icon = Icons.Rounded.ContentCopy, onClick = {
             onDismiss()
-            val ok = copySongLink(item.songId)
-            navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+            val ok = copyTextToClipboard(songInfoText(item.title, item.artist))
+            navigator.showMessage(if (ok) "已复制歌曲信息" else "复制失败")
         })
         if (canRemove) {
             MenuDivider()
