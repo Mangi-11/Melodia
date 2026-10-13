@@ -433,7 +433,7 @@ class SearchViewModel(
                 return@launch
             }
             val queueItem = QueueItem(
-                songId = track.id.hashCode().toLong(),
+                songId = track.queueSongId,
                 title = track.name,
                 artist = track.artists,
                 coverUrl = track.coverUrl,

@@ -265,7 +265,7 @@ class MpvPlaybackController(
         val isSeedPlaying = target != null && target.songId == playingSongId
         if ((playContext == CONTEXT_INTELLIGENCE || playContext == SimilarRoamingController.CONTEXT_ROAMING) && isSeedPlaying) {
             // 以当前曲目为种子时平滑衔接，不重载音频
-            roaming.prefetchOnPlay(target.songId, index)
+            prefetchRoaming(target.songId, index)
             return
         }
         playIndex(index, startPositionMs.coerceAtLeast(0L))
@@ -500,7 +500,7 @@ class MpvPlaybackController(
         if (!_isPlaying.value) return
         val songId = loadedSongId ?: return
         val dur = _duration.value
-        if (dur > 0L) roaming.onProgressTick(songId, dur - _currentPosition.value)
+        if (dur > 0L && isOnlineSong(songId)) roaming.onProgressTick(songId, dur - _currentPosition.value)
         maybePrepareCrossfade(songId)
         val now = System.currentTimeMillis()
         if (now - lastPeriodicSaveMs >= PERIODIC_STATE_SAVE_INTERVAL_MS) {
@@ -531,7 +531,7 @@ class MpvPlaybackController(
         )
         saveQueueState()
         playJob = scope.launch {
-            val playback = knownUrl?.let { Playback(it, null) } ?: resolvePlayback(item.songId).getOrElse { error ->
+            val playback = knownUrl?.let { Playback(it, null) } ?: resolvePlayback(item).getOrElse { error ->
                 AppLogger.w(TAG, "取播放地址失败 songId=${item.songId}", error)
                 handleFailure("《${item.title}》暂无版权或需要会员")
                 return@launch
@@ -540,9 +540,22 @@ class MpvPlaybackController(
             engine.load(playback.url, startMs, record = playback.record.takeIf { startMs == 0L })
             loadedSongId = item.songId
             beginReporting(item.songId)
-            roaming.prefetchOnPlay(item.songId, index)
+            prefetchRoaming(item.songId, index)
             saveState()
         }
+    }
+
+    // 外部平台搜索结果用负数 id 且自带直链，不属于网易云曲库，不参与打卡上报、相似漫游与缓存
+    private fun isOnlineSong(songId: Long): Boolean = songId > 0L
+
+    private fun prefetchRoaming(songId: Long, index: Int) {
+        if (isOnlineSong(songId)) roaming.prefetchOnPlay(songId, index)
+    }
+
+    // 队列项自带直链时直接使用，否则按网易云歌曲 id 解析
+    private suspend fun resolvePlayback(item: QueueItem): Result<Playback> {
+        item.localUri?.takeIf { it.isNotBlank() }?.let { return Result.success(Playback(it, null)) }
+        return resolvePlayback(item.songId)
     }
 
     // 已下载 > 缓存命中 > 联网；联网失败退回任意音质缓存
@@ -589,7 +602,7 @@ class MpvPlaybackController(
 
         crossfadeAttemptedSongId = songId
         crossfadePrepareJob = scope.launch {
-            val playback = resolvePlayback(next.songId).getOrNull() ?: return@launch
+            val playback = resolvePlayback(next).getOrNull() ?: return@launch
             if (!engine.prepareSpare(playback.url, playback.record)) return@launch
             val ready = withTimeoutOrNull(CROSSFADE_PREPARE_TIMEOUT_MS) {
                 while (!engine.spareReady) delay(CROSSFADE_PREPARE_POLL_MS)
@@ -635,7 +648,7 @@ class MpvPlaybackController(
         saveQueueState()
         beginReporting(item.songId)
         startClock()
-        roaming.prefetchOnPlay(item.songId, plan.index)
+        prefetchRoaming(item.songId, plan.index)
         saveState()
     }
 
@@ -694,6 +707,7 @@ class MpvPlaybackController(
     }
 
     private fun beginReporting(songId: Long) {
+        if (!isOnlineSong(songId)) return
         reportingSongId = songId
         val source = playbackQueue.playSource.value
         reportingSource = source

@@ -259,7 +259,7 @@ private fun ExternalResultsContent(
             HoverScrollbarBox(listState) {
                 LazyColumn(state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                     itemsIndexed(resultsState.tracks) { index, track ->
-                        val isCurrent = currentSongId == track.id.hashCode().toLong()
+                        val isCurrent = currentSongId == track.queueSongId
                         ExternalResultEntry(index, track, isCurrent) {
                             viewModel.playExternalTrack(track)
                         }

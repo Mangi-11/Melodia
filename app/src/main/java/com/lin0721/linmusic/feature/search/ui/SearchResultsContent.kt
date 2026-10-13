@@ -223,10 +223,10 @@ private fun ExternalSearchResultsList(
                 }
 
                 items(state.tracks, key = { "${it.platform.name}_${it.id}" }) { track ->
-                    val isActive = currentTrackId == track.id.hashCode().toString()
+                    val isActive = currentTrackId == track.queueSongId.toString()
                     SongRow(
                         data = SongRowData(
-                            id = track.id.hashCode().toLong(),
+                            id = track.queueSongId,
                             title = track.name,
                             artist = if (track.albumName.isNotBlank()) "${track.artists} · ${track.albumName}" else track.artists,
                             coverUrl = track.coverUrl,

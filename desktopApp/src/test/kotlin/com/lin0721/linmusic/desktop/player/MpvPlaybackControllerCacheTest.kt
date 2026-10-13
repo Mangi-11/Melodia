@@ -177,4 +177,18 @@ class MpvPlaybackControllerCacheTest {
         Thread.sleep(1_500)
         assertTrue(cache.playableIds(listOf(1)).isEmpty())
     }
+
+    @Test
+    fun externalTrackPlaysItsOwnUrlWithoutQueryingNeteaseOrCaching() {
+        runBlocking { settings.saveStreamCacheEnabled(true) }
+        val controller = newController()
+        Thread.sleep(300)
+        val url = "http://127.0.0.1:${server.address.port}/song.wav"
+        controller.playQueue(listOf(QueueItem(-7, "外部歌", "歌手", "", localUri = url)), 0, null, null, 0L)
+
+        assertTrue("应直接播放自带直链", await(10_000) { controller.currentPosition.value > 500L })
+        assertEquals("外部歌曲不应向网易云取播放地址", 0, urlRequests.get())
+        Thread.sleep(1_500)
+        assertTrue("外部歌曲不应写入边听边存缓存", cache.playableIds(listOf(-7)).isEmpty())
+    }
 }
