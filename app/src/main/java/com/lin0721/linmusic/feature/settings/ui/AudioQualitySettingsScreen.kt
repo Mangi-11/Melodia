@@ -27,6 +27,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 fun AudioQualitySettingsView(viewModel: SettingsViewModel) {
     val wifiQuality by viewModel.wifiQuality.collectAsStateWithLifecycle()
     val mobileQuality by viewModel.mobileQuality.collectAsStateWithLifecycle()
+    val showPlaybackQuality by viewModel.showPlaybackQuality.collectAsStateWithLifecycle()
 
     var qualityDialogTarget by remember { mutableStateOf<String?>(null) }
 
@@ -51,6 +52,16 @@ fun AudioQualitySettingsView(viewModel: SettingsViewModel) {
             }
         }
 
+        item {
+            SettingsGroupCard(SettingsSubMenu.AUDIO_QUALITY.sectionTitles[1]) {
+                SettingsSwitchRow(
+                    title = "显示实际音质",
+                    subtitle = "在全屏播放页底部显示当前歌曲接口实际下发的音质",
+                    checked = showPlaybackQuality,
+                    onCheckedChange = { viewModel.updateShowPlaybackQuality(it) }
+                )
+            }
+        }
     }
 
     // 音质单选选择弹层

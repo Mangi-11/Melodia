@@ -63,6 +63,7 @@ fun LazyListScope.playlistTrackItems(
                 isActive = currentTrackId == track.id.toString(),
                 isPlaying = isPlaying,
                 enabled = track.id !in unplayableIds,
+                copyable = true,
                 onClick = { onPlaySong(track) },
                 trailingSlot = {
                     val playCount = trackPlayCounts[track.id]

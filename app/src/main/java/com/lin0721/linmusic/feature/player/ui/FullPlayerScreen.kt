@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import com.lin0721.linmusic.core.download.ui.DownloadQualityPickerSheet
+import com.lin0721.linmusic.core.model.getQualityBadgeLabel
 import com.lin0721.linmusic.core.player.PlayerManager
 import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.components.ArtistPickerEntry
@@ -315,6 +316,14 @@ fun FullPlayerScreen(
 
     val title = currentTrack.mediaMetadata.title?.toString() ?: ""
     val artist = currentTrack.mediaMetadata.artist?.toString() ?: ""
+    val showPlaybackQuality by viewModel.showPlaybackQuality.collectAsStateWithLifecycle()
+    val playbackLevel by viewModel.playerManager.playbackLevel.collectAsStateWithLifecycle()
+    // 档位按 songId 绑定，切歌瞬间旧歌的档位不会串到新歌上
+    val qualityLabel = if (showPlaybackQuality && !podcast.isPodcast) {
+        playbackLevel
+            ?.takeIf { it.songId.toString() == currentTrack.mediaId }
+            ?.let { getQualityBadgeLabel(it.level) }
+    } else null
     val rawCoverUrl = currentTrack.mediaMetadata.artworkUri?.toString()
         ?.replace("?param=300y300", "").orEmpty()
     val fallbackCoverUrl = currentQueueItem?.let {
@@ -614,6 +623,7 @@ fun FullPlayerScreen(
                         onQueueClick = { showQueueSheet = true },
                         onShareClick = { shareCurrentSong() },
                         connectedDevice = connectedDevice,
+                        qualityLabel = qualityLabel,
                         showMiniLyric = showMiniLyric,
                         baseCoverPadding = animatedCoverPadding,
                         itemGap = animatedItemGap,
@@ -749,6 +759,7 @@ fun FullPlayerScreen(
                         onQueueClick = { showQueueSheet = true },
                         onShareClick = { shareCurrentSong() },
                         connectedDevice = connectedDevice,
+                        qualityLabel = qualityLabel,
                         showLyricsControls = !podcast.isPodcast,
                         secondaryMode = fullScreenLyricSecondaryMode,
                         hasTranslation = hasTranslation,

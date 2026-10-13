@@ -58,6 +58,7 @@ fun LazyListScope.artistMusicTab(
                 isActive = isActive,
                 isPlaying = isPlaying,
                 index = index + 1,
+                copyable = true,
                 onClick = { onPlaySong(track, hotSongs) },
                 trailingSlot = {
                     val isLiked = track.id in likedSongIds

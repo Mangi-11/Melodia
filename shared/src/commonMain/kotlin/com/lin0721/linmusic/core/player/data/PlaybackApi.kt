@@ -69,6 +69,8 @@ data class SongUrlItem(
     val size: Long = 0,
     val md5: String? = null,
     val type: String? = null,
+    // 服务端实际下发的音质档位，可能低于请求档位
+    val level: String? = null,
     val fee: Int = 0,
     // VIP歌曲或者无版权时收费标识，freeTrialInfo 不为空表示可能只能试听
     val freeTrialInfo: FreeTrialInfo? = null,

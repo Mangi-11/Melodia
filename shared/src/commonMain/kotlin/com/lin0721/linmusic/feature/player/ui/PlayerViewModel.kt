@@ -195,6 +195,13 @@ class PlayerViewModel(
         }
     }
 
+    // 播放页实际音质显隐
+    val showPlaybackQuality: StateFlow<Boolean> = settingsPreferences.showPlaybackQuality.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
     // 更新当前环境的音质设置并重新加载当前歌曲播放
     fun updateQuality(quality: String) {
         viewModelScope.launch {

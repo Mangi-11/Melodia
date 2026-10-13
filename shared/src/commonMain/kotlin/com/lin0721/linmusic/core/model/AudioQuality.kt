@@ -15,6 +15,21 @@ fun getQualityDisplayName(quality: String): String {
     }
 }
 
+// 音质代码转纯英文短标签，用于播放页等空间紧凑处；未知档位返回 null 以便隐藏
+fun getQualityBadgeLabel(quality: String): String? {
+    return when (quality) {
+        "standard" -> "Standard"
+        "higher" -> "Higher"
+        "exhigh" -> "ExHigh"
+        "lossless" -> "Lossless"
+        "hires" -> "Hi-Res"
+        "jyeffect" -> "Surround"
+        "sky" -> "Immersive"
+        "jymaster" -> "Master"
+        else -> null
+    }
+}
+
 // 可选下载音质档位，从低到高排列
 val DOWNLOAD_QUALITY_LEVELS = listOf(
     "standard", "higher", "exhigh", "lossless", "hires", "jyeffect", "sky", "jymaster"

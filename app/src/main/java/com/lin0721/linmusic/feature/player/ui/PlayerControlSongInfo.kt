@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -17,6 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
+import com.lin0721.linmusic.core.ui.interaction.copyOnLongClick
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.feature.podcast.ui.PodcastPlayerState
@@ -51,7 +51,7 @@ fun SongInfo(
                 maxLines = 1,
                 modifier = Modifier
                     .basicMarquee()
-                    .then(if (onAlbumClick != null) Modifier.clickable(onClick = onAlbumClick) else Modifier)
+                    .copyOnLongClick(title, "歌名", onClick = { onAlbumClick?.invoke() })
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -60,7 +60,7 @@ fun SongInfo(
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = if (onArtistClick != null) Modifier.clickable(onClick = onArtistClick) else Modifier
+                modifier = Modifier.copyOnLongClick(artist, "歌手", onClick = { onArtistClick?.invoke() })
             )
         }
         if (podcast.isPodcast) {

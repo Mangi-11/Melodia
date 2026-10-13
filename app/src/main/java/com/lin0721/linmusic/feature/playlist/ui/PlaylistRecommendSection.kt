@@ -53,6 +53,7 @@ fun LazyListScope.playlistRecommendItems(
             ),
             isActive = currentTrackId == track.id.toString(),
             isPlaying = isPlaying,
+            copyable = true,
             onClick = { onPlaySong(track) },
             trailingSlot = {
                 MelodiaIconButton(

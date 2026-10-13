@@ -74,6 +74,7 @@ class SettingsViewModel(
     val lxPluginSources = sourcePreferences.lxPluginSources.asState(emptyList())
 
     val wifiQuality = settingsPreferences.wifiQuality.asState("lossless")
+    val showPlaybackQuality = settingsPreferences.showPlaybackQuality.asState(false)
 
     val mobileQuality = settingsPreferences.mobileQuality.asState("standard")
 
@@ -304,6 +305,7 @@ class SettingsViewModel(
     }
 
     fun updateWifiQuality(quality: String) = launchSave { settingsPreferences.saveWifiQuality(quality) }
+    fun updateShowPlaybackQuality(show: Boolean) = launchSave { settingsPreferences.saveShowPlaybackQuality(show) }
 
     fun updateMobileQuality(quality: String) = launchSave { settingsPreferences.saveMobileQuality(quality) }
 

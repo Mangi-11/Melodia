@@ -230,10 +230,12 @@ private fun ExternalSearchResultsList(
                             title = track.name,
                             artist = if (track.albumName.isNotBlank()) "${track.artists} · ${track.albumName}" else track.artists,
                             coverUrl = track.coverUrl,
-                            durationText = if (track.durationMs > 0) formatTrackDuration(track.durationMs) else null
+                            durationText = if (track.durationMs > 0) formatTrackDuration(track.durationMs) else null,
+                            copyArtist = track.artists
                         ),
                         isActive = isActive,
                         isPlaying = isPlaying,
+                        copyable = true,
                         onClick = { onSongClick(track) }
                     )
                 }
@@ -335,6 +337,7 @@ private fun SearchResultsList(
                                 ),
                                 isActive = isActive,
                                 isPlaying = isPlaying,
+                                copyable = true,
                                 onClick = { onSongClick(track) },
                                 trailingSlot = {
                                     if (isLoggedIn && track.id in likedSongIds) {

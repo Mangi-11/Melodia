@@ -1,5 +1,6 @@
 package com.lin0721.linmusic.core.player
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 // 正在播放曲目的平台无关快照；本地歌曲 mediaId 为负数占位
@@ -11,6 +12,11 @@ data class NowPlaying(
 ) {
     val songId: Long? get() = mediaId.toLongOrNull()
 }
+
+// 接口实际下发的音质档位，按 songId 绑定，界面需与当前曲目比对后再展示
+data class PlaybackLevel(val songId: Long, val level: String)
+
+private val NO_PLAYBACK_LEVEL: StateFlow<PlaybackLevel?> = MutableStateFlow(null)
 
 // 播放门面的跨平台契约，各平台以各自播放引擎实现
 interface PlaybackController {
@@ -25,6 +31,9 @@ interface PlaybackController {
     // 播放意图：点了播放即为真，弱网缓冲期间 isPlaying 仍为 false
     val playWhenReady: StateFlow<Boolean>
     val nowPlaying: StateFlow<NowPlaying?>
+
+    // 当前曲目的实际音质，未获取到（本地、缓存、换源）时为空；默认不提供
+    val playbackLevel: StateFlow<PlaybackLevel?> get() = NO_PLAYBACK_LEVEL
     val currentPosition: StateFlow<Long>
     val duration: StateFlow<Long>
     val sleepTimerRemaining: StateFlow<Long>

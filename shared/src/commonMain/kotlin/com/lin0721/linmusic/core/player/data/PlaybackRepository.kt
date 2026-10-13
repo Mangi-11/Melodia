@@ -6,10 +6,11 @@ import com.lin0721.linmusic.core.player.domain.LyricLine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 
-// 播放直链信息（包含直链地址与是否为 VIP 试听片段）
+// 播放直链信息（包含直链地址、是否为 VIP 试听片段、实际音质档位；换源等取不到档位时 level 为空）
 data class SongPlaybackInfo(
     val url: String,
-    val isFreeTrial: Boolean = false
+    val isFreeTrial: Boolean = false,
+    val level: String? = null
 )
 
 // 播放引擎数据仓储（core 共享能力，服务于 PlayerManager/FloatingLyricService 及多个域的推荐入口）

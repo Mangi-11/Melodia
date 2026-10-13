@@ -53,7 +53,7 @@ private const val QUEUE_MOVE_SAVE_DEBOUNCE_MS = 400L
 private const val PERIODIC_STATE_SAVE_INTERVAL_MS = 3000L
 
 // 预取到的下一首播放链接，按 songId 校验有效性
-private data class PrefetchedUrl(val songId: Long, val url: String)
+private data class PrefetchedUrl(val songId: Long, val url: String, val level: String? = null)
 
 // 播放门面：对外暴露播放状态与控制入口，队列、控制器、进度、持久化等职责交由协作者承担
 class PlayerManager(
@@ -86,6 +86,10 @@ class PlayerManager(
     private val pendingTrack = PendingTrackState<MediaItem> { it.mediaId }
     private val _displayTrack = MutableStateFlow<MediaItem?>(null)
     val currentTrack: StateFlow<MediaItem?> = _displayTrack.asStateFlow()
+
+    // 当前曲目接口实际下发的音质；本地、已下载、离线缓存与换源取不到档位时为空
+    private val _playbackLevel = MutableStateFlow<PlaybackLevel?>(null)
+    override val playbackLevel: StateFlow<PlaybackLevel?> = _playbackLevel.asStateFlow()
 
     // 与 currentTrack 同步写入，保证读取 value 时两者一致
     private val _nowPlaying = MutableStateFlow<NowPlaying?>(null)
@@ -575,6 +579,7 @@ class PlayerManager(
         startPosition: Long = 0,
         networkRetryAttempt: Int = 0,
         prefetchedUrl: String? = null,
+        prefetchedLevel: String? = null,
         playWhenReady: Boolean = true,
         autoTransition: Boolean = false
     ) {
@@ -591,6 +596,7 @@ class PlayerManager(
         }
 
         activePlayJob = scope.launch {
+            _playbackLevel.value = null
             // 本地外部音频直接播放
             val localUri = item.localUri
             if (localUri != null) {
@@ -651,6 +657,7 @@ class PlayerManager(
             // 命中预取缓存时跳过网络请求，最大限度缩短切歌间隙
             if (prefetchedUrl != null) {
                 val mediaItem = item.toMediaItem(prefetchedUrl, playbackQueue.playContext.value)
+                publishPlaybackLevel(item.songId, prefetchedLevel)
                 pendingSkipFromIndex = null
                 controllerHolder.playItem(mediaItem.withCrossfade(autoTransition, startPosition), playbackQueue.playMode.value, startPosition, playWhenReady)
                 return@launch
@@ -661,9 +668,10 @@ class PlayerManager(
                 pauseOutgoingWhilePending()
             }
 
-            repository.getSongUrl(item.songId).collect { result ->
-                result.onSuccess { url ->
-                    val mediaItem = item.toMediaItem(url, playbackQueue.playContext.value)
+            repository.getSongPlaybackInfo(item.songId).collect { result ->
+                result.onSuccess { info ->
+                    val mediaItem = item.toMediaItem(info.url, playbackQueue.playContext.value)
+                    publishPlaybackLevel(item.songId, info.level)
                     pendingSkipFromIndex = null
                     controllerHolder.playItem(mediaItem.withCrossfade(autoTransition, startPosition), playbackQueue.playMode.value, startPosition, playWhenReady)
                 }.onFailure { throwable ->
@@ -676,6 +684,10 @@ class PlayerManager(
                 }
             }
         }
+    }
+
+    private fun publishPlaybackLevel(songId: Long, level: String?) {
+        _playbackLevel.value = level?.let { PlaybackLevel(songId, it) }
     }
 
     @OptIn(UnstableApi::class)
@@ -804,9 +816,9 @@ class PlayerManager(
         prefetchJob = scope.launch {
             // 下一首已下载时跳过网络预取
             if (downloadPreferences.findVerifiedRecord(nextItem.songId) != null) return@launch
-            repository.getSongUrl(nextItem.songId).collect { result ->
-                result.onSuccess { url ->
-                    prefetchedNextUrl = PrefetchedUrl(nextItem.songId, url)
+            repository.getSongPlaybackInfo(nextItem.songId).collect { result ->
+                result.onSuccess { info ->
+                    prefetchedNextUrl = PrefetchedUrl(nextItem.songId, info.url, info.level)
                 }
             }
         }
@@ -818,9 +830,9 @@ class PlayerManager(
         consecutiveErrors = 0
         val nextIndex = playbackQueue.nextIndex()
         val nextItem = playbackQueue.itemAt(nextIndex)
-        val cachedUrl = prefetchedNextUrl?.takeIf { it.songId == nextItem?.songId }?.url
+        val cached = prefetchedNextUrl?.takeIf { it.songId == nextItem?.songId }
         prefetchedNextUrl = null
-        fetchUrlAndPlay(nextIndex, prefetchedUrl = cachedUrl, autoTransition = true)
+        fetchUrlAndPlay(nextIndex, prefetchedUrl = cached?.url, prefetchedLevel = cached?.level, autoTransition = true)
     }
 
     // 临近结尾时分析当前歌的有效结尾与下一首的有效开头，在"有效结尾 - 淡化时长"处精确触发自动切歌；

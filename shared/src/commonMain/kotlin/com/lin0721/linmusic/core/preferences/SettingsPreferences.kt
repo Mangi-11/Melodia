@@ -130,6 +130,8 @@ class SettingsPreferences(
         private val KEY_FLUID_CLOUD_LYRIC_ENABLED = booleanPreferencesKey("fluid_cloud_lyric_enabled")
         // 播放页小歌词显隐，默认 true
         private val KEY_SHOW_MINI_LYRIC = booleanPreferencesKey("show_mini_lyric")
+        // 播放页显示实际音质，默认 false
+        private val KEY_SHOW_PLAYBACK_QUALITY = booleanPreferencesKey("show_playback_quality")
     }
 
     // Wi-Fi 音质设置 Flow
@@ -711,6 +713,17 @@ class SettingsPreferences(
     suspend fun saveShowMiniLyric(show: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_SHOW_MINI_LYRIC] = show
+        }
+    }
+
+    // 播放页实际音质显隐 Flow
+    val showPlaybackQuality: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_SHOW_PLAYBACK_QUALITY] ?: false
+    }
+
+    suspend fun saveShowPlaybackQuality(show: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_SHOW_PLAYBACK_QUALITY] = show
         }
     }
 }

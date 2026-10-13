@@ -56,7 +56,8 @@ class PlaybackRepositoryImpl(
             val item = response.data.first()
             SongPlaybackInfo(
                 url = item.url.orEmpty(),
-                isFreeTrial = item.isTrialAudio
+                isFreeTrial = item.isTrialAudio,
+                level = item.level?.takeIf { it.isNotBlank() }
             )
         }
     )

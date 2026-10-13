@@ -60,6 +60,7 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.lin0721.linmusic.core.download.DownloadPreferences
+import com.lin0721.linmusic.core.ui.interaction.copyOnLongClick
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.DownloadedGreen
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
@@ -78,13 +79,16 @@ data class SongRowData(
     val coverUrl: String?,
     val isVip: Boolean = false,
     val durationText: String? = null,
-    val platformTag: String? = null
+    val platformTag: String? = null,
+    // 长按复制的歌手文本，为空时复制展示的 artist（artist 掺了专辑等附加信息时单独指定）
+    val copyArtist: String? = null
 )
 
 // 离线不可播放的歌曲行置灰程度
 private const val DISABLED_ROW_ALPHA = 0.38f
 
-// 通用歌曲行：Playlist/Artist/Home/Search 共用，compact 控制紧凑尺寸，index 控制是否显示序号列，enabled 为假时置灰且不响应点击
+// 通用歌曲行：Playlist/Artist/Home/Search 共用，compact 控制紧凑尺寸，index 控制是否显示序号列，enabled 为假时置灰且不响应点击，
+// copyable 为真时长按歌名/歌手文字分别复制
 @Composable
 fun SongRow(
     data: SongRowData,
@@ -96,6 +100,7 @@ fun SongRow(
     onArtistClick: (() -> Unit)? = null,
     showDownloadBadge: Boolean = true,
     enabled: Boolean = true,
+    copyable: Boolean = false,
     trailingSlot: @Composable RowScope.() -> Unit = {}
 ) {
     // 平板 Expanded 断点下行高/封面/字号统一加码，结构不变
@@ -185,7 +190,9 @@ fun SongRow(
                     fontSize = titleFontSize,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .then(if (copyable && enabled) Modifier.copyOnLongClick(data.title, "歌名", onClick) else Modifier)
                 )
                 if (!data.platformTag.isNullOrBlank()) {
                     Spacer(Modifier.width(6.dp))
@@ -228,7 +235,11 @@ fun SongRow(
                 fontSize = artistFontSize,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = if (onArtistClick != null && enabled) Modifier.clickable { onArtistClick() } else Modifier
+                modifier = when {
+                    copyable && enabled -> Modifier.copyOnLongClick(data.copyArtist ?: data.artist, "歌手", onArtistClick ?: onClick)
+                    onArtistClick != null && enabled -> Modifier.clickable { onArtistClick() }
+                    else -> Modifier
+                }
             )
         }
 
