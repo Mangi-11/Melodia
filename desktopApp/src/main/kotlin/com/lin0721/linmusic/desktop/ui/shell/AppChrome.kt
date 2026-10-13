@@ -1,6 +1,7 @@
 package com.lin0721.linmusic.desktop.ui.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -12,6 +13,7 @@ import com.lin0721.linmusic.desktop.player.AudioOutputControl
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 import com.lin0721.linmusic.desktop.ui.nowplaying.DockOverlay
 import com.lin0721.linmusic.desktop.ui.player.PlayerBar
+import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.feature.search.ui.DiscoveryUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -24,12 +26,14 @@ internal fun WindowScope.AppTitleBar(
     windowState: WindowState,
     userProfile: UserProfile?,
     searchFocusRequests: Flow<Unit>,
+    dropdown: SearchDropdownState,
     onClose: () -> Unit
 ) {
     val searchViewModel = deps.searchViewModel
     val searchInput by searchViewModel.inputState.collectAsState()
     val discovery by searchViewModel.discoveryState.collectAsState()
     val downloadTasks by deps.downloader.tasks.collectAsState()
+    LaunchedEffect(Unit) { searchViewModel.songHitsEnabled = true }
     val defaultKeyword = (discovery as? DiscoveryUiState.Success)?.defaultKeyword.orEmpty()
     val isMaximized = windowState.placement == WindowPlacement.Maximized
     val openSearch = { state.navigate(DesktopRoute.Search) }
@@ -45,16 +49,25 @@ internal fun WindowScope.AppTitleBar(
         searchQuery = searchInput.query,
         searchPlaceholder = defaultKeyword.ifBlank { "想播放什么？" },
         onSearchQueryChange = { query ->
-            openSearch()
-            // 发现态下开始输入才切到输入态，聚焦本身不切换，保证热搜榜可见
-            searchViewModel.activateSearch()
-            searchViewModel.updateQuery(query)
+            dropdown.selected = SearchDropdownState.NO_SELECTION
+            searchViewModel.updateDraft(query)
         },
-        onSearchFocused = openSearch,
+        onSearchFocusChange = { focused ->
+            dropdown.onFocusChange(focused)
+            // 提交搜索后联想被清空，再次聚焦时按当前文字补拉
+            if (focused && searchInput.query.isNotBlank() && searchInput.currentSuggestions.isEmpty()) {
+                searchViewModel.updateDraft(searchInput.query)
+            }
+        },
+        onSearchBoundsChange = { dropdown.anchor = it },
+        onSearchMove = dropdown::move,
         searchFocusRequests = searchFocusRequests,
         onSearchSubmit = {
-            openSearch()
-            searchViewModel.searchWithKeyword(searchInput.query.ifBlank { defaultKeyword })
+            if (!dropdown.activateSelected()) {
+                dropdown.close()
+                openSearch()
+                searchViewModel.searchWithKeyword(searchInput.query.ifBlank { defaultKeyword })
+            }
         },
         isBrowseActive = state.backStack.current == DesktopRoute.Browse,
         onBrowseClick = { state.navigate(DesktopRoute.Browse) },

@@ -44,6 +44,9 @@ import com.lin0721.linmusic.desktop.ui.login.LoginDialog
 import com.lin0721.linmusic.desktop.ui.lyricsview.CHROME_ANIM_MS
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
+import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
+import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
+import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -80,6 +83,7 @@ fun WindowScope.MelodiaDesktopApp(
     val defaultPlaylistPrivate by deps.settingsPreferences.defaultPlaylistPrivate.collectAsState(initial = false)
     val nowPlaying by controller.nowPlaying.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val searchDropdown = remember { SearchDropdownState() }
 
     // 没有曲目时歌词界面无内容可看，自动收起
     LaunchedEffect(nowPlaying == null) { if (nowPlaying == null) lyricsView.close() }
@@ -117,8 +121,9 @@ fun WindowScope.MelodiaDesktopApp(
             Modifier.fillMaxSize().background(DesktopColors.WindowBackground)
                 .onPointerEvent(PointerEventType.Enter) { lyricsView.pointerInWindow = true }
                 .onPointerEvent(PointerEventType.Exit) { lyricsView.pointerInWindow = false }
-                // 鼠标侧键与浏览器一致：后退键返回，前进键前进；不消费事件，子组件照常响应
+                // 点到搜索下拉之外就收起它；鼠标侧键与浏览器一致：后退键返回，前进键前进；不消费事件，子组件照常响应
                 .onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { event ->
+                    event.changes.firstOrNull()?.position?.let(searchDropdown::onWindowPress)
                     when (event.awtEventOrNull?.button) {
                         MOUSE_BUTTON_BACK -> state.navigateBack()
                         MOUSE_BUTTON_FORWARD -> state.navigateForward()
@@ -126,7 +131,10 @@ fun WindowScope.MelodiaDesktopApp(
                 }
                 // Esc 先让输入框放弃焦点，窗口级快捷键随即恢复；不消费，输入框自己的 Esc 逻辑照常
                 .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) focusManager.clearFocus()
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        searchDropdown.close()
+                        focusManager.clearFocus()
+                    }
                     false
                 }
         ) {
@@ -137,7 +145,7 @@ fun WindowScope.MelodiaDesktopApp(
                     enter = ChromeEnter,
                     exit = ChromeExit
                 ) {
-                    AppTitleBar(state, deps, windowState, userProfile, searchFocusRequests, onClose)
+                    AppTitleBar(state, deps, windowState, userProfile, searchFocusRequests, searchDropdown, onClose)
                 }
                 Workspace(state, deps, frameHost, audioOutput, hasNowPlaying = nowPlaying != null, isFullscreen, Modifier.weight(1f))
                 AnimatedVisibility(
@@ -147,6 +155,10 @@ fun WindowScope.MelodiaDesktopApp(
                 ) {
                     AppPlayerBar(state, deps, audioOutput, fullscreen)
                 }
+            }
+            SearchDropdown(searchDropdown, deps.searchViewModel) { keyword ->
+                state.navigate(DesktopRoute.Search)
+                deps.searchViewModel.searchWithKeyword(keyword)
             }
             SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)) { data ->
                 Snackbar(data, containerColor = DesktopColors.PopupSurface, contentColor = DesktopColors.TextPrimary)

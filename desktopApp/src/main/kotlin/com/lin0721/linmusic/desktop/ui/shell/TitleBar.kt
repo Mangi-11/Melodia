@@ -1,11 +1,14 @@
 package com.lin0721.linmusic.desktop.ui.shell
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -61,11 +64,19 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -124,7 +135,9 @@ fun WindowScope.TitleBar(
     searchQuery: String,
     searchPlaceholder: String,
     onSearchQueryChange: (String) -> Unit,
-    onSearchFocused: () -> Unit,
+    onSearchFocusChange: (Boolean) -> Unit,
+    onSearchBoundsChange: (Rect) -> Unit,
+    onSearchMove: (Int) -> Boolean,
     onSearchSubmit: () -> Unit,
     searchFocusRequests: Flow<Unit>,
     isBrowseActive: Boolean,
@@ -163,19 +176,17 @@ fun WindowScope.TitleBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                Modifier.size(44.dp).clip(CircleShape).background(DesktopColors.Surface)
-                    .clickable(onClick = onHomeClick),
-                contentAlignment = Alignment.Center
-            ) {
-                // 已在首页“全部”时是空心，其余位置是实心
-                Icon(if (isHomeAll) Icons.Outlined.Home else Icons.Rounded.Home, "首页", tint = DesktopColors.TextPrimary)
-            }
+            HomeButton(
+                isHomeAll = isHomeAll,
+                onClick = onHomeClick
+            )
             SearchBox(
                 query = searchQuery,
                 placeholder = searchPlaceholder,
                 onQueryChange = onSearchQueryChange,
-                onFocused = onSearchFocused,
+                onFocusChange = onSearchFocusChange,
+                onBoundsChange = onSearchBoundsChange,
+                onMove = onSearchMove,
                 onSubmit = onSearchSubmit,
                 focusRequests = searchFocusRequests,
                 isBrowseActive = isBrowseActive,
@@ -193,6 +204,41 @@ fun WindowScope.TitleBar(
             )
             WindowButton(Icons.Rounded.Close, "关闭", hoverColor = CloseHover, onClick = onClose)
         }
+    }
+}
+
+// 首页圆形按钮，尺寸与搜索栏 48.dp 统一，具备悬停提亮与缩放动效
+@Composable
+private fun HomeButton(
+    isHomeAll: Boolean,
+    onClick: () -> Unit
+) {
+    val hoverSource = remember { MutableInteractionSource() }
+    val isHovered by hoverSource.collectIsHoveredAsState()
+
+    val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, tween(150))
+    val bgColor by animateColorAsState(if (isHovered) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), tween(150))
+
+    Box(
+        Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .size(48.dp)
+            .hoverable(hoverSource)
+            .clip(CircleShape)
+            .background(bgColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        // 已在首页“全部”时是空心，其余位置是实心
+        Icon(
+            if (isHomeAll) Icons.Outlined.Home else Icons.Rounded.Home,
+            "首页",
+            tint = DesktopColors.TextPrimary,
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 
@@ -328,12 +374,15 @@ private fun MenuScope.AvatarMenuItem(icon: ImageVector, text: String, onClick: (
     MenuItem(text, onClick, icon = icon)
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SearchBox(
     query: String,
     placeholder: String,
     onQueryChange: (String) -> Unit,
-    onFocused: () -> Unit,
+    onFocusChange: (Boolean) -> Unit,
+    onBoundsChange: (Rect) -> Unit,
+    onMove: (Int) -> Boolean,
     onSubmit: () -> Unit,
     focusRequests: Flow<Unit>,
     isBrowseActive: Boolean,
@@ -341,19 +390,72 @@ private fun SearchBox(
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    var isFocused by remember { mutableStateOf(false) }
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+
     LaunchedEffect(focusRequests) {
         focusRequests.collect { runCatching { focusRequester.requestFocus() } }
     }
+
+    val targetBg = when {
+        isFocused || isHovered -> Color(0xFF2A2A2A)
+        else -> Color(0xFF1F1F1F)
+    }
+    val animatedBg by animateColorAsState(targetBg, tween(180))
+
+    val borderColor = when {
+        isFocused -> Color.White
+        isHovered -> Color.White.copy(alpha = 0.55f)
+        else -> Color.Transparent
+    }
+    val animatedBorderColor by animateColorAsState(borderColor, tween(180))
+
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered || isFocused) 1.015f else 1f,
+        animationSpec = tween(180)
+    )
+
     Row(
-        Modifier.width(420.dp).height(44.dp).clip(RoundedCornerShape(22.dp))
-            .background(DesktopColors.Surface).padding(horizontal = 14.dp),
+        Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .width(490.dp)
+            .height(48.dp)
+            .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
+            .hoverable(hoverInteraction)
+            .clip(RoundedCornerShape(24.dp))
+            .border(2.dp, animatedBorderColor, RoundedCornerShape(24.dp))
+            .background(animatedBg)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.Search, null, tint = DesktopColors.TextGray)
+        Icon(
+            Icons.Rounded.Search,
+            null,
+            tint = if (isFocused || isHovered) DesktopColors.TextPrimary else DesktopColors.TextGray,
+            modifier = Modifier.size(20.dp)
+        )
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (query.isEmpty()) {
-                Text(placeholder, color = DesktopColors.TextGray, fontSize = 14.sp, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        placeholder,
+                        color = DesktopColors.TextGray,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isHovered && !isFocused) {
+                        Spacer(Modifier.width(8.dp))
+                        SearchShortcutKey("Ctrl")
+                        Spacer(Modifier.width(3.dp))
+                        SearchShortcutKey("F")
+                    }
+                }
             }
             BasicTextField(
                 value = query,
@@ -364,15 +466,22 @@ private fun SearchBox(
                 modifier = Modifier.fillMaxWidth()
                     .focusRequester(focusRequester)
                     .trackTextInputFocus()
-                    .onFocusChanged { if (it.isFocused) onFocused() }
+                    .onFocusChanged {
+                        isFocused = it.isFocused
+                        onFocusChange(it.isFocused)
+                    }
                     .onPreviewKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
-                            onSubmit()
-                            // 提交后释放焦点，空格等窗口快捷键才不会被输入框吃掉
-                            focusManager.clearFocus()
-                            true
-                        } else {
-                            false
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionDown -> onMove(1)
+                            Key.DirectionUp -> onMove(-1)
+                            Key.Enter -> {
+                                onSubmit()
+                                // 提交后释放焦点，空格等窗口快捷键才不会被输入框吃掉
+                                focusManager.clearFocus()
+                                true
+                            }
+                            else -> false
                         }
                     }
             )
@@ -382,18 +491,119 @@ private fun SearchBox(
                 Icons.Rounded.Close,
                 "清空",
                 tint = DesktopColors.TextGray,
-                modifier = Modifier.size(18.dp).clickable { onQueryChange("") }
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .clickable { onQueryChange("") }
+                    .padding(2.dp)
             )
         }
-        Box(Modifier.padding(horizontal = 10.dp).width(1.dp).height(24.dp).background(DesktopColors.SurfaceLight))
+        Box(Modifier.padding(horizontal = 12.dp).width(1.dp).height(24.dp).background(DesktopColors.SurfaceLight))
         DesktopTooltip("浏览", side = TooltipSide.Bottom) {
-            Icon(
-                Icons.Rounded.Explore,
-                "浏览",
-                tint = if (isBrowseActive) DesktopColors.TextPrimary else DesktopColors.TextGray,
-                modifier = Modifier.size(22.dp).clickable(onClick = onBrowseClick)
+            BrowseCabinetButton(
+                isActive = isBrowseActive,
+                onClick = onBrowseClick
             )
         }
+    }
+}
+
+// 快捷键按键徽标
+@Composable
+private fun SearchShortcutKey(label: String) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(4.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .padding(horizontal = 4.dp, vertical = 1.dp)
+    ) {
+        Text(
+            text = label,
+            color = DesktopColors.TextGray,
+            fontSize = 10.sp,
+            maxLines = 1
+        )
+    }
+}
+
+// 包含独立悬停动效与自绘柜子/抽屉图标的浏览按钮
+@Composable
+private fun BrowseCabinetButton(
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    val buttonHover = remember { MutableInteractionSource() }
+    val isButtonHovered by buttonHover.collectIsHoveredAsState()
+
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isButtonHovered) 1.15f else 1f,
+        animationSpec = tween(150)
+    )
+    val iconColor by animateColorAsState(
+        targetValue = when {
+            isActive || isButtonHovered -> DesktopColors.TextPrimary
+            else -> DesktopColors.TextGray
+        },
+        animationSpec = tween(150)
+    )
+
+    Box(
+        Modifier
+            .graphicsLayer {
+                scaleX = buttonScale
+                scaleY = buttonScale
+            }
+            .hoverable(buttonHover)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        BrowseCabinetIcon(
+            color = iconColor,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+// 自绘热搜榜与歌单分类“收纳箱/抽屉”图标
+@Composable
+private fun BrowseCabinetIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val strokeWidth = 1.6f * density
+
+        // 顶部小把手/弧线盖
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.28f, h * 0.12f),
+            size = Size(w * 0.44f, h * 0.16f),
+            cornerRadius = CornerRadius(2f * density, 2f * density),
+            style = Stroke(width = strokeWidth)
+        )
+
+        // 主体箱体外框
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.12f, h * 0.28f),
+            size = Size(w * 0.76f, h * 0.60f),
+            cornerRadius = CornerRadius(3f * density, 3f * density),
+            style = Stroke(width = strokeWidth)
+        )
+
+        // 抽屉把手/中间扣手
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.38f, h * 0.52f),
+            size = Size(w * 0.24f, h * 0.12f),
+            cornerRadius = CornerRadius(2f * density, 2f * density),
+            style = Stroke(width = strokeWidth)
+        )
     }
 }
 

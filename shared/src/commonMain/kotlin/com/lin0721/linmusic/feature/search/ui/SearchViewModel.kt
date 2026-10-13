@@ -43,6 +43,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+// 输入时展示的歌曲命中卡片数量
+private const val SONG_HIT_LIMIT = 2
+
 class SearchViewModel(
     private val repository: SearchRepository,
     private val historyPreferences: SearchHistoryPreferences,
@@ -76,8 +79,15 @@ class SearchViewModel(
     private val _inputState = MutableStateFlow(SearchInputState())
     val inputState: StateFlow<SearchInputState> = _inputState.asStateFlow()
 
+    // 结果页对应的已提交关键词，与输入框里还在编辑的草稿词分开，翻页与重试只认它
+    private val _committedQuery = MutableStateFlow("")
+    val committedQuery: StateFlow<String> = _committedQuery.asStateFlow()
+
     private val _mode = MutableStateFlow(SearchMode.Discovery)
     val mode: StateFlow<SearchMode> = _mode.asStateFlow()
+
+    // 桌面端下拉浮层才需要输入时的歌曲命中卡片，其余端不额外发请求
+    var songHitsEnabled: Boolean = false
 
     // 热搜第一名的首条单曲，头部卡取色与播放用
     private val _featuredTrack = MutableStateFlow<Track?>(null)
@@ -126,6 +136,7 @@ class SearchViewModel(
     private val offsetByType = mutableMapOf<SearchType, Int>()
     private var searchJob: Job? = null
     private var suggestJob: Job? = null
+    private var hitsJob: Job? = null
 
     init {
         loadDiscoveryData()
@@ -249,7 +260,7 @@ class SearchViewModel(
     // 搜索结果加载失败时的重试入口：重跑当前 Tab 当前关键词，不重复写历史
     fun retrySearch() {
         val type = _selectedType.value
-        val keyword = _inputState.value.query
+        val keyword = _committedQuery.value
         if (keyword.isBlank()) return
         searchJob?.cancel()
         searchJob = viewModelScope.launch { runSearch(keyword, type, isLoadMore = false) }
@@ -275,7 +286,9 @@ class SearchViewModel(
         searchJob?.cancel()
         suggestJob?.cancel()
         cancelExternalJobs()
+        hitsJob?.cancel()
         _inputState.value = SearchInputState()
+        _committedQuery.value = ""
         offsetByType.clear()
         externalOffset.clear()
         _resultsByType.values.forEach { it.value = SearchResultsUiState.Idle }
@@ -289,10 +302,19 @@ class SearchViewModel(
         requestSuggestions(newQuery)
     }
 
+    // 只改输入框草稿词与联想，不动当前模式与已加载的结果；桌面端下拉浮层专用
+    fun updateDraft(newQuery: String) {
+        _inputState.value = _inputState.value.copy(query = newQuery)
+        requestSuggestions(newQuery)
+    }
+
     private fun requestSuggestions(query: String) {
         suggestJob?.cancel()
+        hitsJob?.cancel()
         if (query.isBlank()) {
-            _inputState.value = _inputState.value.copy(suggestions = emptyList(), suggestionQuery = "")
+            _inputState.value = _inputState.value.copy(
+                suggestions = emptyList(), suggestionQuery = "", songHits = emptyList(), songHitsQuery = ""
+            )
             return
         }
         suggestJob = viewModelScope.launch {
@@ -301,6 +323,25 @@ class SearchViewModel(
                 _inputState.value = _inputState.value.copy(suggestions = suggestions, suggestionQuery = query)
             }
         }
+        if (songHitsEnabled) {
+            hitsJob = viewModelScope.launch {
+                delay(300)
+                repository.search(query, SearchType.SONG, offset = 0, limit = SONG_HIT_LIMIT).firstOrNull()?.onSuccess { page ->
+                    val tracks = page.items.filterIsInstance<SearchResultItem.SongItem>().map { it.track }
+                    _inputState.value = _inputState.value.copy(songHits = tracks, songHitsQuery = query)
+                }
+            }
+        }
+    }
+
+    fun playSongHit(track: Track) {
+        val keyword = _inputState.value.query
+        if (keyword.isNotBlank()) viewModelScope.launch { historyPreferences.addKeyword(keyword) }
+        playerManager.playQueue(
+            listOf(QueueItem(track.id, track.name, track.ar.joinToString { it.name }, track.al.picUrl)),
+            0,
+            "搜索"
+        )
     }
 
     // 提交搜索：写入历史并立即执行
@@ -308,8 +349,10 @@ class SearchViewModel(
         if (keyword.isBlank()) return
         searchJob?.cancel()
         suggestJob?.cancel()
+        hitsJob?.cancel()
         cancelExternalJobs()
         _mode.value = SearchMode.Results
+        _committedQuery.value = keyword
         _inputState.value = SearchInputState(query = keyword)
         viewModelScope.launch { historyPreferences.addKeyword(keyword) }
 
@@ -335,7 +378,7 @@ class SearchViewModel(
     fun selectPlatform(platform: MusicPlatform) {
         if (_selectedPlatform.value == platform) return
         _selectedPlatform.value = platform
-        val query = _inputState.value.query
+        val query = _committedQuery.value
         if (query.isNotBlank()) {
             if (platform == MusicPlatform.NETEASE) {
                 if (_resultsByType.getValue(_selectedType.value).value is SearchResultsUiState.Idle) {
@@ -403,7 +446,7 @@ class SearchViewModel(
     }
 
     fun loadMoreExternal(platform: MusicPlatform) {
-        val query = _inputState.value.query
+        val query = _committedQuery.value
         if (query.isNotBlank()) {
             searchExternal(query, platform, isLoadMore = true)
         }
@@ -447,7 +490,7 @@ class SearchViewModel(
     fun selectType(type: SearchType) {
         if (_selectedType.value == type) return
         _selectedType.value = type
-        val query = _inputState.value.query
+        val query = _committedQuery.value
         if (query.isNotBlank() && _resultsByType.getValue(type).value is SearchResultsUiState.Idle) {
             searchJob?.cancel()
             searchJob = viewModelScope.launch { runSearch(query, type, isLoadMore = false) }
@@ -456,7 +499,7 @@ class SearchViewModel(
 
     fun loadMore() {
         val type = _selectedType.value
-        val keyword = _inputState.value.query
+        val keyword = _committedQuery.value
         if (keyword.isBlank()) return
         val current = _resultsByType.getValue(type).value
         if (current !is SearchResultsUiState.Success || current.isLoadingMore || !current.hasMore) return

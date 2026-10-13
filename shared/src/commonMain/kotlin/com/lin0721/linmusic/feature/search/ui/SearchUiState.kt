@@ -1,5 +1,6 @@
 package com.lin0721.linmusic.feature.search.ui
 
+import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.feature.search.domain.HotSearch
 import com.lin0721.linmusic.feature.search.domain.PlaylistTag
 import com.lin0721.linmusic.feature.search.domain.SearchResultItem
@@ -54,12 +55,17 @@ fun ExternalSearchUiState.tabBadge(): String? = when (this) {
 
 enum class SearchMode { Discovery, Typing, Results }
 
-// suggestionQuery 为联想所属关键词，防止旧联想套在新输入上
+// suggestionQuery 为联想所属关键词，防止旧联想套在新输入上；songHits 同理按 songHitsQuery 校验
 data class SearchInputState(
     val query: String = "",
     val suggestions: List<SearchSuggestion> = emptyList(),
-    val suggestionQuery: String = ""
+    val suggestionQuery: String = "",
+    val songHits: List<Track> = emptyList(),
+    val songHitsQuery: String = ""
 ) {
     val currentSuggestions: List<SearchSuggestion>
         get() = if (suggestionQuery == query) suggestions else emptyList()
+
+    val currentSongHits: List<Track>
+        get() = if (songHitsQuery == query) songHits else emptyList()
 }

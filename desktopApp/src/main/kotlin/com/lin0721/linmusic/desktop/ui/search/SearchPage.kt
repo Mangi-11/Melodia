@@ -16,14 +16,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +45,6 @@ import com.lin0721.linmusic.desktop.ui.track.TrackActions
 import com.lin0721.linmusic.desktop.ui.track.TrackRow
 import com.lin0721.linmusic.desktop.ui.track.rememberTrackActions
 import com.lin0721.linmusic.feature.search.domain.SearchResultItem
-import com.lin0721.linmusic.feature.search.domain.SearchSuggestion
 import com.lin0721.linmusic.feature.search.domain.SearchType
 import com.lin0721.linmusic.feature.search.ui.ExternalSearchUiState
 import com.lin0721.linmusic.feature.search.ui.SearchMode
@@ -60,6 +53,7 @@ import com.lin0721.linmusic.feature.search.ui.SearchViewModel
 
 private const val RESULT_LOAD_MORE_THRESHOLD = 5
 
+// 最近搜索与联想在标题栏的下拉浮层里，这里只承载搜索结果
 @Composable
 fun SearchPage(
     viewModel: SearchViewModel,
@@ -68,67 +62,11 @@ fun SearchPage(
     modifier: Modifier = Modifier
 ) {
     val mode by viewModel.mode.collectAsState()
-    val input by viewModel.inputState.collectAsState()
     Box(modifier.fillMaxSize()) {
-        when {
-            mode == SearchMode.Results -> ResultsContent(viewModel, controller, onOpenPlaylist)
-            input.query.isBlank() -> RecentContent(viewModel)
-            else -> SuggestionContent(viewModel)
-        }
-    }
-}
-
-// 热搜与歌单分类在浏览页，这里只列最近搜索
-@Composable
-private fun RecentContent(viewModel: SearchViewModel) {
-    val history by viewModel.history.collectAsState()
-    val listState = rememberLazyListState()
-    HoverScrollbarBox(listState) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(24.dp)) {
-            if (history.isEmpty()) {
-                item { Text("输入关键词后按回车搜索", color = DesktopColors.TextGray) }
-                return@LazyColumn
-            }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SectionHeader("最近搜索", Modifier.weight(1f))
-                    TextButton(onClick = viewModel::clearHistory) {
-                        Text("清空", color = DesktopColors.TextGray)
-                    }
-                }
-            }
-            items(history) { keyword ->
-                ListEntry(Icons.Rounded.History, keyword, onClick = { viewModel.searchWithKeyword(keyword) }) {
-                    Icon(
-                        Icons.Rounded.Close,
-                        "删除",
-                        tint = DesktopColors.TextGray,
-                        modifier = Modifier.clickable { viewModel.removeHistory(keyword) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionContent(viewModel: SearchViewModel) {
-    val input by viewModel.inputState.collectAsState()
-    val listState = rememberLazyListState()
-    HoverScrollbarBox(listState) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(24.dp)) {
-            item {
-                ListEntry(Icons.Rounded.Search, "搜索“${input.query}”", onClick = { viewModel.searchWithKeyword(input.query) })
-            }
-            // 歌手/专辑直达页后续接入，联想项统一按文字搜索
-            items(input.currentSuggestions) { suggestion ->
-                val label = when (suggestion) {
-                    is SearchSuggestion.ArtistMatch -> "歌手：${suggestion.text}"
-                    is SearchSuggestion.AlbumMatch -> "专辑：${suggestion.text} - ${suggestion.artistName}"
-                    else -> suggestion.text
-                }
-                ListEntry(Icons.Rounded.Search, label, onClick = { viewModel.searchWithKeyword(suggestion.text) })
-            }
+        if (mode == SearchMode.Results) {
+            ResultsContent(viewModel, controller, onOpenPlaylist)
+        } else {
+            Centered { Text("在上方搜索框输入关键词后按回车搜索", color = DesktopColors.TextGray) }
         }
     }
 }
@@ -239,7 +177,7 @@ private fun ExternalResultsContent(
         is ExternalSearchUiState.Error -> Centered {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(resultsState.message, color = DesktopColors.TextGray)
-                TextButton(onClick = { viewModel.searchExternal(viewModel.inputState.value.query, platform, false) }) {
+                TextButton(onClick = { viewModel.searchExternal(viewModel.committedQuery.value, platform, false) }) {
                     Text("重试", color = DesktopColors.TextPrimary)
                 }
             }
@@ -397,42 +335,6 @@ private fun CollectionEntry(
             Text(subtitle, color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-}
-
-@Composable
-private fun ListEntry(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-    onClick: () -> Unit,
-    trailing: @Composable () -> Unit = {}
-) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = DesktopColors.TextGray)
-        Text(
-            text,
-            color = DesktopColors.TextPrimary,
-            fontSize = 15.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(start = 12.dp)
-        )
-        trailing()
-    }
-}
-
-@Composable
-private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = DesktopColors.TextPrimary,
-        fontSize = 22.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(bottom = 12.dp)
-    )
 }
 
 @Composable
