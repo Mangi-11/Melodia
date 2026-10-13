@@ -453,8 +453,6 @@ class SettingsPreferences(
         }
     }
 
-    // 悬浮歌词字号 Flow
-    val lyricTextSize: Flow<Int> = dataStore.data.map { prefs ->
     // 界面缩放百分比 Flow
     val uiScalePercent: Flow<Int> = dataStore.data.map { prefs ->
         UiScale.normalizePercent(prefs[KEY_UI_SCALE_PERCENT] ?: UiScale.DEFAULT_PERCENT)
@@ -466,6 +464,8 @@ class SettingsPreferences(
         }
     }
 
+    // 悬浮歌词字号 Flow
+    val lyricTextSize: Flow<Int> = dataStore.data.map { prefs ->
         prefs[KEY_LYRIC_TEXT_SIZE] ?: 14
     }
 
