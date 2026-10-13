@@ -23,6 +23,7 @@ import com.lin0721.linmusic.core.songlike.LoadLikedSongIdsUseCase
 import com.lin0721.linmusic.core.songlike.SongLikeRepository
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
+import com.lin0721.linmusic.feature.playlist.domain.CollectionActionsDelegate
 import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
 import com.lin0721.linmusic.feature.podcast.ui.PodcastPlayerController
 import com.lin0721.linmusic.feature.podcast.ui.PodcastPlayerState
@@ -38,16 +39,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.lin0721.linmusic.core.download.DownloadTrackInfo
 import com.lin0721.linmusic.core.download.SongDownloader
-import com.lin0721.linmusic.core.download.toToastMessage
-import com.lin0721.linmusic.core.download.yearFromEpochMillis
 import com.lin0721.linmusic.core.playlistmutation.PlaylistMutationBus
-import com.lin0721.linmusic.core.playlistmutation.PlaylistMutationEvent
 import com.lin0721.linmusic.core.userplaylist.UserPlaylistRepository
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.QueueItem
-import com.lin0721.linmusic.core.player.PlaySource
 import com.lin0721.linmusic.feature.playlist.data.PlaylistRepository
 
 private const val TAG = "HomeViewModel"
@@ -293,103 +289,32 @@ class HomeViewModel(
         }
     }
 
+    private val collectionActions = CollectionActionsDelegate(
+        playlistRepository, playerManager, songDownloadManager, playlistMutationBus, resourceProvider
+    )
+
     // 卡片上直接播放歌单/专辑：先拉详情，歌单还要补全被服务端截断的曲目，再整列起播
     fun playCollection(id: Long, isAlbum: Boolean) {
-        viewModelScope.launch {
-            val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
-            val detail = detailFlow.first().getOrElse {
-                _toastEvent.emit(it.toUserMessage(resourceProvider))
-                return@launch
-            }
-            val tracks = if (isAlbum) {
-                detail.tracks
-            } else {
-                // 补全失败时退回详情自带的部分曲目，仍可起播
-                playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
-            }
-            if (tracks.isEmpty()) {
-                _toastEvent.emit("暂无可播放的歌曲")
-                return@launch
-            }
-            val queueItems = tracks.map { QueueItem(it.id, it.name, it.ar.joinToString { ar -> ar.name }, it.al.picUrl) }
-            val kind = if (isAlbum) PlaySource.Kind.ALBUM else PlaySource.Kind.PLAYLIST
-            playerManager.playQueue(
-                queueItems,
-                0,
-                detail.name,
-                PlaySource(kind, detail.id, detail.name, detail.coverImgUrl)
-            )
-        }
+        viewModelScope.launch { collectionActions.play(id, isAlbum) { _toastEvent.emit(it) } }
     }
 
     // 歌单或专辑全部加入下一首播放
     fun addCollectionToPlayNext(id: Long, isAlbum: Boolean) {
-        viewModelScope.launch {
-            val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
-            val detail = detailFlow.first().getOrElse {
-                _toastEvent.emit(it.toUserMessage(resourceProvider))
-                return@launch
-            }
-            val tracks = if (isAlbum) {
-                detail.tracks
-            } else {
-                playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
-            }
-            if (tracks.isEmpty()) {
-                _toastEvent.emit("暂无可播放的歌曲")
-                return@launch
-            }
-            val queueItems = tracks.map { QueueItem(it.id, it.name, it.ar.joinToString { ar -> ar.name }, it.al.picUrl) }
-            playerManager.addToPlayNext(queueItems)
-            _toastEvent.emit("已添加至下一首播放")
-        }
+        viewModelScope.launch { collectionActions.addToPlayNext(id, isAlbum) { _toastEvent.emit(it) } }
     }
 
     // 批量下载歌单或专辑
     fun downloadCollection(id: Long, isAlbum: Boolean, level: String) {
         viewModelScope.launch {
-            val detailFlow = if (isAlbum) playlistRepository.getAlbumDetail(id) else playlistRepository.getPlaylistDetail(id)
-            val detail = detailFlow.first().getOrElse {
-                _toastEvent.emit(it.toUserMessage(resourceProvider))
-                return@launch
-            }
-            val tracks = if (isAlbum) {
-                detail.tracks
-            } else {
-                playlistRepository.loadAllTracks(detail).first().getOrElse { detail.tracks }
-            }
-            if (tracks.isEmpty()) {
-                _toastEvent.emit(if (isAlbum) "该专辑没有可下载的歌曲" else "该歌单没有可下载的歌曲")
-                return@launch
-            }
-            val downloadTracks = tracks.map { track ->
-                DownloadTrackInfo(
-                    track.id, track.name, track.ar.joinToString("/") { it.name },
-                    track.al.name, track.al.picUrl.takeIf { it.isNotBlank() },
-                    yearFromEpochMillis(track.publishTime)
-                )
-            }
-            val enqueueResult = songDownloadManager.enqueueBatch(
-                downloadTracks, level, batchTag = "home_collection_$id", batchLabel = detail.name
-            )
-            _toastEvent.emit(enqueueResult.toToastMessage())
+            collectionActions.download(id, isAlbum, level, "home_collection_$id") { _toastEvent.emit(it) }
         }
     }
 
     // 收藏歌单
     fun subscribePlaylist(playlistId: Long) {
         viewModelScope.launch {
-            playlistRepository.subscribePlaylist(playlistId, subscribe = true).collect { result ->
-                result.fold(
-                    onSuccess = {
-                        _subscribedPlaylistIds.value = _subscribedPlaylistIds.value + playlistId
-                        playlistMutationBus.emit(PlaylistMutationEvent.Subscribed(playlistId, true))
-                        _toastEvent.emit("已收藏歌单")
-                    },
-                    onFailure = {
-                        _toastEvent.emit(it.toUserMessage(resourceProvider))
-                    }
-                )
+            if (collectionActions.subscribePlaylist(playlistId) { _toastEvent.emit(it) }) {
+                _subscribedPlaylistIds.value = _subscribedPlaylistIds.value + playlistId
             }
         }
     }

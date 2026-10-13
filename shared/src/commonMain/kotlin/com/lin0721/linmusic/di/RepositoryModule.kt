@@ -45,6 +45,7 @@ import com.lin0721.linmusic.feature.player.data.PlayerRepository
 import com.lin0721.linmusic.feature.player.data.PlayerRepositoryImpl
 import com.lin0721.linmusic.feature.playlist.data.PlaylistRepository
 import com.lin0721.linmusic.feature.playlist.domain.CreatePlaylistAndAddSongUseCase
+import com.lin0721.linmusic.feature.playlist.domain.CollectionActionsDelegate
 import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
 import com.lin0721.linmusic.feature.playlist.domain.UpdatePlaylistCoverUseCase
 import com.lin0721.linmusic.feature.settings.data.SettingsRepository
@@ -141,6 +142,9 @@ val repositoryModule = module {
 
     // “收藏到歌单”弹窗状态与操作，artist/playlist 各持有独立实例
     factoryOf(::SongCollectDelegate)
+
+    // 歌单/专辑整体操作（播放、下一首、下载、收藏），首页与搜索共用
+    factoryOf(::CollectionActionsDelegate)
 
     // 登录成功后同步账号资料（跨 home/library/artist/playlist 域共用）
     singleOf(::SyncProfileAfterLoginUseCase)
