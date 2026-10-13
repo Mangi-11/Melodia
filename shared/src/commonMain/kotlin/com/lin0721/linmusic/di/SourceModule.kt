@@ -4,6 +4,7 @@ import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.player.data.PlaybackRepositoryImpl
 import com.lin0721.linmusic.core.source.AudioSourceProvider
 import com.lin0721.linmusic.core.source.AudioSourceRouter
+import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.UnmApiClient
 import com.lin0721.linmusic.core.source.provider.KugouSearchProvider
@@ -16,6 +17,9 @@ val sourceModule = module {
 
     // UNM API 客户端单例
     single { UnmApiClient() }
+
+    // 社区源插件的导入与启停编排，运行时由各端模块提供
+    single { LxPluginManager(get(), get()) }
 
     // 聚合搜索平台，仅搜索，不参与换源
     single<PlatformSearchProvider>(named("kugou")) { KugouSearchProvider() }

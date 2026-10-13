@@ -25,6 +25,8 @@ coroutinesTest = "1.9.0"
 coroutinesSwing = "1.10.2"
 jna = "5.17.0"
 jaudiotagger = "3.0.1"
+# 桌面端 LX 插件脚本引擎
+graalvm = "25.0.4"
 imageCropper = "4.7.0"
 zxing = "3.5.3"
 bouncycastle = "1.85.2"
@@ -45,6 +47,9 @@ kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-co
 # 桌面端调用 libmpv
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 jaudiotagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jaudiotagger" }
+# 桌面端 LX 插件脚本引擎（GraalJS）
+graal-polyglot = { group = "org.graalvm.polyglot", name = "polyglot", version.ref = "graalvm" }
+graal-js-community = { group = "org.graalvm.polyglot", name = "js-community", version.ref = "graalvm" }
 # 桌面端 org.json（Android 由系统提供）
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

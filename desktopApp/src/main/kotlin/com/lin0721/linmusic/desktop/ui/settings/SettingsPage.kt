@@ -77,6 +77,7 @@ import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
+import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.io.File
@@ -100,6 +101,7 @@ private val QualityOptions = listOf(
 fun SettingsPage(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
+    lxPlugins: LxPluginSettingsViewModel,
     modifier: Modifier = Modifier
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -179,6 +181,8 @@ fun SettingsPage(
                         SettingSwitch(communityPriority, onChange = common::updateCommunityPriority)
                     }
                 }
+
+                LxPluginSection(lxPlugins)
 
                 SettingRow(
                     title = "启用远程 UNM 服务",
@@ -344,7 +348,7 @@ private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> U
 }
 
 @Composable
-private fun SettingRow(
+internal fun SettingRow(
     title: String,
     subtitle: String? = null,
     subtitleColor: androidx.compose.ui.graphics.Color = DesktopColors.TextGray,

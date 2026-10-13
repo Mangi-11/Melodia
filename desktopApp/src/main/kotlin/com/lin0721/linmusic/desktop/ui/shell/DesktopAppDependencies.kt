@@ -19,6 +19,7 @@ import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
 import com.lin0721.linmusic.feature.podcast.ui.PodcastHomeViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
+import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
 import kotlin.reflect.KClass
 
 // 页面专属 ViewModel 的创建入口，每个栈帧各取一份
@@ -44,6 +45,7 @@ class DesktopAppDependencies(
     val searchViewModel: SearchViewModel,
     val commonSettingsViewModel: CommonSettingsViewModel,
     val desktopSettingsViewModel: DesktopSettingsViewModel,
+    val lxPluginSettingsViewModel: LxPluginSettingsViewModel,
     val playbackController: DesktopPlaybackController,
     val downloader: DesktopSongDownloader,
     val desktopPreferences: DesktopPreferences,

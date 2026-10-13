@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.LocalBottomOverlayInset
+import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.core.source.UnmApiClient
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
@@ -50,7 +51,7 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
 
     var showServerUrlDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
-    var duplicateCheckResult by remember { mutableStateOf<SettingsViewModel.ScriptImportCheckResult.Duplicate?>(null) }
+    var duplicateCheckResult by remember { mutableStateOf<LxPluginManager.ImportCheckResult.Duplicate?>(null) }
 
     // 系统文件选取器 (选取 .js 文件)
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -64,13 +65,13 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
                     }
                     if (!content.isNullOrBlank()) {
                         when (val result = viewModel.precheckAndImportScript(content)) {
-                            is SettingsViewModel.ScriptImportCheckResult.Success -> {
+                            is LxPluginManager.ImportCheckResult.Success -> {
                                 ToastManager.showToast("插件导入成功: ${result.item.name}")
                             }
-                            is SettingsViewModel.ScriptImportCheckResult.Duplicate -> {
+                            is LxPluginManager.ImportCheckResult.Duplicate -> {
                                 duplicateCheckResult = result
                             }
-                            is SettingsViewModel.ScriptImportCheckResult.Failure -> {
+                            is LxPluginManager.ImportCheckResult.Failure -> {
                                 ToastManager.showToast("插件解析失败: ${result.message}")
                             }
                         }
@@ -499,7 +500,7 @@ private fun ServerUrlEditDialog(
 private fun LxScriptImportDialog(
     viewModel: SettingsViewModel,
     onDismiss: () -> Unit,
-    onDuplicate: (SettingsViewModel.ScriptImportCheckResult.Duplicate) -> Unit
+    onDuplicate: (LxPluginManager.ImportCheckResult.Duplicate) -> Unit
 ) {
     var textValue by remember { mutableStateOf("") }
     var isProcessing by remember { mutableStateOf(false) }
@@ -574,17 +575,17 @@ private fun LxScriptImportDialog(
                             statusText = "正在加载并校验脚本..."
                             val script = contentRes.getOrThrow()
                             when (val result = viewModel.precheckAndImportScript(script)) {
-                                is SettingsViewModel.ScriptImportCheckResult.Success -> {
+                                is LxPluginManager.ImportCheckResult.Success -> {
                                     isProcessing = false
                                     ToastManager.showToast("插件导入成功: ${result.item.name}")
                                     onDismiss()
                                 }
-                                is SettingsViewModel.ScriptImportCheckResult.Duplicate -> {
+                                is LxPluginManager.ImportCheckResult.Duplicate -> {
                                     isProcessing = false
                                     onDuplicate(result)
                                     onDismiss()
                                 }
-                                is SettingsViewModel.ScriptImportCheckResult.Failure -> {
+                                is LxPluginManager.ImportCheckResult.Failure -> {
                                     isProcessing = false
                                     ToastManager.showToast("解析失败: ${result.message}")
                                 }
@@ -614,7 +615,7 @@ private fun LxScriptImportDialog(
 // 重名插件冲突处理弹窗
 @Composable
 private fun DuplicatePluginDialog(
-    duplicate: SettingsViewModel.ScriptImportCheckResult.Duplicate,
+    duplicate: LxPluginManager.ImportCheckResult.Duplicate,
     onDismiss: () -> Unit,
     onOverwrite: () -> Unit,
     onKeepBoth: () -> Unit

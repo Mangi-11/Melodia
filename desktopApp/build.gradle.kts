@@ -33,6 +33,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.jna)
     implementation(libs.jaudiotagger)
+    implementation(libs.graal.polyglot)
+    runtimeOnly(libs.graal.js.community)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
@@ -200,7 +202,7 @@ compose.desktop {
         mainClass = "com.lin0721.linmusic.desktop.MainKt"
         javaHome = packagingJavaHome.get()
         // 中文系统默认 GBK，统一日志输出编码
-        jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+        jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "--enable-native-access=ALL-UNNAMED")
         // 发布版打包时用 ProGuard 裁掉未使用的类（图标库等体积大头）
         buildTypes.release.proguard {
             configurationFiles.from(project.file("proguard-rules.pro"))

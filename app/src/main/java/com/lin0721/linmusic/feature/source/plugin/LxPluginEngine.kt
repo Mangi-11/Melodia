@@ -10,6 +10,9 @@ import android.webkit.WebViewClient
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.source.LxPluginInfo
 import com.lin0721.linmusic.core.source.LxPluginItem
+import com.lin0721.linmusic.core.source.LxPluginRuntime
+import com.lin0721.linmusic.core.source.LxScriptSupport
+import com.lin0721.linmusic.core.source.LxShim
 import com.lin0721.linmusic.core.source.SourceHttpClient
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
@@ -22,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 private const val TAG = "LxPluginEngine"
 
 // LX Music JS 插件沙盒引擎（多沙盒隔离与生命周期管理）
-class LxPluginEngine(private val context: Context) {
+class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -39,7 +42,7 @@ class LxPluginEngine(private val context: Context) {
     )
 
     // 从远程 URL 下载脚本内容
-    suspend fun downloadScript(url: String): Result<String> = withContext(Dispatchers.IO) {
+    override suspend fun downloadScript(url: String): Result<String> = withContext(Dispatchers.IO) {
         try {
             val script = SourceHttpClient.get(url)
             if (script.isNotBlank()) {
@@ -54,11 +57,11 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 校验并提取脚本信息（使用临时无头沙盒测试运行并监听 inited）
-    suspend fun loadAndVerifyScript(scriptText: String): Result<LxPluginInfo> = withContext(Dispatchers.Main) {
+    override suspend fun loadAndVerifyScript(scriptText: String): Result<LxPluginInfo> = withContext(Dispatchers.Main) {
         val tempId = "temp_${System.currentTimeMillis()}"
         var tempSandbox: PluginSandbox? = null
         try {
-            val headerInfo = parseScriptHeader(scriptText)
+            val headerInfo = LxScriptSupport.parseScriptHeader(scriptText)
             val initDeferred = CompletableDeferred<List<String>>()
 
             tempSandbox = createSandboxInstance(
@@ -76,7 +79,7 @@ class LxPluginEngine(private val context: Context) {
             tempSandbox.webView.evaluateJavascript(scriptText, null)
 
             // 等待 inited 事件触发（最长 8 秒）
-            val sources = withTimeoutOrNull(8000L) {
+            val sources = withTimeoutOrNull(LxScriptSupport.INIT_TIMEOUT_MS) {
                 initDeferred.await()
             } ?: emptyList()
 
@@ -95,7 +98,7 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 激活并注册插件
-    suspend fun activatePlugin(item: LxPluginItem): Boolean = withContext(Dispatchers.Main) {
+    override suspend fun activatePlugin(item: LxPluginItem): Boolean = withContext(Dispatchers.Main) {
         try {
             // 若已存在相同 ID 沙盒，先进行销毁
             deactivatePlugin(item.id)
@@ -116,7 +119,7 @@ class LxPluginEngine(private val context: Context) {
             sandbox.webView.evaluateJavascript(item.rawScript, null)
 
             // 等待初始化
-            val sources = withTimeoutOrNull(8000L) {
+            val sources = withTimeoutOrNull(LxScriptSupport.INIT_TIMEOUT_MS) {
                 initDeferred.await()
             }
             if (sources != null && sources.isNotEmpty()) {
@@ -133,7 +136,7 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 注销并销毁指定插件沙盒
-    fun deactivatePlugin(pluginId: String) {
+    override fun deactivatePlugin(pluginId: String) {
         activeSandboxes.remove(pluginId)?.let { sandbox ->
             scope.launch(Dispatchers.Main) {
                 destroySandbox(sandbox)
@@ -142,7 +145,7 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 批量同步活跃插件沙盒状态
-    suspend fun syncActivePlugins(items: List<LxPluginItem>) = withContext(Dispatchers.Main) {
+    override suspend fun syncActivePlugins(items: List<LxPluginItem>) = withContext(Dispatchers.Main) {
         val enabledItems = items.filter { it.isEnabled }
         val enabledIds = enabledItems.map { it.id }.toSet()
 
@@ -159,12 +162,12 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 获取特定插件当前支持的平台列表
-    fun getSupportedSources(pluginId: String): List<String> {
+    override fun getSupportedSources(pluginId: String): List<String> {
         return activeSandboxes[pluginId]?.supportedSources ?: emptyList()
     }
 
     // 针对特定插件调用解析音乐直链
-    suspend fun resolveMusicUrl(
+    override suspend fun resolveMusicUrl(
         pluginId: String,
         source: String,
         songId: String,
@@ -179,15 +182,8 @@ class LxPluginEngine(private val context: Context) {
         val deferred = CompletableDeferred<String?>()
         sandbox.pendingResolves[callId] = deferred
 
-        val lxQuality = mapQualityToLx(quality)
-        val musicInfoJson = org.json.JSONObject().apply {
-            put("id", songId)
-            put("songmid", songId)
-            put("name", songName)
-            put("singer", singer)
-            put("albumName", albumName)
-            put("interval", formatDuration(durationMs))
-        }.toString()
+        val lxQuality = LxScriptSupport.mapQualityToLx(quality)
+        val musicInfoJson = LxScriptSupport.buildMusicInfoJson(songId, songName, singer, albumName, durationMs)
 
         withContext(Dispatchers.Main) {
             val quotedMusicInfo = org.json.JSONObject.quote(musicInfoJson)
@@ -198,7 +194,7 @@ class LxPluginEngine(private val context: Context) {
         }
 
         try {
-            withTimeoutOrNull(12000L) { deferred.await() }
+            withTimeoutOrNull(LxScriptSupport.RESOLVE_TIMEOUT_MS) { deferred.await() }
         } catch (e: Exception) {
             AppLogger.w(TAG, "插件[$pluginId] 解析直链超时或失败: ${e.message}")
             null
@@ -213,7 +209,7 @@ class LxPluginEngine(private val context: Context) {
     }
 
     // 重置并销毁全部沙盒
-    fun reset() {
+    override fun reset() {
         val sandboxes = activeSandboxes.values.toList()
         activeSandboxes.clear()
         scope.launch(Dispatchers.Main) {
@@ -383,146 +379,8 @@ class LxPluginEngine(private val context: Context) {
         }
     }
 
-    private fun parseScriptHeader(script: String): LxPluginInfo {
-        var name = "未命名插件"
-        var version = "1.0.0"
-        var author = "未知"
-        var desc = ""
-
-        val lines = script.lines().take(50)
-        for (line in lines) {
-            val trimmed = line.trim()
-            when {
-                trimmed.contains("@name") -> name = trimmed.substringAfter("@name").trim()
-                trimmed.contains("@version") -> version = trimmed.substringAfter("@version").trim()
-                trimmed.contains("@author") -> author = trimmed.substringAfter("@author").trim()
-                trimmed.contains("@description") -> desc = trimmed.substringAfter("@description").trim()
-            }
-        }
-        return LxPluginInfo(name = name, version = version, author = author, description = desc)
-    }
-
-    private fun mapQualityToLx(quality: String): String = when (quality) {
-        "lossless" -> "flac"
-        "hires" -> "flac24bit"
-        "exhigh" -> "320k"
-        else -> "128k"
-    }
-
-    private fun formatDuration(durationMs: Long): String {
-        val totalSec = durationMs / 1000
-        val m = totalSec / 60
-        val s = totalSec % 60
-        return "%02d:%02d".format(m, s)
-    }
-
-    private fun escapeJsString(str: String): String {
-        return str.replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-    }
-
-    private fun buildShimHtml(): String = """
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"></head>
-        <body>
-        <script>
-        (function() {
-            var pendingCallbacks = {};
-            var reqIdCounter = 0;
-            var requestHandler = null;
-
-            window.lx = {
-                version: "2.0.0",
-                env: "mobile",
-                currentScriptInfo: {
-                    name: "",
-                    description: "",
-                    version: "",
-                    author: "",
-                    rawScript: ""
-                },
-                EVENT_NAMES: {
-                    request: "request",
-                    inited: "inited",
-                    updateAlert: "updateAlert"
-                },
-                request: function(url, opts, callback) {
-                    var id = ++reqIdCounter;
-                    pendingCallbacks[id] = callback;
-                    var options = opts || {};
-                    var method = options.method || 'GET';
-                    var headers = JSON.stringify(options.headers || {});
-                    var body = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : '');
-                    MelodiaHostBridge.httpRequest(id, url, method, headers, body);
-                    return function() { delete pendingCallbacks[id]; };
-                },
-                on: function(event, handler) {
-                    if (event === 'request') {
-                        requestHandler = handler;
-                    }
-                    return Promise.resolve();
-                },
-                send: function(event, data) {
-                    MelodiaHostBridge.onEvent(event, JSON.stringify(data || {}));
-                    return Promise.resolve();
-                },
-                utils: {
-                    crypto: {
-                        md5: function(str) { return MelodiaHostBridge.md5(str); }
-                    },
-                    buffer: {
-                        from: function(data) { return data; },
-                        bufToString: function(buf) { return String(buf); }
-                    }
-                }
-            };
-
-            window.__melodia_handle_http_response = function(id, err, respJson, body) {
-                var cb = pendingCallbacks[id];
-                if (!cb) return;
-                delete pendingCallbacks[id];
-                var resp = null;
-                try { resp = respJson ? JSON.parse(respJson) : {}; } catch(e) { resp = {}; }
-                var parsedBody = body;
-                if (typeof body === 'string') {
-                    var trimmed = body.trim();
-                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-                        try { parsedBody = JSON.parse(trimmed); } catch(e) {}
-                    }
-                }
-                resp.body = parsedBody;
-                resp.statusCode = resp.statusCode || 200;
-                cb(err ? new Error(err) : null, resp, parsedBody);
-            };
-
-            window.__melodia_resolve_music_url = function(callId, source, musicInfoJson, quality) {
-                if (!requestHandler) {
-                    MelodiaHostBridge.onResolveResult(callId, null, "No handler");
-                    return;
-                }
-                var musicInfo = (typeof musicInfoJson === 'object') ? musicInfoJson : JSON.parse(musicInfoJson);
-                Promise.resolve().then(function() {
-                    return requestHandler({
-                        source: source,
-                        action: 'musicUrl',
-                        info: {
-                            type: quality,
-                            musicInfo: musicInfo
-                        }
-                    });
-                }).then(function(result) {
-                    var url = typeof result === 'string' ? result : (result && result.url ? result.url : null);
-                    MelodiaHostBridge.onResolveResult(callId, url, null);
-                }).catch(function(err) {
-                    MelodiaHostBridge.onResolveResult(callId, null, err ? err.message : "Error");
-                });
-            };
-        })();
-        </script>
-        </body>
-        </html>
-    """.trimIndent()
+    private fun buildShimHtml(): String =
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><script>\n" +
+            LxShim.script("mobile") +
+            "\n</script></body></html>"
 }

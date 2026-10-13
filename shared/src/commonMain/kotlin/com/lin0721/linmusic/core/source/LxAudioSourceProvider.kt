@@ -1,18 +1,13 @@
-package com.lin0721.linmusic.feature.source.plugin
+package com.lin0721.linmusic.core.source
 
 import com.lin0721.linmusic.core.log.AppLogger
-import com.lin0721.linmusic.core.source.AudioSourceProvider
-import com.lin0721.linmusic.core.source.ExternalTrack
-import com.lin0721.linmusic.core.source.MusicPlatform
-import com.lin0721.linmusic.core.source.SourcePreferences
-import com.lin0721.linmusic.core.source.SourceResult
 import kotlinx.coroutines.flow.first
 
 private const val TAG = "LxAudioSourceProvider"
 
 // LX 自定义插件音源 Provider 适配器（支持多插件按优先级轮询）
 class LxAudioSourceProvider(
-    private val engine: LxPluginEngine,
+    private val runtime: LxPluginRuntime,
     private val sourcePreferences: SourcePreferences
 ) : AudioSourceProvider {
 
@@ -33,19 +28,19 @@ class LxAudioSourceProvider(
         if (plugins.isEmpty()) return null
 
         // 确保沙盒池与当前已启用的插件保持同步
-        engine.syncActivePlugins(plugins)
+        runtime.syncActivePlugins(plugins)
 
         val priorityPlatformOrder = listOf("wy", "kw", "kg", "tx", "mg")
 
         // 按照用户调整的插件优先级顺序逐个尝试
         for (plugin in plugins) {
-            val supported = engine.getSupportedSources(plugin.id).ifEmpty { plugin.sources }
+            val supported = runtime.getSupportedSources(plugin.id).ifEmpty { plugin.sources }
             if (supported.isEmpty()) continue
 
             val trySources = priorityPlatformOrder.filter { it in supported }.ifEmpty { supported }
             for (source in trySources) {
                 try {
-                    val url = engine.resolveMusicUrl(
+                    val url = runtime.resolveMusicUrl(
                         pluginId = plugin.id,
                         source = source,
                         songId = songId,

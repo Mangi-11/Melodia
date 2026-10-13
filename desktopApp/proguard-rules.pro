@@ -47,3 +47,13 @@
 
 # 应用自身的数据模型较多且体积小，整体保留，避免 JSON 字段被裁
 -keep class com.lin0721.linmusic.** { *; }
+
+# GraalJS / Truffle：语言与引擎实现通过 ServiceLoader 和反射加载，不能裁剪
+-keep class org.graalvm.** { *; }
+-keep class com.oracle.truffle.** { *; }
+-keep class com.oracle.js.** { *; }
+-keep class com.ibm.icu.** { *; }
+
+# 暴露给 LX 插件沙盒脚本的宿主接口，成员由 Export 注解反射访问
+-keep class com.lin0721.linmusic.desktop.plugin.LxHostBridge { *; }
+
