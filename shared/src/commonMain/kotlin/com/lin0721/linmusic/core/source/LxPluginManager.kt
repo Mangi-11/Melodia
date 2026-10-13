@@ -40,6 +40,35 @@ class LxPluginManager(
         runtime.reset()
     }
 
+    // 批量导入的汇总：成功入库的、需要确认的重名项、失败原因
+    data class BatchImportResult(
+        val imported: List<LxPluginItem>,
+        val duplicates: List<ImportCheckResult.Duplicate>,
+        val failures: List<String>
+    ) {
+        fun summary(): String {
+            val parts = mutableListOf("导入 ${imported.size} 个")
+            if (duplicates.isNotEmpty()) parts += "重名 ${duplicates.size} 个待确认"
+            if (failures.isNotEmpty()) parts += "失败 ${failures.size} 个"
+            return parts.joinToString("，")
+        }
+    }
+
+    // 逐个校验并导入压缩包里选中的脚本
+    suspend fun importScripts(scripts: List<ArchiveScript>): BatchImportResult {
+        val imported = mutableListOf<LxPluginItem>()
+        val duplicates = mutableListOf<ImportCheckResult.Duplicate>()
+        val failures = mutableListOf<String>()
+        for (script in scripts) {
+            when (val result = precheckAndImport(script.content)) {
+                is ImportCheckResult.Success -> imported += result.item
+                is ImportCheckResult.Duplicate -> duplicates += result
+                is ImportCheckResult.Failure -> failures += "${script.path}：${result.message}"
+            }
+        }
+        return BatchImportResult(imported, duplicates, failures)
+    }
+
     // 输入为链接时下载脚本，否则当作脚本文本
     suspend fun resolveScriptContent(input: String): Result<String> {
         val trimmed = input.trim()

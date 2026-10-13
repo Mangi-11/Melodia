@@ -1,6 +1,9 @@
 package com.lin0721.linmusic.desktop.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,12 +22,15 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +41,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.source.ArchiveScript
+import com.lin0721.linmusic.core.source.LxArchiveReader
 import com.lin0721.linmusic.core.source.LxPluginItem
 import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.core.source.MusicPlatform
@@ -59,30 +69,39 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
     val scope = rememberCoroutineScope()
     val enabled by viewModel.pluginEnabled.collectAsState()
     val plugins by viewModel.plugins.collectAsState()
+    val importing by viewModel.importing.collectAsState()
+    val duplicates by viewModel.pendingDuplicates.collectAsState()
     var showImportDialog by remember { mutableStateOf(false) }
-    var duplicate by remember { mutableStateOf<LxPluginManager.ImportCheckResult.Duplicate?>(null) }
-    var fileImporting by remember { mutableStateOf(false) }
+    var pendingScripts by remember { mutableStateOf<List<ArchiveScript>>(emptyList()) }
+    var fileReading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(viewModel) { viewModel.messages.collect { navigator.showMessage(it) } }
 
     val handleResult: (LxPluginManager.ImportCheckResult) -> Unit = { result ->
         when (result) {
             is LxPluginManager.ImportCheckResult.Success -> navigator.showMessage("插件导入成功：${result.item.name}")
-            is LxPluginManager.ImportCheckResult.Duplicate -> duplicate = result
+            is LxPluginManager.ImportCheckResult.Duplicate -> viewModel.addDuplicate(result)
             is LxPluginManager.ImportCheckResult.Failure -> navigator.showMessage("插件解析失败：${result.message}")
         }
     }
 
     val pickFile = {
-        val file = chooseScriptFile("选择 LX 插件脚本")
+        val file = chooseScriptFile("选择 LX 插件脚本或压缩包")
         if (file != null) {
             scope.launch {
-                fileImporting = true
+                fileReading = true
                 try {
-                    val text = withContext(Dispatchers.IO) { file.readText() }
-                    if (text.isBlank()) navigator.showMessage("脚本文件为空") else handleResult(viewModel.importFrom(text))
+                    val read = withContext(Dispatchers.IO) { file.inputStream().use { LxArchiveReader.readScripts(file.name, it) } }
+                    val scripts = read.getOrNull()
+                    when {
+                        scripts == null -> navigator.showMessage("读取失败：${read.exceptionOrNull()?.message}")
+                        scripts.size == 1 -> handleResult(viewModel.importFrom(scripts[0].content))
+                        else -> pendingScripts = scripts
+                    }
                 } catch (e: Exception) {
                     navigator.showMessage("读取文件失败：${e.message}")
                 } finally {
-                    fileImporting = false
+                    fileReading = false
                 }
             }
         }
@@ -110,9 +129,9 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        ImportButton("选取文件 (.js)", enabled = !fileImporting, onClick = pickFile)
-        ImportButton("粘贴脚本或链接导入", enabled = !fileImporting, onClick = { showImportDialog = true })
-        if (fileImporting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = DesktopColors.Accent)
+        ImportButton("选取文件 (.js/.zip/.7z)", enabled = !fileReading && !importing, onClick = pickFile)
+        ImportButton("粘贴脚本或链接导入", enabled = !fileReading && !importing, onClick = { showImportDialog = true })
+        if (fileReading || importing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = DesktopColors.Accent)
     }
 
     if (showImportDialog) {
@@ -123,27 +142,26 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
         )
     }
 
-    duplicate?.let { dup ->
+    if (pendingScripts.isNotEmpty()) {
+        ScriptPickerDialog(
+            scripts = pendingScripts,
+            onDismiss = { pendingScripts = emptyList() },
+            onConfirm = { selected ->
+                pendingScripts = emptyList()
+                viewModel.importScriptsInBackground(selected)
+            }
+        )
+    }
+
+    duplicates.firstOrNull()?.let { dup ->
         DesktopDialog(
             title = "检测到同名插件",
-            onDismiss = { duplicate = null },
+            onDismiss = viewModel::skipFirstDuplicate,
             width = 440.dp,
             actions = {
-                DialogButton("取消", { duplicate = null })
-                DialogButton("保留为副本", {
-                    scope.launch {
-                        viewModel.confirmImport(dup.newInfo, dup.rawScript, overwriteId = null)
-                        navigator.showMessage("已作为新插件添加：${dup.newInfo.name}")
-                        duplicate = null
-                    }
-                })
-                DialogButton("覆盖更新", {
-                    scope.launch {
-                        viewModel.confirmImport(dup.newInfo, dup.rawScript, overwriteId = dup.existing.id)
-                        navigator.showMessage("已覆盖更新插件：${dup.newInfo.name}")
-                        duplicate = null
-                    }
-                }, primary = true)
+                DialogButton("取消", viewModel::skipFirstDuplicate)
+                DialogButton("保留为副本", { viewModel.resolveFirstDuplicate(overwrite = false) })
+                DialogButton("覆盖更新", { viewModel.resolveFirstDuplicate(overwrite = true) }, primary = true)
             }
         ) {
             Text(
@@ -162,6 +180,60 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
                 color = DesktopColors.TextPrimary,
                 fontSize = 12.sp
             )
+        }
+    }
+}
+
+// 压缩包里有多个脚本时让用户勾选要导入的，默认全选
+@Composable
+private fun ScriptPickerDialog(
+    scripts: List<ArchiveScript>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<ArchiveScript>) -> Unit
+) {
+    var selected by remember(scripts) { mutableStateOf(scripts.map { it.path }.toSet()) }
+
+    DesktopDialog(
+        title = "选择要导入的脚本",
+        onDismiss = onDismiss,
+        width = 480.dp,
+        actions = {
+            DialogButton("取消", onDismiss)
+            DialogButton(
+                text = "导入所选（${selected.size}）",
+                onClick = { onConfirm(scripts.filter { it.path in selected }) },
+                primary = true,
+                enabled = selected.isNotEmpty()
+            )
+        }
+    ) {
+        Text(
+            text = "压缩包内找到 ${scripts.size} 个 .js 脚本：",
+            color = DesktopColors.TextGray,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Column(Modifier.fillMaxWidth().heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
+            scripts.forEach { script ->
+                val checked = script.path in selected
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clickable { selected = if (checked) selected - script.path else selected + script.path }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { selected = if (it) selected + script.path else selected - script.path },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = DesktopColors.Accent,
+                            uncheckedColor = DesktopColors.TextGray,
+                            checkmarkColor = DesktopColors.TextPrimary
+                        )
+                    )
+                    Text(script.path, color = DesktopColors.TextPrimary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }
@@ -311,7 +383,7 @@ private fun PluginIconButton(
 private fun chooseScriptFile(title: String): File? {
     val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
         // Windows 原生对话框把 file 当作过滤模式
-        file = "*.js"
+        file = "*.js;*.zip;*.7z"
         isVisible = true
     }
     val name = dialog.file ?: return null

@@ -57,3 +57,6 @@
 # 暴露给 LX 插件沙盒脚本的宿主接口，成员由 Export 注解反射访问
 -keep class com.lin0721.linmusic.desktop.plugin.LxHostBridge { *; }
 
+# 压缩包解析（zip/7z）：编解码器与压缩方法按名称查找，不能裁剪
+-keep class org.apache.commons.compress.** { *; }
+-keep class org.tukaani.xz.** { *; }

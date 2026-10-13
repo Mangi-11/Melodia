@@ -88,3 +88,9 @@
     static ** CREATOR;
 }
 -keep class com.hchen.superlyricapi.** { *; }
+
+
+# 压缩包解析（zip/7z）：未使用的可选压缩算法依赖不在运行时
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
+-dontwarn org.apache.commons.compress.**

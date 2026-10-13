@@ -133,4 +133,21 @@ class LxPluginManagerTest {
         manager.toggle(item.id)
         assertEquals(listOf(emptyList<String>()), runtime.synced)
     }
+
+    @Test
+    fun `批量导入汇总成功与重名`() = runBlocking {
+        val result = manager.importScripts(listOf(ArchiveScript("a.js", "s1"), ArchiveScript("b.js", "s2")))
+        assertEquals(1, result.imported.size)
+        assertEquals(1, result.duplicates.size)
+        assertTrue(result.failures.isEmpty())
+        assertEquals("导入 1 个，重名 1 个待确认", result.summary())
+    }
+
+    @Test
+    fun `批量导入时失败项带上文件路径`() = runBlocking {
+        runtime.verifyResult = Result.failure(Exception("语法错误"))
+        val result = manager.importScripts(listOf(ArchiveScript("lib/bad.js", "x")))
+        assertEquals(listOf("lib/bad.js：语法错误"), result.failures)
+        assertEquals("导入 0 个，失败 1 个", result.summary())
+    }
 }

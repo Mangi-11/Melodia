@@ -22,6 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.lin0721.linmusic.core.source.ArchiveScript
+import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.source.LxPluginInfo
 import com.lin0721.linmusic.core.source.LxPluginItem
 import com.lin0721.linmusic.core.source.MusicPlatform
@@ -270,6 +272,17 @@ class SettingsViewModel(
     // 确认导入插件（支持覆盖更新或保留两者）
     suspend fun confirmImportPlugin(info: LxPluginInfo, script: String, overwriteExistingId: String? = null): LxPluginItem =
         lxPluginManager.confirmImport(info, script, overwriteExistingId)
+
+    // 导入压缩包里勾选的脚本，跑在 ViewModel 作用域，页面销毁后仍会完成
+    fun importScriptsInBackground(scripts: List<ArchiveScript>, onDone: (LxPluginManager.BatchImportResult) -> Unit) {
+        viewModelScope.launch {
+            try {
+                onDone(lxPluginManager.importScripts(scripts))
+            } catch (e: Exception) {
+                ToastManager.showToast("导入异常: ${e.message}")
+            }
+        }
+    }
 
     // 兼容旧接口
     suspend fun importLxScript(scriptText: String): Result<LxPluginInfo> {

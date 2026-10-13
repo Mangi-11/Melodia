@@ -33,6 +33,8 @@ kotlin {
             api(libs.androidx.lifecycle.viewmodel)
             api(libs.zxing.core)
             implementation(libs.bouncycastle)
+            implementation(libs.commons.compress)
+            implementation(libs.xz)
             // Android 自带 org.json，只在编译期引用
             compileOnly(libs.org.json)
         }
