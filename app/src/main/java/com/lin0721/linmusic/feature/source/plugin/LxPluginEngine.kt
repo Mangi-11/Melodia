@@ -183,7 +183,7 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
         sandbox.pendingResolves[callId] = deferred
 
         val lxQuality = LxScriptSupport.mapQualityToLx(quality)
-        val musicInfoJson = LxScriptSupport.buildMusicInfoJson(songId, songName, singer, albumName, durationMs)
+        val musicInfoJson = LxScriptSupport.buildMusicInfoJson(source, songId, songName, singer, albumName, durationMs)
 
         withContext(Dispatchers.Main) {
             val quotedMusicInfo = org.json.JSONObject.quote(musicInfoJson)

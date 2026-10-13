@@ -417,12 +417,13 @@ class SearchViewModel(
             for (provider in sourceProviders) {
                 playUrl = runCatching {
                     provider.resolveUrl(
-                        songId = track.id,
+                        songId = track.hash ?: track.id,
                         songName = track.name,
                         artists = track.artists,
                         albumName = track.albumName,
                         durationMs = track.durationMs,
-                        quality = "lossless"
+                        quality = "lossless",
+                        origin = track.platform
                     )?.url
                 }.getOrNull()
                 if (!playUrl.isNullOrBlank()) break

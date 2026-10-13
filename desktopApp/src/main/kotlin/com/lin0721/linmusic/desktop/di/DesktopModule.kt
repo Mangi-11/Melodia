@@ -106,7 +106,7 @@ val desktopPlatformModule = module {
     single { SettingsPreferences(store(PreferencesStores.SETTINGS), streamCacheDefault = true) }
     single { SourcePreferences(store(PreferencesStores.SOURCE)) }
     single { GraalLxPluginRuntime() } bind LxPluginRuntime::class
-    single<AudioSourceProvider>(named("lx")) { LxAudioSourceProvider(get<LxPluginRuntime>(), get()) }
+    single<AudioSourceProvider>(named("lx")) { LxAudioSourceProvider(get<LxPluginRuntime>(), get(), getAll<PlatformSearchProvider>()) }
     single { SessionMonitor(get(), get()) }
     single { SearchHistoryPreferences(store(PreferencesStores.SEARCH_HISTORY)) }
     single { PlaybackPreferences(store(PreferencesStores.PLAYBACK)) }

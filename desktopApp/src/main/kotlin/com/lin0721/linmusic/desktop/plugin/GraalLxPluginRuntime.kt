@@ -125,7 +125,7 @@ class GraalLxPluginRuntime(
         val deferred = CompletableDeferred<String?>()
         sandbox.pendingResolves[callId] = deferred
 
-        val musicInfoJson = LxScriptSupport.buildMusicInfoJson(songId, songName, singer, albumName, durationMs)
+        val musicInfoJson = LxScriptSupport.buildMusicInfoJson(source, songId, songName, singer, albumName, durationMs)
         val lxQuality = LxScriptSupport.mapQualityToLx(quality)
         return try {
             sandbox.call("__melodia_resolve_music_url", callId, source, musicInfoJson, lxQuality)

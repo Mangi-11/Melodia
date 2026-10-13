@@ -6,9 +6,11 @@ import kotlinx.coroutines.flow.first
 private const val TAG = "LxAudioSourceProvider"
 
 // LX 自定义插件音源 Provider 适配器（支持多插件按优先级轮询）
+// 各平台的歌曲标识互不通用：只有与 origin 同平台的插件源能直接用 songId，其他平台要先搜索匹配出自己的标识
 class LxAudioSourceProvider(
     private val runtime: LxPluginRuntime,
-    private val sourcePreferences: SourcePreferences
+    private val sourcePreferences: SourcePreferences,
+    private val searchProviders: List<PlatformSearchProvider> = emptyList()
 ) : AudioSourceProvider {
 
     override val platform: MusicPlatform = MusicPlatform.LX
@@ -19,7 +21,8 @@ class LxAudioSourceProvider(
         artists: String,
         albumName: String?,
         durationMs: Long,
-        quality: String
+        quality: String,
+        origin: MusicPlatform
     ): SourceResult? {
         val enabled = sourcePreferences.lxPluginEnabled.first()
         if (!enabled) return null
@@ -30,20 +33,25 @@ class LxAudioSourceProvider(
         // 确保沙盒池与当前已启用的插件保持同步
         runtime.syncActivePlugins(plugins)
 
-        val priorityPlatformOrder = listOf("wy", "kw", "kg", "tx", "mg")
+        val originKey = origin.lxKey
+        // 同一首歌在各平台的匹配结果，多个插件之间复用，null 表示没匹配上
+        val matched = mutableMapOf<String, String?>()
 
         // 按照用户调整的插件优先级顺序逐个尝试
         for (plugin in plugins) {
             val supported = runtime.getSupportedSources(plugin.id).ifEmpty { plugin.sources }
-            if (supported.isEmpty()) continue
+            for (source in candidateSources(originKey, supported)) {
+                val sourceSongId = if (source == originKey && songId.isNotBlank()) {
+                    songId
+                } else {
+                    matched.getOrPut(source) { matchSongId(source, songName, artists, albumName, durationMs) }
+                } ?: continue
 
-            val trySources = priorityPlatformOrder.filter { it in supported }.ifEmpty { supported }
-            for (source in trySources) {
                 try {
                     val url = runtime.resolveMusicUrl(
                         pluginId = plugin.id,
                         source = source,
-                        songId = songId,
+                        songId = sourceSongId,
                         songName = songName,
                         singer = artists,
                         albumName = albumName ?: "",
@@ -66,7 +74,47 @@ class LxAudioSourceProvider(
         return null
     }
 
+    // 歌曲所属平台排最前；其余平台只收能搜索匹配的，拿不到对应标识的不尝试，避免把别家的 id 当成自己的
+    private fun candidateSources(originKey: String, supported: List<String>): List<String> {
+        val searchable = searchProviders.mapTo(hashSetOf()) { it.platform.lxKey }
+        val others = PRIORITY_SOURCES.filter { it != originKey && it in searchable }
+        return (listOf(originKey) + others).filter { it in supported }
+    }
+
+    // 在目标平台搜索并按歌名、歌手、时长匹配，没有把握时返回 null，宁可不播也不播错歌
+    private suspend fun matchSongId(
+        source: String,
+        songName: String,
+        artists: String,
+        albumName: String?,
+        durationMs: Long
+    ): String? {
+        val provider = searchProviders.firstOrNull { it.platform.lxKey == source } ?: return null
+        val candidates = try {
+            provider.search("$songName $artists".trim(), 0, MATCH_SEARCH_LIMIT)
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "[$source] 搜索匹配失败: ${e.message}")
+            return null
+        }
+        val best = SongMatcher.pickBestCandidate(
+            candidates = candidates,
+            targetName = songName,
+            targetArtists = artists.split(ARTIST_SEPARATORS).map { it.trim() }.filter { it.isNotEmpty() },
+            targetAlbum = albumName,
+            targetDurationMs = durationMs
+        )
+        if (best == null) AppLogger.d(TAG, "[$source] 未匹配到同一首歌: $songName - $artists")
+        return best?.let { it.hash ?: it.id }
+    }
+
     override suspend fun search(keyword: String, offset: Int, limit: Int): List<ExternalTrack> {
         return emptyList()
+    }
+
+    private companion object {
+        // 歌曲所属平台之外的尝试顺序；咪咕与网易云没有可用的搜索源，只在作为歌曲所属平台时参与
+        val PRIORITY_SOURCES = listOf("kw", "kg", "tx")
+        val ARTIST_SEPARATORS = Regex("[、&;，,/|·・]+")
+        const val MATCH_SEARCH_LIMIT = 10
     }
 }

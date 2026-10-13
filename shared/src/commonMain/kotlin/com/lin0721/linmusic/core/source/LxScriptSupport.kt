@@ -44,7 +44,9 @@ object LxScriptSupport {
         return "%02d:%02d".format(m, s)
     }
 
+    // source 为目标平台代号；songId 必须是该平台自己的歌曲标识，酷狗的 hash 与 songmid 取同一个值
     fun buildMusicInfoJson(
+        source: String,
         songId: String,
         songName: String,
         singer: String,
@@ -53,6 +55,7 @@ object LxScriptSupport {
     ): String = buildJsonObject {
         put("id", songId)
         put("songmid", songId)
+        if (source == "kg") put("hash", songId)
         put("name", songName)
         put("singer", singer)
         put("albumName", albumName)

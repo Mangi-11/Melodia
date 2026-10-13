@@ -12,7 +12,9 @@ interface AudioSourceProvider {
         artists: String,
         albumName: String?,
         durationMs: Long,
-        quality: String
+        quality: String,
+        // songId 所属的平台，插件据此决定能否直接用这个 id
+        origin: MusicPlatform = MusicPlatform.NETEASE
     ): SourceResult?
 
     // 搜索歌曲
