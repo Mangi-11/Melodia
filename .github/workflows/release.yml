@@ -218,9 +218,9 @@ jobs:
           declare -A TITLES=(
             [feat]="✨ 新功能" [fix]="🐛 修复" [refactor]="♻️ 重构"
             [perf]="⚡ 性能" [docs]="📝 文档" [test]="✅ 测试"
-            [ci]="🔧 CI/构建" [chore]="🧹 杂项" [style]="🎨 样式"
+            [build]="📦 构建" [ci]="🔧 CI" [chore]="🧹 杂项" [style]="🎨 样式"
           )
-          ORDER=(feat fix refactor perf docs test ci chore style)
+          ORDER=(feat fix refactor perf build docs test ci chore style)
           declare -A BUCKETS
           OTHER=""
 
@@ -247,17 +247,14 @@ jobs:
               echo "$OTHER"
               echo ""
             fi
+            echo "### 💻 桌面端安装说明"
+            echo "- Windows 10 及以上 64 位系统，正式版提供 MSI 安装包与免安装 zip，预发布版只提供免安装 zip"
+            echo "- 安装包暂未做代码签名，首次运行若出现 SmartScreen 提示，点击「更多信息」→「仍要运行」即可"
+            echo ""
             if [ -n "$PREV_TAG" ]; then
               echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${GITHUB_REF_NAME}"
             fi
           } > release-notes.md
-
-          {
-            echo ""
-            echo "### 💻 桌面端安装说明"
-            echo "- Windows 10 及以上 64 位系统，正式版提供 MSI 安装包与免安装 zip，预发布版只提供免安装 zip"
-            echo "- 安装包暂未做代码签名，首次运行若出现 SmartScreen 提示，点击「更多信息」→「仍要运行」即可"
-          } >> release-notes.md
 
           cat release-notes.md
 

@@ -9,6 +9,18 @@ body:
       value: |
         感谢提出建议！请尽量描述清楚使用场景，方便评估可行性。
 
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 适用平台
+      multiple: true
+      options:
+        - Android 手机
+        - Android 平板
+        - Windows 桌面端
+    validations:
+      required: true
+
   - type: textarea
     id: problem
     attributes:
