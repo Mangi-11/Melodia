@@ -114,6 +114,8 @@ class SettingsPreferences(
         private val KEY_BOTTOM_BAR_LAYOUT = stringPreferencesKey("bottom_bar_layout")
         // 底栏仅显示图标模式，默认 false
         private val KEY_BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
+        // 启动默认打开音乐库，默认 false
+        private val KEY_START_IN_LIBRARY = booleanPreferencesKey("start_in_library")
         // 启用 SuperLyric 实时歌词，默认 false
         private val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
         // 启用 LyricInfo 系统歌词注入，默认 true
@@ -382,6 +384,17 @@ class SettingsPreferences(
     suspend fun saveBottomBarIconOnly(iconOnly: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_BOTTOM_BAR_ICON_ONLY] = iconOnly
+        }
+    }
+
+    // 启动默认打开音乐库 Flow
+    val startInLibrary: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_START_IN_LIBRARY] ?: false
+    }
+
+    suspend fun saveStartInLibrary(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_START_IN_LIBRARY] = enabled
         }
     }
 

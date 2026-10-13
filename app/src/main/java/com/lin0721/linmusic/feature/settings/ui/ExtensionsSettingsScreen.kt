@@ -41,6 +41,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val carMode by viewModel.carMode.collectAsStateWithLifecycle()
     val bottomBarLayout by viewModel.bottomBarLayout.collectAsStateWithLifecycle()
     val bottomBarIconOnly by viewModel.bottomBarIconOnly.collectAsStateWithLifecycle()
+    val startInLibrary by viewModel.startInLibrary.collectAsStateWithLifecycle()
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
@@ -91,6 +92,13 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                         title = "底栏自定义",
                         subtitle = "当前启用：$enabledItemsSummary",
                         onClick = { showBottomBarSheet = true }
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    SettingsSwitchRow(
+                        title = "启动默认打开音乐库",
+                        subtitle = "冷启动时直接进入音乐库页面",
+                        checked = startInLibrary,
+                        onCheckedChange = { viewModel.updateStartInLibrary(it) }
                     )
                 }
             }
