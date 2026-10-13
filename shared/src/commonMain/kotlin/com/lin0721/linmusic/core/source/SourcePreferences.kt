@@ -32,6 +32,18 @@ class SourcePreferences(private val dataStore: DataStore<Preferences>) {
 
         // 社区源优先偏好
         private val KEY_COMMUNITY_SOURCE_PRIORITY = booleanPreferencesKey("source_community_source_priority")
+
+        // 多平台聚合搜索偏好
+        private val KEY_SEARCH_AGGREGATION_ENABLED = booleanPreferencesKey("source_search_aggregation_enabled")
+    }
+
+    // 聚合搜索开关
+    val searchAggregationEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_SEARCH_AGGREGATION_ENABLED] ?: false
+    }
+
+    suspend fun saveSearchAggregationEnabled(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_SEARCH_AGGREGATION_ENABLED] = enabled }
     }
 
     // 换源总开关

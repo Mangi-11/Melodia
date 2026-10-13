@@ -25,6 +25,7 @@ import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.source.AudioSourceProvider
 import com.lin0721.linmusic.core.source.ExternalTrack
 import com.lin0721.linmusic.core.source.MusicPlatform
+import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.SourcePreferences
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -53,6 +54,7 @@ class SearchViewModel(
     private val songLikeRepository: SongLikeRepository,
     private val syncProfileAfterLoginUseCase: SyncProfileAfterLoginUseCase,
     private val sourceProviders: List<AudioSourceProvider> = emptyList(),
+    private val searchProviders: List<PlatformSearchProvider> = emptyList(),
     private val settingsPreferences: SettingsPreferences? = null,
     private val sourcePreferences: SourcePreferences? = null
 ) : ViewModel() {
@@ -81,24 +83,34 @@ class SearchViewModel(
     private val _featuredTrack = MutableStateFlow<Track?>(null)
     val featuredTrack: StateFlow<Track?> = _featuredTrack.asStateFlow()
 
-    val searchPlatforms: StateFlow<List<MusicPlatform>> =
-        MutableStateFlow(listOf(MusicPlatform.NETEASE)).asStateFlow()
-
-    private val _selectedPlatform = MutableStateFlow(MusicPlatform.NETEASE)
-    val selectedPlatform: StateFlow<MusicPlatform> = _selectedPlatform.asStateFlow()
-
     private val allExternalPlatforms = listOf(
         MusicPlatform.KUGOU,
         MusicPlatform.KUWO,
         MusicPlatform.QQ
     )
 
+    // 开关打开后才展示已注册搜索源的平台 Tab
+    val searchPlatforms: StateFlow<List<MusicPlatform>> = (sourcePreferences?.searchAggregationEnabled ?: flowOf(false))
+        .map { enabled ->
+            if (enabled) {
+                val available = searchProviders.mapTo(hashSetOf()) { it.platform }
+                listOf(MusicPlatform.NETEASE) + allExternalPlatforms.filter { it in available }
+            } else {
+                listOf(MusicPlatform.NETEASE)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, listOf(MusicPlatform.NETEASE))
+
+    private val _selectedPlatform = MutableStateFlow(MusicPlatform.NETEASE)
+    val selectedPlatform: StateFlow<MusicPlatform> = _selectedPlatform.asStateFlow()
+
     private val _externalResults: Map<MusicPlatform, MutableStateFlow<ExternalSearchUiState>> =
         allExternalPlatforms.associateWith { MutableStateFlow<ExternalSearchUiState>(ExternalSearchUiState.Idle) }
     val externalResults: Map<MusicPlatform, StateFlow<ExternalSearchUiState>> = _externalResults
 
     private val externalOffset = mutableMapOf<MusicPlatform, Int>()
-    private var externalSearchJob: Job? = null
+    // 每个平台独立任务，切换 Tab 不会打断其他平台正在进行的加载
+    private val externalSearchJobs = mutableMapOf<MusicPlatform, Job>()
 
     private val _selectedType = MutableStateFlow(SearchType.SONG)
     val selectedType: StateFlow<SearchType> = _selectedType.asStateFlow()
@@ -262,7 +274,7 @@ class SearchViewModel(
     private fun resetSearchState() {
         searchJob?.cancel()
         suggestJob?.cancel()
-        externalSearchJob?.cancel()
+        cancelExternalJobs()
         _inputState.value = SearchInputState()
         offsetByType.clear()
         externalOffset.clear()
@@ -296,7 +308,7 @@ class SearchViewModel(
         if (keyword.isBlank()) return
         searchJob?.cancel()
         suggestJob?.cancel()
-        externalSearchJob?.cancel()
+        cancelExternalJobs()
         _mode.value = SearchMode.Results
         _inputState.value = SearchInputState(query = keyword)
         viewModelScope.launch { historyPreferences.addKeyword(keyword) }
@@ -341,9 +353,9 @@ class SearchViewModel(
 
     fun searchExternal(keyword: String, platform: MusicPlatform, isLoadMore: Boolean) {
         val stateFlow = _externalResults[platform] ?: return
-        val provider = sourceProviders.find { it.platform == platform }
+        val provider = searchProviders.find { it.platform == platform }
         if (provider == null) {
-            stateFlow.value = ExternalSearchUiState.Error("未找到该平台音源服务")
+            stateFlow.value = ExternalSearchUiState.Error("未找到该平台搜索服务")
             return
         }
 
@@ -356,8 +368,8 @@ class SearchViewModel(
             externalOffset[platform] = 0
         }
 
-        externalSearchJob?.cancel()
-        externalSearchJob = viewModelScope.launch {
+        externalSearchJobs[platform]?.cancel()
+        externalSearchJobs[platform] = viewModelScope.launch {
             try {
                 val offset = externalOffset[platform] ?: 0
                 val limit = 30
@@ -385,6 +397,11 @@ class SearchViewModel(
         }
     }
 
+    private fun cancelExternalJobs() {
+        externalSearchJobs.values.forEach { it.cancel() }
+        externalSearchJobs.clear()
+    }
+
     fun loadMoreExternal(platform: MusicPlatform) {
         val query = _inputState.value.query
         if (query.isNotBlank()) {
@@ -395,35 +412,24 @@ class SearchViewModel(
     fun playExternalTrack(track: ExternalTrack) {
         viewModelScope.launch {
             _toastEvent.emit("正在解析 ${track.platform.displayName} 音频...")
-            val provider = sourceProviders.find { it.platform == track.platform }
-            var playUrl = provider?.resolveUrl(
-                songId = track.id,
-                songName = track.name,
-                artists = track.artists,
-                albumName = track.albumName,
-                durationMs = track.durationMs,
-                quality = "lossless"
-            )?.url
-
-            // 本源未解析到时，通过其他第三方源尝试交叉解析
-            if (playUrl.isNullOrBlank()) {
-                for (otherProvider in sourceProviders) {
-                    if (otherProvider != provider) {
-                        playUrl = otherProvider.resolveUrl(
-                            songId = track.id,
-                            songName = track.name,
-                            artists = track.artists,
-                            albumName = track.albumName,
-                            durationMs = track.durationMs,
-                            quality = "lossless"
-                        )?.url
-                        if (!playUrl.isNullOrBlank()) break
-                    }
-                }
+            // 与换源一致，交给已启用的换源插件按歌曲信息解析
+            var playUrl: String? = null
+            for (provider in sourceProviders) {
+                playUrl = runCatching {
+                    provider.resolveUrl(
+                        songId = track.id,
+                        songName = track.name,
+                        artists = track.artists,
+                        albumName = track.albumName,
+                        durationMs = track.durationMs,
+                        quality = "lossless"
+                    )?.url
+                }.getOrNull()
+                if (!playUrl.isNullOrBlank()) break
             }
 
             if (playUrl.isNullOrBlank()) {
-                _toastEvent.emit("无法获取播放直链")
+                _toastEvent.emit(if (sourceProviders.isEmpty()) "当前平台暂无可用换源插件" else "无法获取播放直链")
                 return@launch
             }
             val queueItem = QueueItem(

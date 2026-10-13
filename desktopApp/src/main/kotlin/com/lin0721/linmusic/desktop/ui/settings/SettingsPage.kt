@@ -109,6 +109,7 @@ fun SettingsPage(
     LaunchedEffect(desktop) { desktop.messages.collect { navigator.showMessage(it) } }
 
     val quality by common.wifiQuality.collectAsState()
+    val searchAggregationEnabled by common.searchAggregationEnabled.collectAsState()
     val fallbackEnabled by common.fallbackEnabled.collectAsState()
     val communityPriority by common.communityPriority.collectAsState()
     val unmServerUrl by common.unmServerUrl.collectAsState()
@@ -156,6 +157,13 @@ fun SettingsPage(
             }
 
             SettingsCard("音源与换源") {
+                SettingRow(
+                    title = "多平台聚合搜索",
+                    subtitle = "在搜索结果页提供酷狗、酷我、QQ 音乐的平台标签，切换后才会发起搜索；播放通过换源插件解析"
+                ) {
+                    SettingSwitch(searchAggregationEnabled, onChange = common::updateSearchAggregationEnabled)
+                }
+
                 SettingRow(
                     title = "无版权/VIP 自动换源",
                     subtitle = "官方网易云音源不可用或仅为试听时，自动从可用音源解析完整播放直链"

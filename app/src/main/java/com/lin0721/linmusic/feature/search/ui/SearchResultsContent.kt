@@ -96,10 +96,11 @@ internal fun SearchResultsContent(
     val types = SearchType.entries
     Column(modifier = Modifier.fillMaxSize()) {
         if (searchPlatforms.size > 1) {
-            FilterChipsRow(
-                items = remember(searchPlatforms) { searchPlatforms.map { it.displayName } },
-                selectedIndex = searchPlatforms.indexOf(selectedPlatform).coerceAtLeast(0),
-                onSelected = { index -> searchPlatforms.getOrNull(index)?.let(onSelectPlatform) },
+            PlatformTabRow(
+                platforms = searchPlatforms,
+                selected = selectedPlatform,
+                externalResults = externalResults,
+                onSelect = onSelectPlatform,
                 modifier = Modifier.padding(bottom = MelodiaSpacing.xs)
             )
         }

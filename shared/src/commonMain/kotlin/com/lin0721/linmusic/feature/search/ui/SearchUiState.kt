@@ -43,6 +43,15 @@ sealed interface ExternalSearchUiState {
     data class Error(val message: String) : ExternalSearchUiState
 }
 
+// 平台 Tab 上的状态角标：未加载不显示，已加载显示条数，仍有下一页时加 +
+fun ExternalSearchUiState.tabBadge(): String? = when (this) {
+    ExternalSearchUiState.Idle -> null
+    ExternalSearchUiState.Loading -> "加载中"
+    ExternalSearchUiState.Empty -> "0"
+    is ExternalSearchUiState.Error -> "失败"
+    is ExternalSearchUiState.Success -> if (hasMore) "${tracks.size}+" else "${tracks.size}"
+}
+
 enum class SearchMode { Discovery, Typing, Results }
 
 // suggestionQuery 为联想所属关键词，防止旧联想套在新输入上

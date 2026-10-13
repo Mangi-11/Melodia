@@ -39,6 +39,7 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    val searchAggregationEnabled by viewModel.searchAggregationEnabled.collectAsStateWithLifecycle()
     val fallbackEnabled by viewModel.fallbackEnabled.collectAsStateWithLifecycle()
     val unmServerUrl by viewModel.unmServerUrl.collectAsStateWithLifecycle()
     val unmRemoteFallbackEnabled by viewModel.unmRemoteFallbackEnabled.collectAsStateWithLifecycle()
@@ -88,6 +89,13 @@ fun AudioSourcesSettingsView(viewModel: SettingsViewModel) {
         // 分组 1：换源基础设置
         item {
             SettingsGroupCard(SettingsSubMenu.AUDIO_SOURCES.sectionTitles[0]) {
+                SettingsSwitchRow(
+                    title = "多平台聚合搜索",
+                    subtitle = "在搜索结果页提供酷狗、酷我、QQ 音乐的平台标签，切换后才会发起搜索；播放通过换源插件解析",
+                    checked = searchAggregationEnabled,
+                    onCheckedChange = { viewModel.updateSearchAggregationEnabled(it) }
+                )
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                 SettingsSwitchRow(
                     title = "无版权/VIP 自动换源",
                     subtitle = "官方网易云音源不可用或仅为试听时，自动从可用音源解析完整播放直链",

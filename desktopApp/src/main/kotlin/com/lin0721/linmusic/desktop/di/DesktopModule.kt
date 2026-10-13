@@ -22,6 +22,7 @@ import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.source.AudioSourceProvider
+import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.desktop.app.DesktopPaths
 import com.lin0721.linmusic.desktop.data.DesktopLibraryPreferences
@@ -180,6 +181,7 @@ val desktopViewModelModule = module {
             songLikeRepository = get(),
             syncProfileAfterLoginUseCase = get(),
             sourceProviders = getAll<AudioSourceProvider>(),
+            searchProviders = getAll<PlatformSearchProvider>(),
             settingsPreferences = getOrNull(),
             sourcePreferences = getOrNull()
         )

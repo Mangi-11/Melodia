@@ -27,6 +27,7 @@ import com.lin0721.linmusic.feature.cloud.ui.CloudViewModel
 import com.lin0721.linmusic.feature.downloads.ui.DownloadsViewModel
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
 import com.lin0721.linmusic.core.source.AudioSourceProvider
+import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import org.koin.core.module.dsl.viewModel
@@ -62,6 +63,7 @@ val viewModelModule = module {
             songLikeRepository = get(),
             syncProfileAfterLoginUseCase = get(),
             sourceProviders = getAll<AudioSourceProvider>(),
+            searchProviders = getAll<PlatformSearchProvider>(),
             settingsPreferences = getOrNull(),
             sourcePreferences = getOrNull()
         )

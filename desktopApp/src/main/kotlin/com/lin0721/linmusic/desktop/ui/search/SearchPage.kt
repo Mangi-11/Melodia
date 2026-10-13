@@ -158,23 +158,13 @@ private fun ResultsContent(
 
     Column(Modifier.fillMaxSize()) {
         if (searchPlatforms.size > 1) {
-            Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                searchPlatforms.forEach { platform ->
-                    FilterChip(
-                        selected = selectedPlatform == platform,
-                        onClick = { viewModel.selectPlatform(platform) },
-                        label = { Text(platform.displayName) },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = DesktopColors.Surface,
-                            labelColor = DesktopColors.TextPrimary,
-                            selectedContainerColor = DesktopColors.TextPrimary,
-                            selectedLabelColor = DesktopColors.Pane
-                        ),
-                        border = null
-                    )
-                }
-            }
+            PlatformTabs(
+                platforms = searchPlatforms,
+                selected = selectedPlatform,
+                externalResults = viewModel.externalResults,
+                onSelect = viewModel::selectPlatform,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
         }
 
         if (selectedPlatform == MusicPlatform.NETEASE) {
