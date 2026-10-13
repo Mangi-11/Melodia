@@ -68,6 +68,24 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+## 桌面端发版
+
+同一个 tag 会在 `windows-latest` 上并行打桌面端安装包，与 APK 一起上传到同一个 Release；
+任一端失败都不会创建 Release。桌面端不需要额外配置 Secret。
+
+| 版本 | 产物 |
+|---|---|
+| 正式版 `v1.2.3` | `Melodia-v1.2.3-windows-x64.msi` 与 `Melodia-v1.2.3-windows-x64.zip`（免安装版） |
+| 预发布 `v1.2.3-beta.1` / `-rc.1` | 只有免安装版 zip |
+
+- 预发布不出 MSI：MSI 判断升级只比较三段数字版本，beta 与正式版同为 `1.2.3` 时，装了 beta 的机器升不到正式版
+- libmpv 按 `gradle.properties` 的 `libmpvReleaseTag` / `libmpvSha256` 下载并校验；升级 libmpv 时在
+  [mpv-winbuild-cmake](https://github.com/rinchao0721/mpv-winbuild-cmake) 勾选 `publish` 运行 `libmpv audio` 工作流，
+  再把新 Release 的 tag 与 `SHA256SUMS` 里 `libmpv-2.dll` 的值一起更新到这两项
+- SMTC 桥接 DLL 在流水线里现编（`-PrequireSmtc=true`），编译失败会让发版直接失败
+- 安装包暂未做代码签名，用户首次运行会看到 SmartScreen 的“未知发布者”提示，需选择“仍要运行”
+- Android 应用内更新只取 Release 里 `.apk` 结尾的附件，桌面端附件不影响其更新检查
+
 ## 注意
 
 - `melodia-release.jks` 一旦丢失，已上架的应用无法再发布更新，务必单独备份。

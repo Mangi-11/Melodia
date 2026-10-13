@@ -1,41 +1,42 @@
 name: Release
 
-# 推送 v1.2.3 或 v1.2.3-beta.1/-rc.1 形式的 tag 时触发：正式签名构建 + 创建 GitHub Release
+# 推送 v1.2.3 或 v1.2.3-beta.1/-rc.1 形式的 tag 时触发：Android 与桌面端并行构建，
+# 两端都成功后才创建 GitHub Release，避免发出缺一端安装包的版本。
+# 手动运行为演练：按输入的版本号打两端安装包、作为 artifact 留存，不创建 Release
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '演练用版本号，如 1.2.3 或 1.2.3-beta.1（不带 v）'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  # 版本号只解析一次，两端构建与发布共用
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      code: ${{ steps.version.outputs.code }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
-      # 生成分类日志需要完整提交历史和全部 tag，checkout 默认浅克隆（depth=1）拿不到
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 配置 JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: 配置 Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: 从 tag 解析版本号
         id: version
+        env:
+          DRY_RUN_VERSION: ${{ github.event.inputs.version }}
         run: |
-          TAG_NAME=${GITHUB_REF_NAME#v}
+          TAG_NAME=${DRY_RUN_VERSION:-${GITHUB_REF_NAME#v}}
           BASE_VERSION=${TAG_NAME%%-*}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
           if ! [[ "$MAJOR" =~ ^[0-9]+$ && "$MINOR" =~ ^[0-9]+$ && "$PATCH" =~ ^[0-9]+$ ]]; then
-            echo "tag 格式不是 vMAJOR.MINOR.PATCH[-beta.N|-rc.N]：$GITHUB_REF_NAME" >&2
+            echo "tag 格式不是 vMAJOR.MINOR.PATCH[-beta.N|-rc.N]：$TAG_NAME" >&2
             exit 1
           fi
 
@@ -50,7 +51,7 @@ jobs:
             KIND=${SUFFIX%%.*}
             NUM=${SUFFIX#*.}
             if ! [[ "$NUM" =~ ^[0-9]+$ ]]; then
-              echo "预发布 tag 需要形如 v1.2.3-beta.1 的编号：$GITHUB_REF_NAME" >&2
+              echo "预发布 tag 需要形如 v1.2.3-beta.1 的编号：$TAG_NAME" >&2
               exit 1
             fi
             case "$KIND" in
@@ -80,6 +81,22 @@ jobs:
           echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
 
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       # certutil -encode 会在内容前后包一层 -----BEGIN/END CERTIFICATE----- 分隔行，
       # 这两行不是合法 base64 字符，grep 过滤掉再拼接解码，兼容两种生成方式
       - name: 写入签名 keystore
@@ -97,14 +114,14 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           ./gradlew :app:assembleRelease \
-            -PreleaseVersionName=${{ steps.version.outputs.name }} \
-            -PreleaseVersionCode=${{ steps.version.outputs.code }} \
+            -PreleaseVersionName=${{ needs.version.outputs.name }} \
+            -PreleaseVersionCode=${{ needs.version.outputs.code }} \
             --no-daemon
 
       # 四项签名 secret 缺任一项时 build.gradle.kts 会静默退回 debug 签名
       - name: 校验正式签名生效
         run: |
-          APK=app/build/outputs/apk/release/Melodia-v${{ steps.version.outputs.name }}-release.apk
+          APK=app/build/outputs/apk/release/Melodia-v${{ needs.version.outputs.name }}-release.apk
           APKSIGNER=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -maxdepth 1 -type d | sort -V | tail -1)/apksigner
           DN=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 'certificate DN')
           echo "$DN"
@@ -116,6 +133,80 @@ jobs:
       - name: 清理 keystore
         if: always()
         run: rm -f melodia-release.jks
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: app/build/outputs/apk/release/Melodia-v${{ needs.version.outputs.name }}-release.apk
+          retention-days: 7
+
+  # windows-latest 自带 CMake、VS 2022（编 SMTC 桥接 DLL）与 WiX 3（打 MSI）
+  desktop:
+    needs: version
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 配置 Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # libmpv 按 gradle.properties 固定的 Release 下载并校验 SHA256；SMTC 编不出来直接失败
+      # 预发布版只出免安装版：MSI 升级只比较三段数字版本，beta 与正式版同号时装了 beta 升不到正式版
+      - name: 桌面端打包
+        run: |
+          TASKS=":desktopApp:packageReleaseZip"
+          if [ "${{ needs.version.outputs.prerelease }}" = "false" ]; then
+            TASKS="$TASKS :desktopApp:packageReleaseMsi"
+          fi
+          ./gradlew $TASKS \
+            -PreleaseVersionName=${{ needs.version.outputs.name }} \
+            -PrequireSmtc=true \
+            --no-daemon
+
+      - name: 整理安装包
+        run: |
+          OUT=desktopApp/build/compose/binaries/main-release
+          mkdir -p dist
+          cp "$OUT/zip/Melodia-v${{ needs.version.outputs.name }}-windows-x64.zip" dist/
+          if [ "${{ needs.version.outputs.prerelease }}" = "false" ]; then
+            cp "$OUT"/msi/*.msi "dist/Melodia-v${{ needs.version.outputs.name }}-windows-x64.msi"
+          fi
+          ls -l dist
+
+      - name: 上传桌面端安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop
+          path: dist/*
+          retention-days: 7
+
+  publish:
+    needs: [version, android, desktop]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      # 生成分类日志需要完整提交历史和全部 tag，checkout 默认浅克隆（depth=1）拿不到
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 下载两端安装包
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       # 按 commit message 的 conventional commits 前缀（feat/fix/refactor...）自己分类生成
       - name: 生成分类日志
@@ -161,6 +252,13 @@ jobs:
             fi
           } > release-notes.md
 
+          {
+            echo ""
+            echo "### 💻 桌面端安装说明"
+            echo "- Windows 10 及以上 64 位系统，正式版提供 MSI 安装包与免安装 zip，预发布版只提供免安装 zip"
+            echo "- 安装包暂未做代码签名，首次运行若出现 SmartScreen 提示，点击「更多信息」→「仍要运行」即可"
+          } >> release-notes.md
+
           cat release-notes.md
 
       - name: 创建 GitHub Release
@@ -169,5 +267,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           body_path: release-notes.md
-          prerelease: ${{ steps.version.outputs.prerelease }}
-          files: app/build/outputs/apk/release/Melodia-v${{ steps.version.outputs.name }}-release.apk
+          prerelease: ${{ needs.version.outputs.prerelease }}
+          files: dist/*

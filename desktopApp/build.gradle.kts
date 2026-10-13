@@ -1,5 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.net.URI
+import java.security.MessageDigest
 import javax.inject.Inject
 
 plugins {
@@ -37,7 +40,13 @@ dependencies {
 // 与 Android 端共用发版参数，保证两端版本号一致
 val desktopVersion = (findProperty("releaseVersionName") as String?) ?: "1.0.0"
 
-// 调用本机 cmake 编译原生桥接 DLL；缺少 cmake 或 MSVC 时只告警跳过，运行时由代码回退
+// jpackage 只接受纯数字版本：预发布版 1.2.3-beta.1 取 1.2.3（预发布不出 MSI，只出免安装版）
+val desktopPackageVersion = desktopVersion.substringBefore('-').also {
+    require(Regex("""\d+\.\d+\.\d+""").matches(it)) { "版本号需形如 1.2.3：$desktopVersion" }
+}
+
+// 调用本机 cmake 编译原生桥接 DLL；缺少 cmake 或 MSVC 时默认只告警跳过（运行时由代码回退），
+// required 为真（CI 发版）时直接失败，避免打出缺少系统媒体控制的安装包
 abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperations) : DefaultTask() {
     @get:InputDirectory
     abstract val sourceDir: DirectoryProperty
@@ -48,8 +57,16 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
     @get:Input
     abstract val dllName: Property<String>
 
+    @get:Input
+    abstract val required: Property<Boolean>
+
     @get:OutputFile
     abstract val outputDll: RegularFileProperty
+
+    private fun skip(reason: String) {
+        if (required.get()) throw GradleException(reason)
+        logger.warn("$reason，已跳过")
+    }
 
     @TaskAction
     fun build() {
@@ -57,7 +74,7 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
             .map { File(it, "cmake.exe") }
             .firstOrNull { it.isFile }
         if (cmake == null) {
-            logger.warn("未找到 cmake，跳过 ${dllName.get()} 编译")
+            skip("未找到 cmake，无法编译 ${dllName.get()}")
             return
         }
         val buildDir = cmakeBuildDir.get().asFile
@@ -74,7 +91,7 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
                 isIgnoreExitValue = true
             }
             if (result.exitValue != 0) {
-                logger.warn("${dllName.get()} 编译失败，已跳过：\n$log")
+                skip("${dllName.get()} 编译失败：\n$log")
                 return
             }
         }
@@ -87,12 +104,70 @@ val buildSmtc by tasks.registering(CmakeDllTask::class) {
     sourceDir.set(layout.projectDirectory.dir("native-src/smtc"))
     cmakeBuildDir.set(layout.buildDirectory.dir("smtc"))
     dllName.set("melodia_smtc.dll")
+    required.set(providers.gradleProperty("requireSmtc").map { it.toBoolean() }.orElse(false))
     outputDll.set(layout.projectDirectory.file("native/melodia_smtc.dll"))
 }
 
-// libmpv 由开发者放在仓库外的 native 目录，打包与运行前同步进 Compose 约定的平台资源目录
+// 按 gradle.properties 固定的 Release 下载定制 libmpv 并校验 SHA256；本地已有且校验一致时不重复下载
+abstract class DownloadVerifiedFileTask : DefaultTask() {
+    @get:Input
+    abstract val url: Property<String>
+
+    @get:Input
+    abstract val sha256: Property<String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    private fun digestOf(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    @TaskAction
+    fun download() {
+        val target = outputFile.get().asFile
+        val expected = sha256.get().lowercase()
+        if (target.isFile && digestOf(target) == expected) return
+        target.parentFile.mkdirs()
+        val temp = File(target.parentFile, "${target.name}.download")
+        logger.lifecycle("下载 ${url.get()}")
+        try {
+            URI(url.get()).toURL().openStream().use { input ->
+                temp.outputStream().use { input.copyTo(it) }
+            }
+        } catch (e: IOException) {
+            temp.delete()
+            throw GradleException("下载失败：${url.get()}", e)
+        }
+        val actual = digestOf(temp)
+        if (actual != expected) {
+            temp.delete()
+            throw GradleException("SHA256 校验失败：期望 $expected，实际 $actual")
+        }
+        if (target.exists() && !target.delete()) throw GradleException("无法替换 ${target.absolutePath}，可能正被占用")
+        if (!temp.renameTo(target)) throw GradleException("无法写入 ${target.absolutePath}")
+    }
+}
+
+val downloadLibmpv by tasks.registering(DownloadVerifiedFileTask::class) {
+    val tag = providers.gradleProperty("libmpvReleaseTag")
+    url.set(tag.map { "https://github.com/rinchao0721/mpv-winbuild-cmake/releases/download/$it/libmpv-2.dll" })
+    sha256.set(providers.gradleProperty("libmpvSha256"))
+    outputFile.set(layout.projectDirectory.file("native/libmpv-2.dll"))
+}
+
+// native 目录里的 libmpv 与 SMTC 桥接 DLL，打包与运行前同步进 Compose 约定的平台资源目录
 val prepareNativeResources by tasks.registering(Sync::class) {
-    dependsOn(buildSmtc)
+    dependsOn(buildSmtc, downloadLibmpv)
     from(layout.projectDirectory.dir("native")) {
         include("*.dll")
     }
@@ -135,7 +210,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = "Melodia"
-            packageVersion = desktopVersion
+            packageVersion = desktopPackageVersion
             vendor = "Melodia"
             description = "Melodia 音乐播放器"
             appResourcesRootDir.set(layout.buildDirectory.dir("appResources"))
@@ -170,6 +245,6 @@ afterEvaluate {
 val packageReleaseZip by tasks.registering(Zip::class) {
     dependsOn("createReleaseDistributable")
     from(layout.buildDirectory.dir("compose/binaries/main-release/app"))
-    archiveFileName.set("Melodia-$desktopVersion-windows-x64.zip")
+    archiveFileName.set("Melodia-v$desktopVersion-windows-x64.zip")
     destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release/zip"))
 }

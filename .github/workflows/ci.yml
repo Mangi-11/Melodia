@@ -28,11 +28,11 @@ jobs:
       - name: 配置 Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # shared 的测试跑在桌面 JVM 目标上，覆盖网络、加密与仓储层
+      # shared 的测试跑在桌面 JVM 目标上，覆盖网络、加密与仓储层；桌面端依赖 libmpv 的用例在 Linux 上自动跳过
       - name: 单元测试
-        run: ./gradlew :app:testDebugUnitTest :shared:desktopTest --no-daemon
+        run: ./gradlew :app:testDebugUnitTest :shared:desktopTest :desktopApp:test --no-daemon
 
-      # 桌面端只做编译检查，不打安装包（依赖 Windows 与 libmpv）
+      # 桌面端只做编译检查，安装包在发版时由 Windows runner 打
       - name: 桌面端编译
         run: ./gradlew :desktopApp:compileKotlin --no-daemon
 
@@ -48,6 +48,7 @@ jobs:
           path: |
             app/build/reports/tests/
             shared/build/reports/tests/
+            desktopApp/build/reports/tests/
           retention-days: 7
 
       - name: 上传 APK 与混淆映射
