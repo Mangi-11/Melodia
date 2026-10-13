@@ -191,7 +191,10 @@ val desktopViewModelModule = module {
             sourceProviders = getAll<AudioSourceProvider>(),
             searchProviders = getAll<PlatformSearchProvider>(),
             settingsPreferences = getOrNull(),
-            sourcePreferences = getOrNull()
+            sourcePreferences = getOrNull(),
+            collectionActions = get(),
+            artistRepository = get(),
+            podcastRepository = get()
         )
     }
     factoryOf(::PlaylistCategoryViewModel)

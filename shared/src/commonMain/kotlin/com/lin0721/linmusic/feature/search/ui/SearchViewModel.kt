@@ -14,7 +14,11 @@ import com.lin0721.linmusic.core.songlike.LoadLikedSongIdsUseCase
 import com.lin0721.linmusic.core.songlike.SongLikeRepository
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
+import com.lin0721.linmusic.feature.artist.data.ArtistRepository
+import com.lin0721.linmusic.feature.playlist.domain.CollectionActionsDelegate
 import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
+import com.lin0721.linmusic.feature.podcast.data.PodcastRepository
+import com.lin0721.linmusic.feature.podcast.domain.toQueueItem
 import com.lin0721.linmusic.feature.search.data.SearchHistoryPreferences
 import com.lin0721.linmusic.feature.search.data.SearchRepository
 import com.lin0721.linmusic.feature.podcast.domain.PodcastProgram
@@ -27,6 +31,7 @@ import com.lin0721.linmusic.core.source.ExternalTrack
 import com.lin0721.linmusic.core.source.MusicPlatform
 import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.SourcePreferences
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -59,7 +64,10 @@ class SearchViewModel(
     private val sourceProviders: List<AudioSourceProvider> = emptyList(),
     private val searchProviders: List<PlatformSearchProvider> = emptyList(),
     private val settingsPreferences: SettingsPreferences? = null,
-    private val sourcePreferences: SourcePreferences? = null
+    private val sourcePreferences: SourcePreferences? = null,
+    private val collectionActions: CollectionActionsDelegate? = null,
+    private val artistRepository: ArtistRepository? = null,
+    private val podcastRepository: PodcastRepository? = null
 ) : ViewModel() {
 
     val userProfile: StateFlow<UserProfile?> = userPreferences.userProfile
@@ -88,6 +96,10 @@ class SearchViewModel(
 
     // 桌面端下拉浮层才需要输入时的歌曲命中卡片，其余端不额外发请求
     var songHitsEnabled: Boolean = false
+
+    private val _resolvingTrackKey = MutableStateFlow<String?>(null)
+    val resolvingTrackKey: StateFlow<String?> = _resolvingTrackKey.asStateFlow()
+    private var externalPlayJob: Job? = null
 
     // 热搜第一名的首条单曲，头部卡取色与播放用
     private val _featuredTrack = MutableStateFlow<Track?>(null)
@@ -452,39 +464,140 @@ class SearchViewModel(
         }
     }
 
+    // 点击后该行进入解析状态；解析期间重复点同一首忽略，点别的歌则取消上一首
     fun playExternalTrack(track: ExternalTrack) {
-        viewModelScope.launch {
-            _toastEvent.emit("正在解析 ${track.platform.displayName} 音频...")
-            // 与换源一致，交给已启用的换源插件按歌曲信息解析
-            var playUrl: String? = null
-            for (provider in sourceProviders) {
-                playUrl = runCatching {
-                    provider.resolveUrl(
-                        songId = track.hash ?: track.id,
-                        songName = track.name,
-                        artists = track.artists,
-                        albumName = track.albumName,
-                        durationMs = track.durationMs,
-                        quality = "lossless",
-                        origin = track.platform
-                    )?.url
-                }.getOrNull()
-                if (!playUrl.isNullOrBlank()) break
+        val key = track.resolveKey
+        if (_resolvingTrackKey.value == key) return
+        externalPlayJob?.cancel()
+        externalPlayJob = viewModelScope.launch {
+            _resolvingTrackKey.value = key
+            try {
+                val playUrl = resolveExternalUrl(track)
+                if (playUrl == null) {
+                    _toastEvent.emit(explainResolveFailure(track))
+                    return@launch
+                }
+                playerManager.playQueue(listOf(track.toQueueItem(playUrl)), 0, "搜索")
+            } finally {
+                if (_resolvingTrackKey.value == key) _resolvingTrackKey.value = null
             }
-
-            if (playUrl.isNullOrBlank()) {
-                _toastEvent.emit(if (sourceProviders.isEmpty()) "当前平台暂无可用换源插件" else "无法获取播放直链")
-                return@launch
-            }
-            val queueItem = QueueItem(
-                songId = track.queueSongId,
-                title = track.name,
-                artist = track.artists,
-                coverUrl = track.coverUrl,
-                localUri = playUrl
-            )
-            playerManager.playQueue(listOf(queueItem), 0, "搜索")
         }
+    }
+
+    // 先解析直链再入队，直链可能在排队期间过期，到点播放失败时由播放器按常规失败处理
+    fun addExternalToPlayNext(track: ExternalTrack) {
+        val key = track.resolveKey
+        if (_resolvingTrackKey.value == key) return
+        viewModelScope.launch {
+            _resolvingTrackKey.value = key
+            try {
+                val playUrl = resolveExternalUrl(track)
+                if (playUrl == null) {
+                    _toastEvent.emit(explainResolveFailure(track))
+                    return@launch
+                }
+                playerManager.addToPlayNext(listOf(track.toQueueItem(playUrl)))
+                _toastEvent.emit("已添加至下一首播放")
+            } finally {
+                if (_resolvingTrackKey.value == key) _resolvingTrackKey.value = null
+            }
+        }
+    }
+
+    private fun ExternalTrack.toQueueItem(playUrl: String) = QueueItem(
+        songId = queueSongId,
+        title = name,
+        artist = artists,
+        coverUrl = coverUrl,
+        localUri = playUrl
+    )
+
+    // 与换源一致，交给已启用的换源插件按歌曲信息解析
+    private suspend fun resolveExternalUrl(track: ExternalTrack): String? {
+        for (provider in sourceProviders) {
+            val url = runCatching {
+                provider.resolveUrl(
+                    songId = track.hash ?: track.id,
+                    songName = track.name,
+                    artists = track.artists,
+                    albumName = track.albumName,
+                    durationMs = track.durationMs,
+                    quality = "lossless",
+                    origin = track.platform
+                )?.url
+            }.getOrNull()
+            if (!url.isNullOrBlank()) return url
+        }
+        return null
+    }
+
+    // 区分没配置与配置了但没解析出来，让用户知道该去哪里处理
+    private suspend fun explainResolveFailure(track: ExternalTrack): String {
+        if (sourceProviders.isEmpty()) return "当前平台暂无可用换源插件"
+        val prefs = sourcePreferences ?: return "无法获取播放直链"
+        if (!prefs.lxPluginEnabled.first()) return "未启用社区源插件，请到 设置 › 音源与换源 中开启"
+        if (prefs.lxPlugins.first().none { it.isEnabled }) return "没有已启用的 LX 插件，请先在 设置 › 音源与换源 中启用"
+        return "《${track.name}》解析失败，可能暂无该音源或插件已失效"
+    }
+
+    // 外部歌曲没有网易云 id，只能按歌名歌手回到网易云重新搜索
+    fun searchOnNetease(track: ExternalTrack) {
+        selectPlatform(MusicPlatform.NETEASE)
+        searchWithKeyword("${track.name} ${track.artists}".trim())
+    }
+
+    fun playCollection(id: Long, isAlbum: Boolean) {
+        val actions = collectionActions ?: return
+        viewModelScope.launch { actions.play(id, isAlbum) { _toastEvent.emit(it) } }
+    }
+
+    fun addCollectionToPlayNext(id: Long, isAlbum: Boolean) {
+        val actions = collectionActions ?: return
+        viewModelScope.launch { actions.addToPlayNext(id, isAlbum) { _toastEvent.emit(it) } }
+    }
+
+    fun downloadCollection(id: Long, isAlbum: Boolean, level: String) {
+        val actions = collectionActions ?: return
+        viewModelScope.launch {
+            actions.download(id, isAlbum, level, "search_collection_$id") { _toastEvent.emit(it) }
+        }
+    }
+
+    fun subscribePlaylist(playlistId: Long) {
+        val actions = collectionActions ?: return
+        viewModelScope.launch { actions.subscribePlaylist(playlistId) { _toastEvent.emit(it) } }
+    }
+
+    // 菜单展开时查询关注状态，查询失败返回 null，菜单按未关注处理
+    suspend fun isArtistFollowed(artistId: Long): Boolean? =
+        artistRepository?.checkArtistFollowed(artistId)?.firstOrNull()?.getOrNull()
+
+    fun setArtistFollowed(artistId: Long, follow: Boolean) {
+        val repo = artistRepository ?: return
+        viewModelScope.launch {
+            repo.subscribeArtist(artistId, follow).firstOrNull()?.fold(
+                onSuccess = { _toastEvent.emit(if (follow) "已关注" else "已取消关注") },
+                onFailure = { _toastEvent.emit(it.toUserMessage(resourceProvider)) }
+            )
+        }
+    }
+
+    suspend fun isRadioSubscribed(radioId: Long): Boolean? =
+        podcastRepository?.getRadioDetail(radioId)?.firstOrNull()?.getOrNull()?.subscribed
+
+    fun setRadioSubscribed(radioId: Long, subscribe: Boolean) {
+        val repo = podcastRepository ?: return
+        viewModelScope.launch {
+            repo.setRadioSubscribed(radioId, subscribe).firstOrNull()?.fold(
+                onSuccess = { _toastEvent.emit(if (subscribe) "已订阅" else "已取消订阅") },
+                onFailure = { _toastEvent.emit(it.toUserMessage(resourceProvider)) }
+            )
+        }
+    }
+
+    fun addProgramToPlayNext(program: PodcastProgram) {
+        playerManager.addToPlayNext(listOf(program.toQueueItem()))
+        viewModelScope.launch { _toastEvent.emit("已添加至下一首播放") }
     }
 
     fun selectType(type: SearchType) {

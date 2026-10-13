@@ -9,16 +9,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,14 +30,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.format.formatDuration
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.source.ExternalTrack
 import com.lin0721.linmusic.core.source.MusicPlatform
-import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.podcast.PodcastProgramRow
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
@@ -147,7 +147,7 @@ private fun ResultsContent(
                     }
                     HoverScrollbarBox(listState) {
                         LazyColumn(state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                            itemsIndexed(state.items) { index, item ->
+                            itemsIndexed(state.items, key = { _, item -> item.stableKey }) { index, item ->
                                 ResultEntry(index, item, nowPlaying?.songId, viewModel, actions, onOpenPlaylist)
                             }
                             if (state.isLoadingMore) {
@@ -170,6 +170,7 @@ private fun ExternalResultsContent(
     currentSongId: Long?
 ) {
     val resultsState = viewModel.externalResults[platform]?.collectAsState()?.value ?: ExternalSearchUiState.Idle
+    val resolvingKey by viewModel.resolvingTrackKey.collectAsState()
     when (resultsState) {
         ExternalSearchUiState.Idle, ExternalSearchUiState.Loading ->
             Centered { CircularProgressIndicator(color = DesktopColors.Accent) }
@@ -196,11 +197,14 @@ private fun ExternalResultsContent(
             }
             HoverScrollbarBox(listState) {
                 LazyColumn(state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                    itemsIndexed(resultsState.tracks) { index, track ->
-                        val isCurrent = currentSongId == track.queueSongId
-                        ExternalResultEntry(index, track, isCurrent) {
-                            viewModel.playExternalTrack(track)
-                        }
+                    itemsIndexed(resultsState.tracks, key = { _, track -> track.resolveKey }) { index, track ->
+                        ExternalResultEntry(
+                            index = index,
+                            track = track,
+                            isCurrent = currentSongId == track.queueSongId,
+                            resolving = resolvingKey == track.resolveKey,
+                            viewModel = viewModel
+                        )
                     }
                     if (resultsState.isLoadingMore) {
                         item { Centered { CircularProgressIndicator(color = DesktopColors.Accent) } }
@@ -216,48 +220,40 @@ private fun ExternalResultEntry(
     index: Int,
     track: ExternalTrack,
     isCurrent: Boolean,
-    onPlay: () -> Unit
+    resolving: Boolean,
+    viewModel: SearchViewModel
 ) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).clickable(onClick = onPlay)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            (index + 1).toString().padStart(2, '0'),
-            color = DesktopColors.TextGray,
-            fontSize = 13.sp,
-            modifier = Modifier.width(32.dp)
-        )
-        Cover(track.coverUrl.orEmpty(), 48.dp, shape = RoundedCornerShape(4.dp))
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(
-                track.name,
-                color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                if (track.albumName.isNotBlank()) "${track.artists} · ${track.albumName}" else track.artists,
-                color = DesktopColors.TextGray,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (track.durationMs > 0) {
-            val totalSeconds = (track.durationMs / 1000).coerceAtLeast(0)
-            val minutes = totalSeconds / 60
-            val seconds = totalSeconds % 60
-            Text(
-                "$minutes:${seconds.toString().padStart(2, '0')}",
-                color = DesktopColors.TextGray,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-    }
+    val onPlay = { viewModel.playExternalTrack(track) }
+    SearchResultRow(
+        coverUrl = track.coverUrl,
+        title = track.name,
+        subtitle = if (track.albumName.isNotBlank()) "${track.artists} · ${track.albumName}" else track.artists,
+        highlighted = isCurrent || resolving,
+        leading = { hovered ->
+            when {
+                resolving -> CircularProgressIndicator(
+                    color = DesktopColors.Accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp)
+                )
+                hovered -> Icon(
+                    Icons.Rounded.PlayArrow,
+                    "播放${track.name}",
+                    tint = DesktopColors.TextPrimary,
+                    modifier = Modifier.size(22.dp).clickable(onClick = onPlay)
+                )
+                else -> Text(
+                    "${index + 1}",
+                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextGray,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.End
+                )
+            }
+        },
+        trailingText = if (track.durationMs > 0) formatDuration(track.durationMs) else null,
+        onDoubleClick = onPlay,
+        menu = { dismiss -> ExternalTrackMenuItems(track, viewModel, onPlay, dismiss) }
+    )
 }
 
 @Composable
@@ -278,61 +274,48 @@ private fun ResultEntry(
             onPlay = { viewModel.playSong(item.track) },
             actions = actions
         )
-        is SearchResultItem.PlaylistItem -> CollectionEntry(
+        is SearchResultItem.PlaylistItem -> SearchResultRow(
             coverUrl = item.playlist.coverImgUrl,
+            coverSize = 56.dp,
             title = item.playlist.name,
             subtitle = "${item.playlist.trackCount} 首 · ${item.playlist.creator?.nickname.orEmpty()}",
-            onClick = { onOpenPlaylist(item.playlist.id, item.playlist.name, false) }
+            onClick = { onOpenPlaylist(item.playlist.id, item.playlist.name, false) },
+            menu = { dismiss -> CollectionMenuItems(item.playlist.id, false, emptyList(), viewModel, dismiss) }
         )
-        is SearchResultItem.AlbumItem -> CollectionEntry(
+        is SearchResultItem.AlbumItem -> SearchResultRow(
             coverUrl = item.album.picUrl,
+            coverSize = 56.dp,
             title = item.album.name,
-            subtitle = "专辑",
-            onClick = { onOpenPlaylist(item.album.id, item.album.name, true) }
+            subtitle = listOf("专辑", item.album.artists.joinToString(" / ") { it.name }).filter { it.isNotBlank() }
+                .joinToString(" · "),
+            onClick = { onOpenPlaylist(item.album.id, item.album.name, true) },
+            menu = { dismiss -> CollectionMenuItems(item.album.id, true, item.album.artists, viewModel, dismiss) }
         )
-        is SearchResultItem.ArtistItem -> CollectionEntry(
+        is SearchResultItem.ArtistItem -> SearchResultRow(
             coverUrl = item.artist.picUrl,
+            coverSize = 56.dp,
+            circleCover = true,
             title = item.artist.name,
             subtitle = "歌手",
-            circle = true,
-            onClick = { navigator.openArtist(item.artist.id, item.artist.name) }
+            onClick = { navigator.openArtist(item.artist.id, item.artist.name) },
+            menu = { dismiss -> ArtistMenuItems(item.artist, viewModel, dismiss) }
         )
-        is SearchResultItem.RadioItem -> CollectionEntry(
+        is SearchResultItem.RadioItem -> SearchResultRow(
             coverUrl = item.radio.picUrl,
+            coverSize = 56.dp,
             title = item.radio.name,
             subtitle = listOfNotNull(
                 item.radio.djName.takeIf { it.isNotBlank() },
                 item.radio.programCount.takeIf { it > 0 }?.let { "$it 期" }
             ).joinToString(" · ").ifBlank { "电台" },
-            onClick = { navigator.openRadio(item.radio.id) }
+            onClick = { navigator.openRadio(item.radio.id) },
+            menu = { dismiss -> RadioMenuItems(item.radio.id, viewModel, dismiss) }
         )
-        is SearchResultItem.ProgramItem -> PodcastProgramRow(
-            program = item.program,
-            progress = null,
-            onPlay = { viewModel.playProgram(item.program) },
-            index = null
-        )
-    }
-}
-
-@Composable
-private fun CollectionEntry(
-    coverUrl: String,
-    title: String,
-    subtitle: String,
-    circle: Boolean = false,
-    onClick: (() -> Unit)?
-) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Cover(coverUrl, 56.dp, shape = if (circle) CircleShape else RoundedCornerShape(4.dp))
-        Column(Modifier.padding(start = 12.dp)) {
-            Text(title, color = DesktopColors.TextPrimary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        is SearchResultItem.ProgramItem -> {
+            val onPlay = { viewModel.playProgram(item.program) }
+            RowContextMenu(menu = { dismiss -> ProgramMenuItems(item.program, viewModel, onPlay, dismiss) }) {
+                PodcastProgramRow(program = item.program, progress = null, onPlay = onPlay, index = null)
+            }
         }
     }
 }

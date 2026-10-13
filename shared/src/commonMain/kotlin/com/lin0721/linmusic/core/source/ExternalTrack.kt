@@ -16,6 +16,10 @@ data class ExternalTrack(
     // 酷狗专用 32 位 hex hash
     val hash: String? = null
 ) {
+    // 搜索结果里唯一标识一首外部歌曲，用于解析状态与去重
+    val resolveKey: String
+        get() = "${platform.key}:$id"
+
     // 播放队列里的歌曲 id；取负数，与网易云的正数 id 区分，避免被当成网易云歌曲去查词、打卡
     val queueSongId: Long
         get() = -1L - "${platform.key}:$id".hashCode().toLong().absoluteValue
