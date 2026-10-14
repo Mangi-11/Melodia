@@ -45,16 +45,6 @@ class SearchBarRevealState internal constructor(
         private set
 
     private var settleJob: Job? = null
-    private var isClosing = false
-
-    // 展开前的列表位置
-    private var savedIndex = 0
-    private var savedOffset = 0
-
-    private fun saveScrollPosition() {
-        savedIndex = listState.firstVisibleItemIndex
-        savedOffset = listState.firstVisibleItemScrollOffset
-    }
 
     // 继续下拉：越接近展开上限，同样的拖拽距离换来的位移越小，橡皮筋阻尼只作用于这个方向
     private fun applyDampedOpen(delta: Float) {
@@ -109,7 +99,6 @@ class SearchBarRevealState internal constructor(
     fun open() {
         val max = searchBarHeightPx
         if (max <= 0f || isOpen) return
-        saveScrollPosition()
         isOpen = true
         settleJob?.cancel()
         settleJob = scope.launch {
@@ -126,31 +115,22 @@ class SearchBarRevealState internal constructor(
         }
     }
 
-    // 搜索返回箭头专用：展开态下唯一允许把它关掉的入口。
-    // 先在头部仍收起时把结果列表平滑滚回展开前的位置，再收起搜索栏、展开头部；两步串行，位置不会瞬间跳变
+    // 搜索返回箭头专用：展开态下唯一允许把它关掉的入口
     fun close() {
         val max = searchBarHeightPx
-        if (max <= 0f || !isOpen || isClosing) return
-        isClosing = true
+        if (max <= 0f || !isOpen) return
+        isOpen = false
         settleJob?.cancel()
         settleJob = scope.launch {
-            try {
-                if (listState.firstVisibleItemIndex != savedIndex || listState.firstVisibleItemScrollOffset != savedOffset) {
-                    listState.animateScrollToItem(savedIndex, savedOffset)
-                }
-                isOpen = false
-                animate(
-                    initialValue = revealPx,
-                    targetValue = 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) { value, _ ->
-                    revealPx = value.coerceIn(0f, max)
-                }
-            } finally {
-                isClosing = false
+            animate(
+                initialValue = revealPx,
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) { value, _ ->
+                revealPx = value.coerceIn(0f, max)
             }
         }
     }
@@ -165,7 +145,6 @@ class SearchBarRevealState internal constructor(
             revealPx > max / 2f -> max
             else -> 0f
         }
-        if (target > 0f) saveScrollPosition()
         isOpen = target > 0f
         settleJob?.cancel()
         settleJob = scope.launch {

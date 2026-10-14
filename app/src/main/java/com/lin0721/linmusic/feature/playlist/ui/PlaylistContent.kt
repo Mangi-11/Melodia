@@ -245,42 +245,40 @@ fun PlaylistContent(
         ) {
             // Item 0：全出血 Hero；搜索展开意图确定后淡出收起，让出空间给搜索结果
             item(key = "header") {
-                Box(modifier = Modifier.heightIn(min = 1.dp)) {
-                    AnimatedVisibility(
-                        visible = !searchFullyRevealed,
-                        enter   = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit    = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
-                    ) {
-                        PlaylistHeaderItem(
-                            playlist            = playlist,
-                            coverSize           = coverSize,
-                            coverAlpha          = coverAlpha,
-                            progress            = progress,
-                            statusBarHeight     = statusBarHeight,
-                            dominantColor       = dominantColor,
-                            onColorCalculated   = { dominantColor = it },
-                            onPlayAll              = onPlayAll,
-                            onShuffleToggle        = onShuffleToggle,
-                            isShuffleActive        = isShuffleActive,
-                            isCurrentlyPlayingThis = isCurrentlyPlayingThis,
-                            isSubscribed        = isSubscribed,
-                            onSubscribeClick    = onSubscribeClick,
-                            onCommentsClick     = onCommentsClick,
-                            onMoreClick         = onMoreClick,
-                            isLikedSongsPlaylistView = isLikedSongsPlaylistView,
-                            isOwnedPlaylist     = canRemoveFromPlaylist,
-                            onShareClick        = onShareClick,
-                            onDownloadClick     = onDownloadClick,
-                            onHistoryClick      = onHistoryClick,
-                            selectedHistoryDate = selectedHistoryDate,
-                            onCreatorClick      = onCreatorClick,
-                            onPlayButtonPositioned = { y ->
-                                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                                    playButtonBaselineYPx = y
-                                }
+                AnimatedVisibility(
+                    visible = !searchFullyRevealed,
+                    enter   = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                    exit    = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                ) {
+                    PlaylistHeaderItem(
+                        playlist            = playlist,
+                        coverSize           = coverSize,
+                        coverAlpha          = coverAlpha,
+                        progress            = progress,
+                        statusBarHeight     = statusBarHeight,
+                        dominantColor       = dominantColor,
+                        onColorCalculated   = { dominantColor = it },
+                        onPlayAll              = onPlayAll,
+                        onShuffleToggle        = onShuffleToggle,
+                        isShuffleActive        = isShuffleActive,
+                        isCurrentlyPlayingThis = isCurrentlyPlayingThis,
+                        isSubscribed        = isSubscribed,
+                        onSubscribeClick    = onSubscribeClick,
+                        onCommentsClick     = onCommentsClick,
+                        onMoreClick         = onMoreClick,
+                        isLikedSongsPlaylistView = isLikedSongsPlaylistView,
+                        isOwnedPlaylist     = canRemoveFromPlaylist,
+                        onShareClick        = onShareClick,
+                        onDownloadClick     = onDownloadClick,
+                        onHistoryClick      = onHistoryClick,
+                        selectedHistoryDate = selectedHistoryDate,
+                        onCreatorClick      = onCreatorClick,
+                        onPlayButtonPositioned = { y ->
+                            if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                playButtonBaselineYPx = y
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
 
