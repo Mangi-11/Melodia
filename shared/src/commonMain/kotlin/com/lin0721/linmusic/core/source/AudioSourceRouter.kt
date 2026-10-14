@@ -137,7 +137,7 @@ class AudioSourceRouter(
             AppLogger.w(TAG, "所有换源均未命中: songId=$songId")
             if (officialInfo != null && officialInfo.url.isNotBlank()) {
                 AppLogger.i(TAG, "兜底返回官方试听链接: songId=$songId")
-                emit(Result.success(officialInfo))
+                emit(Result.success(officialInfo.copy(trialFallback = officialInfo.isFreeTrial)))
             } else {
                 emit(Result.failure(officialInfoResult.exceptionOrNull() ?: AppError.BizError(-1, "换源未能获取到可用播放链接")))
             }

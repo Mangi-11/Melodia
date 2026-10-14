@@ -673,6 +673,9 @@ class PlayerManager(
                     val mediaItem = item.toMediaItem(info.url, playbackQueue.playContext.value)
                     publishPlaybackLevel(item.songId, info.level)
                     pendingSkipFromIndex = null
+                    if (info.trialFallback && playWhenReady) {
+                        Toast.makeText(context, "换源失败，当前仅可试听", Toast.LENGTH_SHORT).show()
+                    }
                     controllerHolder.playItem(mediaItem.withCrossfade(autoTransition, startPosition), playbackQueue.playMode.value, startPosition, playWhenReady)
                 }.onFailure { throwable ->
                     AppLogger.w(TAG, "获取播放URL失败 songId=${item.songId} index=$index networkRetryAttempt=$networkRetryAttempt", throwable)
@@ -818,6 +821,8 @@ class PlayerManager(
             if (downloadPreferences.findVerifiedRecord(nextItem.songId) != null) return@launch
             repository.getSongPlaybackInfo(nextItem.songId).collect { result ->
                 result.onSuccess { info ->
+                    // 退回试听的结果不缓存，真正切歌时重新取链并提示
+                    if (info.trialFallback) return@onSuccess
                     prefetchedNextUrl = PrefetchedUrl(nextItem.songId, info.url, info.level)
                 }
             }
