@@ -42,6 +42,10 @@ import com.lin0721.linmusic.core.model.ArtistInfo
 import com.lin0721.linmusic.core.ui.theme.CoverPlaceholderDark
 import com.lin0721.linmusic.feature.playlist.ui.PlaylistSongOptionsSheet
 
+// 搜索展开、头图收起后第 0 项保留的最小高度：保证列表位置可恢复，也用于背板对齐
+private val CollapsedHeaderMinHeight = 1.dp
+private val PlateSafetyOverlap = 3.dp
+
 // 歌手详情页骨架：持有折叠进度与弹层状态，按 Tab 装配各内容区块
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,22 +106,19 @@ fun ArtistContent(
         }
     }
 
-    // 头图 + 操作栏合计高度：与 ArtistBackdrop 的图片+融合色层总高度一致
-    val headerHeightPx = with(density) { 310.dp.toPx() }
-    val actionBarHeightPx = with(density) { 80.dp.toPx() }
-    val backdropCoverThresholdPx = headerHeightPx + actionBarHeightPx
-    // 已滚动越过头图区域的像素数：用于驱动下方不透明背板，彻底盖住固定不动的背景图，避免歌曲行等透明区域漏色
-    val backdropCoveredPx by remember {
-        derivedStateOf {
-            // 搜索展开时头图已收起，背板直接铺满，避免背景图从结果行下漏出
-            if (searchBarRevealState.isOpen) return@derivedStateOf backdropCoverThresholdPx
-            val index = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset.toFloat()
-            when {
-                index <= 0 -> offset
-                index == 1 -> headerHeightPx + offset
-                else -> backdropCoverThresholdPx
-            }.coerceIn(0f, backdropCoverThresholdPx)
+    // 不透明背板上沿：取 Tab 栏的实际位置，随头图展开/收起/滚动同步移动，彻底盖住固定不动的背景图，
+    // 避免歌曲行等透明区域漏出封面。Tab 栏滚出视口时背板铺满；首帧布局未出时按设计高度（头图 + 操作栏）兜底
+    val fallbackPlateTopPx = with(density) { (310.dp + 80.dp).toPx() }
+    // 背板上沿向上多盖：折叠头部的最小高度加几 dp 余量，吸收像素取整误差，否则与搜索栏底边之间会漏出一条缝
+    // （多盖的这一截在搜索栏浮层之下，被不透明的搜索栏遮住）
+    val plateOverlapPx = with(density) { (CollapsedHeaderMinHeight + PlateSafetyOverlap).toPx() }
+    val plateTopPx: () -> Float = {
+        val visible = listState.layoutInfo.visibleItemsInfo
+        if (visible.isEmpty()) {
+            fallbackPlateTopPx
+        } else {
+            val tabBar = visible.firstOrNull { it.key == "tab_bar" }
+            if (tabBar == null) 0f else (tabBar.offset + searchBarRevealState.revealPx - plateOverlapPx).coerceAtLeast(0f)
         }
     }
 
@@ -163,11 +164,11 @@ fun ArtistContent(
             onDominantColorChange = { dominantColor = it }
         )
 
-        // 不透明背板：随头图区滚动距离同步上移，跟随内容边缘彻底盖住背景图，防止歌曲行等透明区域漏出封面
+        // 不透明背板：上沿跟随 Tab 栏位置
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = backdropCoverThresholdPx - backdropCoveredPx }
+                .graphicsLayer { translationY = plateTopPx() }
                 .background(MaterialTheme.colorScheme.background)
         )
 
@@ -184,12 +185,15 @@ fun ArtistContent(
             ) {
                 // 头图、操作栏、Tab 栏在搜索展开意图确定后淡出收起，把空间让给搜索结果
                 item(key = "header_placeholder") {
-                    AnimatedVisibility(
-                        visible = !searchOpen,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
-                    ) {
-                        ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                    // 收起时第 0 项也保留 1dp：高度为 0 的项会被列表算作已滚过，导致关闭搜索后无法回到顶部
+                    Box(modifier = Modifier.heightIn(min = CollapsedHeaderMinHeight)) {
+                        AnimatedVisibility(
+                            visible = !searchOpen,
+                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        ) {
+                            ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                        }
                     }
                 }
 
