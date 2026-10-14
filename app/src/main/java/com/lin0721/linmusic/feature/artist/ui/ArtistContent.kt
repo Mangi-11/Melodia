@@ -184,12 +184,15 @@ fun ArtistContent(
             ) {
                 // 头图、操作栏、Tab 栏在搜索展开意图确定后淡出收起，把空间让给搜索结果
                 item(key = "header_placeholder") {
-                    AnimatedVisibility(
-                        visible = !searchOpen,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
-                    ) {
-                        ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                    // 收起时第 0 项也保留 1dp：高度为 0 的项会被列表算作已滚过，导致关闭搜索后无法回到顶部
+                    Box(modifier = Modifier.heightIn(min = 1.dp)) {
+                        AnimatedVisibility(
+                            visible = !searchOpen,
+                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        ) {
+                            ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                        }
                     }
                 }
 
