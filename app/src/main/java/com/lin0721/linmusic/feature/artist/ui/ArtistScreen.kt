@@ -8,6 +8,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.core.ui.components.MelodiaTextButton
+import com.lin0721.linmusic.core.ui.components.SelectionAction
+import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
+import com.lin0721.linmusic.core.download.ui.DownloadQualityPickerSheet
+import com.lin0721.linmusic.feature.playlist.ui.PlaylistImportTargetSheet
 import com.lin0721.linmusic.core.ui.components.MelodiaButton
 import com.lin0721.linmusic.core.ui.components.LoginBottomSheet
 import com.lin0721.linmusic.core.ui.components.WebViewLoginScreen
@@ -44,8 +53,14 @@ fun ArtistScreen(
     val currentTrack by viewModel.playerManager.nowPlaying.collectAsStateWithLifecycle()
     val isPlaying by viewModel.playerManager.playWhenReady.collectAsStateWithLifecycle()
 
+    val songSearch by viewModel.songSearch.collectAsStateWithLifecycle()
+    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val importState by viewModel.importState.collectAsStateWithLifecycle()
+
     var showLoginSheet by remember { mutableStateOf(false) }
     var showWebViewLogin by remember { mutableStateOf(false) }
+    var showBatchTargetSheet by remember { mutableStateOf(false) }
+    var showBatchDownloadSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.toastEvent.collect { com.lin0721.linmusic.core.ui.components.ToastManager.showToast(it) }
@@ -122,9 +137,63 @@ fun ArtistScreen(
                     onRequireLogin = {
                         showLoginSheet = true
                     },
-                    onLoadMoreAlbums = { viewModel.loadMoreAlbums() }
+                    onLoadMoreAlbums = { viewModel.loadMoreAlbums() },
+                    songSearch = songSearch,
+                    onSongSearchQueryChange = viewModel::updateSongSearchQuery,
+                    onLoadMoreSongSearch = viewModel::loadMoreSongSearch,
+                    selectionUi = TrackSelectionUi(
+                        active = selection.active,
+                        selectedIds = selection.selectedIds,
+                        onEnter = viewModel::enterSelection,
+                        onToggle = viewModel::toggleSelected
+                    ),
+                    selectionActions = listOf(
+                        SelectionAction("下一首播放", Icons.AutoMirrored.Filled.QueueMusic) { viewModel.batchPlayNext() },
+                        SelectionAction("添加到歌单", Icons.AutoMirrored.Filled.PlaylistAdd) {
+                            if (userProfile == null) {
+                                showLoginSheet = true
+                            } else {
+                                viewModel.prepareImportTargets()
+                                showBatchTargetSheet = true
+                            }
+                        },
+                        SelectionAction("喜欢", Icons.Default.FavoriteBorder) {
+                            if (userProfile == null) showLoginSheet = true else viewModel.batchLike()
+                        },
+                        SelectionAction("下载", Icons.Default.Download) { showBatchDownloadSheet = true }
+                    ),
+                    onToggleSelectAll = viewModel::toggleSelectAll,
+                    onExitSelection = viewModel::exitSelection
                 )
             }
+        }
+
+        if (showBatchTargetSheet) {
+            PlaylistImportTargetSheet(
+                importState = importState,
+                onDismiss = { showBatchTargetSheet = false },
+                onSelectTarget = { targetId ->
+                    viewModel.batchAddToPlaylist(targetId)
+                    showBatchTargetSheet = false
+                },
+                onCreateAndImport = { name ->
+                    viewModel.batchCreatePlaylistAndAdd(name)
+                    showBatchTargetSheet = false
+                }
+            )
+        }
+
+        if (showBatchDownloadSheet) {
+            DownloadQualityPickerSheet(
+                onQualitySelected = { level ->
+                    viewModel.batchDownload(level)
+                    showBatchDownloadSheet = false
+                },
+                onDismiss = { showBatchDownloadSheet = false },
+                headline = "批量下载",
+                supportingText = "共 ${selection.count} 首",
+                batchSongIds = selection.selectedIds.toList()
+            )
         }
 
         if (showLoginSheet) {

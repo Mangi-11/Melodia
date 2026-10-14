@@ -40,6 +40,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
@@ -124,6 +125,8 @@ import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.track.ADDED_COLUMN_WIDTH
 import com.lin0721.linmusic.desktop.ui.track.ImportSubmenuContent
 import com.lin0721.linmusic.desktop.ui.track.TrackReorder
+import com.lin0721.linmusic.desktop.ui.track.TrackRowSelection
+import com.lin0721.linmusic.desktop.ui.track.TrackSelectionBar
 import com.lin0721.linmusic.desktop.ui.track.TrackRow
 import com.lin0721.linmusic.desktop.ui.track.rememberTrackActions
 import com.lin0721.linmusic.feature.playlist.presentation.PlaylistSortKey
@@ -247,6 +250,9 @@ private fun PlaylistContent(
     var showDelete by remember(playlist.id) { mutableStateOf(false) }
     var showCreateImport by remember(playlist.id) { mutableStateOf(false) }
     val importState by viewModel.importState.collectAsState()
+    val selection by viewModel.selection.collectAsState()
+    var showBatchCreate by remember(playlist.id) { mutableStateOf(false) }
+    var showBatchRemove by remember(playlist.id) { mutableStateOf(false) }
     var query by remember(playlist.id) { mutableStateOf("") }
     var order by remember(playlist.id) { mutableStateOf(PlaylistSortOrder()) }
     val addedAt = remember(playlist.trackIds) { playlist.trackIds.associate { it.id to it.at } }
@@ -400,7 +406,8 @@ private fun PlaylistContent(
                             navigator.showMessage(if (copyPlaylistLink(isAlbum, playlist.id)) "已复制链接" else "复制失败")
                         },
                         onQueryChange = { query = it },
-                        onOrderChange = { order = it }
+                        onOrderChange = { order = it },
+                        onEnterSelection = { viewModel.enterSelection() }
                     )
                     if (isOwned) {
                         Row(
@@ -423,7 +430,27 @@ private fun PlaylistContent(
                         }
                     }
                 ) {
-                    TrackColumnHeader(order, hasDates) { order = order.toggled(it) }
+                    Column(Modifier.background(DesktopColors.Pane)) {
+                        if (selection.active) {
+                            val shownIds = shown.map { it.id }
+                            TrackSelectionBar(
+                                count = selection.count,
+                                allSelected = shownIds.isNotEmpty() && selection.selectedIds.containsAll(shownIds),
+                                importState = importState,
+                                canRemove = isOwned,
+                                onToggleAll = { viewModel.toggleSelectAll(shownIds) },
+                                onPlayNext = viewModel::batchPlayNext,
+                                onPrepareImport = { viewModel.prepareImportTargets(playlist.id) },
+                                onImportTo = { target -> viewModel.batchAddToPlaylist(target.id) },
+                                onCreateImport = { showBatchCreate = true },
+                                onLike = viewModel::batchLike,
+                                onDownload = { viewModel.batchDownload(navigator.downloadLevel) },
+                                onRemove = { showBatchRemove = true },
+                                onExit = viewModel::exitSelection
+                            )
+                        }
+                        TrackColumnHeader(order, hasDates) { order = order.toggled(it) }
+                    }
                 }
             }
             itemsIndexed(shown, key = { index, _ -> rowKeys[index] }) { index, track ->
@@ -435,12 +462,21 @@ private fun PlaylistContent(
                     isCurrent = nowPlaying?.songId == track.id,
                     onPlay = { playFrom(track) },
                     actions = actions,
-                    enabled = track.id !in unplayableIds,
+                    // 多选态下不可播放的歌曲也能勾选
+                    enabled = selection.active || track.id !in unplayableIds,
+                    selection = if (selection.active) {
+                        TrackRowSelection(
+                            checked = track.id in selection.selectedIds,
+                            onToggle = { viewModel.toggleSelected(track.id) }
+                        )
+                    } else {
+                        null
+                    },
                     // 抬起中的行自己负责位移，交给 animateItem 会和手动位移打架
                     modifier = Modifier.padding(horizontal = 16.dp)
                         .then(if (dragging || settling) Modifier.zIndex(1f) else Modifier.animateItem()),
                     addedAtText = if (hasDates) formatAddedDate(addedAt[track.id] ?: 0L) else null,
-                    reorder = if (canReorder || dragging) {
+                    reorder = if (!selection.active && (canReorder || dragging)) {
                         TrackReorder(
                             dragging = dragging,
                             offsetY = reorder.offsetOf(index),
@@ -548,6 +584,32 @@ private fun PlaylistContent(
             },
             onEmptyName = { navigator.showMessage(EMPTY_NAME_MESSAGE) }
         )
+    }
+    if (showBatchCreate) {
+        CreatePlaylistDialog(
+            onDismiss = { showBatchCreate = false },
+            onCreate = { name, isPrivate ->
+                showBatchCreate = false
+                viewModel.batchCreatePlaylistAndAdd(name, isPrivate)
+            },
+            onEmptyName = { navigator.showMessage(EMPTY_NAME_MESSAGE) }
+        )
+    }
+    if (showBatchRemove) {
+        DesktopDialog(
+            title = "从歌单中删除",
+            onDismiss = { showBatchRemove = false },
+            width = 340.dp,
+            actions = {
+                DialogButton("取消", { showBatchRemove = false })
+                DialogButton("删除", {
+                    showBatchRemove = false
+                    viewModel.batchRemove()
+                }, danger = true)
+            }
+        ) {
+            Text("确定要从歌单中删除选中的 ${selection.count} 首歌曲吗？", color = DesktopColors.TextGray, fontSize = 13.sp)
+        }
     }
     if (showDelete) {
         DesktopDialog(
@@ -697,7 +759,8 @@ private fun PlaylistActionBar(
     canCopyLink: Boolean,
     onCopyLink: () -> Unit,
     onQueryChange: (String) -> Unit,
-    onOrderChange: (PlaylistSortOrder) -> Unit
+    onOrderChange: (PlaylistSortOrder) -> Unit,
+    onEnterSelection: () -> Unit
 ) {
     val resourceLabel = if (isAlbum) "专辑" else "歌单"
     Row(
@@ -729,6 +792,7 @@ private fun PlaylistActionBar(
             importState, onPrepareImport, onImportTo, onCreateImport, onCopyLink, onDelete
         )
         Spacer(Modifier.weight(1f))
+        ActionIcon(Icons.Rounded.Checklist, "多选", onClick = onEnterSelection)
         PlaylistSearchBox(query, onQueryChange)
         PlaylistSortMenu(order, showAdded) { key ->
             onOrderChange(if (key == PlaylistSortKey.CUSTOM) PlaylistSortOrder() else PlaylistSortOrder(key, true))

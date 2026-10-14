@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +30,11 @@ fun ArtistTopBarOverlay(
     artistName: String,
     progress: Float,
     dominantColor: Color,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    // 仅音乐 Tab 提供歌曲搜索入口；searchOpen 为 true 时按钮变为关闭
+    showSearch: Boolean = false,
+    searchOpen: Boolean = false,
+    onSearchClick: () -> Unit = {}
 ) {
     val statusBarHeight = melodiaStatusBarTopPadding()
     val overlayHeight = TOP_BAR_HEIGHT + statusBarHeight
@@ -55,6 +61,22 @@ fun ArtistTopBarOverlay(
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(32.dp)
             )
+        }
+
+        if (showSearch) {
+            MelodiaIconButton(
+                onClick = onSearchClick,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = MelodiaSpacing.xs)
+            ) {
+                Icon(
+                    imageVector = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                    contentDescription = if (searchOpen) "关闭搜索" else "搜索歌曲",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         if (isCollapsed) {

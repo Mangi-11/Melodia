@@ -29,6 +29,7 @@ fun MelodiaIconButton(
     style: PressStyle = MelodiaPress.Icon,
     // 圆底必须由本组件画：调用点的 modifier 排在缩放层外侧，在那里加 background 底色不会跟着缩
     containerColor: Color = Color.Transparent,
+    onLongClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -39,6 +40,7 @@ fun MelodiaIconButton(
                 shape = CircleShape,
                 enabled = enabled,
                 role = Role.Button,
+                onLongClick = onLongClick,
                 onClick = onClick
             )
             .background(containerColor),

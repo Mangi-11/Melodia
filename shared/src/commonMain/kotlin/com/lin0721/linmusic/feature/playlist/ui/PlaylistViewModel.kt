@@ -17,6 +17,8 @@ import com.lin0721.linmusic.core.songlike.LoadLikedSongIdsUseCase
 import com.lin0721.linmusic.core.comment.data.CommentRepository
 import com.lin0721.linmusic.feature.create.data.playlistPrivacyOf
 import com.lin0721.linmusic.feature.playlist.domain.CreatePlaylistAndAddSongUseCase
+import com.lin0721.linmusic.feature.playlist.domain.TrackBatchActionsDelegate
+import com.lin0721.linmusic.feature.playlist.presentation.TrackSelection
 import com.lin0721.linmusic.feature.playlist.domain.pendingTrackIds
 import com.lin0721.linmusic.feature.playlist.domain.withLoadedTracks
 import com.lin0721.linmusic.feature.playlist.domain.SongCollectDelegate
@@ -28,7 +30,6 @@ import com.lin0721.linmusic.feature.playlist.data.PlaylistRepository
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.QueueItem
-import com.lin0721.linmusic.core.userplaylist.UserPlaylistRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Job
@@ -66,7 +67,6 @@ class PlaylistViewModel(
     private val playlistRepository: PlaylistRepository,
     private val songLikeRepository: SongLikeRepository,
     private val playbackRepository: PlaybackRepository,
-    private val userPlaylistRepository: UserPlaylistRepository,
     private val createPlaylistAndAddSongUseCase: CreatePlaylistAndAddSongUseCase,
     private val updatePlaylistCoverUseCase: UpdatePlaylistCoverUseCase,
     val playerManager: PlaybackController,
@@ -75,7 +75,8 @@ class PlaylistViewModel(
     private val playlistMutationBus: PlaylistMutationBus,
     private val searchRepository: SearchRepository,
     private val songDownloadManager: SongDownloader,
-    private val offlinePlayability: OfflinePlayability
+    private val offlinePlayability: OfflinePlayability,
+    private val trackBatchActions: TrackBatchActionsDelegate
 ) : ViewModel() {
 
     private var allRecommendedTracks = listOf<Track>()
@@ -128,6 +129,10 @@ class PlaylistViewModel(
     private val _importState = MutableStateFlow(PlaylistImportState())
     val importState: StateFlow<PlaylistImportState> = _importState.asStateFlow()
 
+    // 歌曲多选状态，按歌曲 id 记录，仅对当前歌单已加载的曲目生效
+    private val _selection = MutableStateFlow(TrackSelection())
+    val selection: StateFlow<TrackSelection> = _selection.asStateFlow()
+
     // 编辑歌单信息（名称/简介/封面）整体保存中的状态，供弹窗禁用保存按钮并显示进度
     private val _isSavingInfo = MutableStateFlow(false)
     val isSavingInfo: StateFlow<Boolean> = _isSavingInfo.asStateFlow()
@@ -153,6 +158,7 @@ class PlaylistViewModel(
     }
 
     fun loadPlaylist(id: Long, isAlbum: Boolean = false) {
+        if (requestedPlaylistId != id) _selection.value = TrackSelection()
         requestedPlaylistId = id
         isAlbumMode = isAlbum
         _uiState.value = PlaylistUiState.Loading
@@ -603,13 +609,7 @@ class PlaylistViewModel(
             playlistRepository.manipulatePlaylistTracks("del", playlistId, listOf(trackId)).collect { result ->
                 result.onSuccess {
                     _toastEvent.emit("已从歌单中删除")
-                    _uiState.update { state ->
-                        if (state is PlaylistUiState.Success && state.playlist.id == playlistId) {
-                            val updatedTracks = state.playlist.tracks.filter { it.id != trackId }
-                            val updatedIds = state.playlist.trackIds.filter { it.id != trackId }
-                            state.copy(playlist = state.playlist.copy(tracks = updatedTracks, trackIds = updatedIds))
-                        } else state
-                    }
+                    dropTracksFromState(playlistId, setOf(trackId))
                 }.onFailure { e ->
                     _toastEvent.emit(e.toUserMessage(resourceProvider))
                 }
@@ -617,27 +617,86 @@ class PlaylistViewModel(
         }
     }
 
+    private fun dropTracksFromState(playlistId: Long, trackIds: Set<Long>) {
+        _uiState.update { state ->
+            if (state is PlaylistUiState.Success && state.playlist.id == playlistId) {
+                val updatedTracks = state.playlist.tracks.filter { it.id !in trackIds }
+                val updatedIds = state.playlist.trackIds.filter { it.id !in trackIds }
+                state.copy(playlist = state.playlist.copy(tracks = updatedTracks, trackIds = updatedIds))
+            } else state
+        }
+    }
+
     // 拉取当前用户自建的歌单，供"添加到歌单"批量导入选择目标；排除当前歌单本身与"我喜欢的音乐"
     fun prepareImportTargets(excludePlaylistId: Long) {
         viewModelScope.launch {
-            val profile = userPreferences.userProfile.first()
-            if (profile == null) {
+            _importState.update { it.copy(isLoading = true) }
+            val items = trackBatchActions.loadTargetPlaylists(excludePlaylistId) { _toastEvent.emit(it) }
+            _importState.value = PlaylistImportState(items = items ?: _importState.value.items, isLoading = false)
+        }
+    }
+
+    fun enterSelection(firstTrackId: Long? = null) {
+        _selection.update { if (it.active) it else it.enter(firstTrackId) }
+    }
+
+    fun toggleSelected(trackId: Long) {
+        _selection.update { it.toggle(trackId) }
+    }
+
+    fun toggleSelectAll(visibleTrackIds: List<Long>) {
+        _selection.update { it.toggleAll(visibleTrackIds) }
+    }
+
+    fun exitSelection() {
+        _selection.value = TrackSelection()
+    }
+
+    private fun selectedTracks(): List<Track> {
+        val state = _uiState.value as? PlaylistUiState.Success ?: return emptyList()
+        return _selection.value.pick(state.playlist.tracks)
+    }
+
+    // 批量操作成功后退出多选，失败保留已选便于重试；需要账号的操作先校验登录
+    private fun runBatch(needLogin: Boolean = false, block: suspend (List<Track>) -> Boolean) {
+        val tracks = selectedTracks()
+        if (tracks.isEmpty()) return
+        viewModelScope.launch {
+            if (needLogin && userPreferences.userProfile.first() == null) {
                 _toastEvent.emit("请先登录账号")
                 return@launch
             }
-            _importState.update { it.copy(isLoading = true) }
-            userPlaylistRepository.getUserPlaylists(profile.uid).collect { result ->
-                result.onSuccess { playlists ->
-                    val items = playlists.filter {
-                        it.userId == profile.uid && it.id != excludePlaylistId && it.id != profile.uid
-                    }
-                    _importState.value = PlaylistImportState(items = items, isLoading = false)
-                }.onFailure { e ->
-                    _importState.update { it.copy(isLoading = false) }
-                    _toastEvent.emit(e.toUserMessage(resourceProvider))
-                }
-            }
+            if (block(tracks)) exitSelection()
         }
+    }
+
+    fun batchPlayNext() = runBatch { tracks ->
+        trackBatchActions.playNext(tracks, unplayableIds.value) { _toastEvent.emit(it) }
+    }
+
+    fun batchAddToPlaylist(targetPlaylistId: Long) = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.addToPlaylist(targetPlaylistId, tracks) { _toastEvent.emit(it) }
+    }
+
+    fun batchCreatePlaylistAndAdd(name: String, isPrivate: Boolean = false) = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.createPlaylistAndAdd(name, playlistPrivacyOf(isPrivate), tracks) { _toastEvent.emit(it) }
+    }
+
+    fun batchLike() = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.like(tracks) { _toastEvent.emit(it) } > 0
+    }
+
+    fun batchDownload(level: String) = runBatch { tracks ->
+        val playlist = (_uiState.value as? PlaylistUiState.Success)?.playlist ?: return@runBatch false
+        trackBatchActions.download(tracks, level, "playlist_${playlist.id}", playlist.name) { _toastEvent.emit(it) }
+    }
+
+    // 仅限歌单创建者可调用（由调用方按 UI 状态判断是否展示入口）
+    fun batchRemove() = runBatch(needLogin = true) { tracks ->
+        val playlistId = (_uiState.value as? PlaylistUiState.Success)?.playlist?.id ?: return@runBatch false
+        val removed = trackBatchActions.removeFromPlaylist(playlistId, tracks) { _toastEvent.emit(it) }
+        if (removed) dropTracksFromState(playlistId, tracks.map { it.id }.toSet())
+        removed
     }
 
     // 把当前歌单全部歌曲一次性导入到已有的目标歌单

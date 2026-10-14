@@ -37,9 +37,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -85,7 +87,13 @@ import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.desktop.ui.library.CreatePlaylistDialog
+import com.lin0721.linmusic.desktop.ui.library.EMPTY_NAME_MESSAGE
+import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
+import com.lin0721.linmusic.feature.playlist.presentation.TrackSelection
 import com.lin0721.linmusic.desktop.ui.track.TrackActions
+import com.lin0721.linmusic.desktop.ui.track.TrackRowSelection
+import com.lin0721.linmusic.desktop.ui.track.TrackSelectionBar
 import com.lin0721.linmusic.desktop.ui.track.TrackRow
 import com.lin0721.linmusic.desktop.ui.track.rememberTrackActions
 import com.lin0721.linmusic.feature.artist.ui.ArtistUiState
@@ -101,6 +109,8 @@ private const val STICKY_BAR_ANIMATION_MS = 200
 private val BackdropHeight = 300.dp
 private val AlbumCardWidth = 168.dp
 private val ContentPadding = 24.dp
+private val SongSearchWidth = 240.dp
+private val SongSearchHeight = 36.dp
 private val ActionBarVerticalPadding = 16.dp
 private val PlayButtonSize = 56.dp
 private val StickyBarHeight = 64.dp
@@ -161,7 +171,12 @@ private fun ArtistContent(
     val blockedIds by viewModel.blockedArtistIds.collectAsState()
     val likedSongIds by viewModel.likedSongIds.collectAsState()
     val collectState by viewModel.collectState.collectAsState()
+    val songSearch by viewModel.songSearch.collectAsState()
+    val selection by viewModel.selection.collectAsState()
+    val importState by viewModel.importState.collectAsState()
+    var showBatchCreate by remember(state.artist.id) { mutableStateOf(false) }
     var tab by rememberSaveable(state.artist.id) { mutableStateOf(ArtistTab.SONGS) }
+    val songsShown = if (songSearch.active) songSearch.results else state.topSongs
 
     val onToggleFollow = {
         if (navigator.isLoggedIn) viewModel.toggleFollow(state.artist.id) else navigator.showMessage("请先登录账号")
@@ -209,7 +224,11 @@ private fun ArtistContent(
     }
     LaunchedEffect(shouldLoadMore, tab) {
         if (!shouldLoadMore) return@LaunchedEffect
-        if (tab == ArtistTab.ALBUMS) viewModel.loadMoreAlbums()
+        when (tab) {
+            ArtistTab.ALBUMS -> viewModel.loadMoreAlbums()
+            ArtistTab.SONGS -> if (songSearch.active) viewModel.loadMoreSongSearch()
+            else -> Unit
+        }
     }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -248,8 +267,43 @@ private fun ArtistContent(
                 }
                 when (tab) {
                     ArtistTab.SONGS -> {
-                        trackItems(state.topSongs, nowPlaying?.songId, actions) { viewModel.playSongInList(it, state.topSongs) }
-                        if (state.topSongs.isEmpty()) emptyItem("songs_empty", "暂无歌曲")
+                        item(key = "songs_toolbar") {
+                            if (selection.active) {
+                                val shownIds = songsShown.map { it.id }
+                                TrackSelectionBar(
+                                    count = selection.count,
+                                    allSelected = shownIds.isNotEmpty() && selection.selectedIds.containsAll(shownIds),
+                                    importState = importState,
+                                    canRemove = false,
+                                    onToggleAll = { viewModel.toggleSelectAll(shownIds) },
+                                    onPlayNext = viewModel::batchPlayNext,
+                                    onPrepareImport = viewModel::prepareImportTargets,
+                                    onImportTo = { target -> viewModel.batchAddToPlaylist(target.id) },
+                                    onCreateImport = { showBatchCreate = true },
+                                    onLike = viewModel::batchLike,
+                                    onDownload = { viewModel.batchDownload(navigator.downloadLevel) },
+                                    onRemove = {},
+                                    onExit = viewModel::exitSelection,
+                                    modifier = Modifier.padding(horizontal = ContentPadding - 16.dp)
+                                )
+                            } else {
+                                SongsToolbar(
+                                    query = songSearch.query,
+                                    onQueryChange = viewModel::updateSongSearchQuery,
+                                    onEnterSelection = { viewModel.enterSelection() }
+                                )
+                            }
+                        }
+                        when {
+                            songSearch.active && songSearch.isLoading -> loadingItem("songs_search_loading")
+                            songSearch.active && songSearch.errorMessage != null ->
+                                emptyItem("songs_search_error", songSearch.errorMessage.orEmpty())
+                            songsShown.isEmpty() -> emptyItem("songs_empty", if (songSearch.active) "没有找到相关歌曲" else "暂无歌曲")
+                            else -> trackItems(songsShown, nowPlaying?.songId, actions, selection, viewModel::toggleSelected) {
+                                viewModel.playSongInList(it, songsShown)
+                            }
+                        }
+                        if (songSearch.active && songSearch.loadingMore) loadingItem("songs_search_more")
                     }
                     ArtistTab.ALBUMS -> {
                         val rows = state.albums.chunked(columns)
@@ -272,6 +326,16 @@ private fun ArtistContent(
                         }
                     }
                 }
+            }
+            if (showBatchCreate) {
+                CreatePlaylistDialog(
+                    onDismiss = { showBatchCreate = false },
+                    onCreate = { name, isPrivate ->
+                        showBatchCreate = false
+                        viewModel.batchCreatePlaylistAndAdd(name, isPrivate)
+                    },
+                    onEmptyName = { navigator.showMessage(EMPTY_NAME_MESSAGE) }
+                )
             }
             Box(Modifier.fillMaxWidth().clipToBounds()) {
                 AnimatedVisibility(
@@ -298,6 +362,8 @@ private fun LazyListScope.trackItems(
     tracks: List<Track>,
     currentSongId: Long?,
     actions: TrackActions,
+    selection: TrackSelection,
+    onToggleSelected: (Long) -> Unit,
     onPlay: (Track) -> Unit
 ) {
     itemsIndexed(tracks, key = { index, track -> "track_${track.id}_$index" }) { index, track ->
@@ -307,8 +373,45 @@ private fun LazyListScope.trackItems(
             isCurrent = currentSongId == track.id,
             onPlay = { onPlay(track) },
             actions = actions,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
+            selection = if (selection.active) {
+                TrackRowSelection(
+                    checked = selection.isSelected(track.id),
+                    onToggle = { onToggleSelected(track.id) }
+                )
+            } else {
+                null
+            }
         )
+    }
+}
+
+// 歌曲 Tab 顶部：歌手歌曲搜索框与多选入口
+@Composable
+private fun SongsToolbar(query: String, onQueryChange: (String) -> Unit, onEnterSelection: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = ContentPadding, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.width(SongSearchWidth).height(SongSearchHeight)
+                .clip(RoundedCornerShape(SongSearchHeight / 2)).background(DesktopColors.Surface)
+        ) {
+            LibrarySearchInput(
+                query = query,
+                startPadding = 12.dp,
+                showClear = query.isNotEmpty(),
+                onQueryChange = onQueryChange,
+                onClear = { onQueryChange("") },
+                placeholder = "搜索歌手的歌曲"
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        DesktopTooltip("多选") {
+            IconButton(onClick = onEnterSelection) {
+                Icon(Icons.Rounded.Checklist, "多选", tint = DesktopColors.TextGray, modifier = Modifier.size(24.dp))
+            }
+        }
     }
 }
 

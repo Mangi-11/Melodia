@@ -74,7 +74,9 @@ import com.lin0721.linmusic.LocalGlobalOverlayOpen
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.model.isLikedSongsPlaylist
 import com.lin0721.linmusic.core.ui.components.DraggableSongRow
+import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.SongRowData
+import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
 import java.util.Collections
 import kotlin.math.max
@@ -111,6 +113,7 @@ fun PlaylistScreen(
     val addMusicSearchQuery by viewModel.addMusicSearchQuery.collectAsStateWithLifecycle()
     val addMusicSearchState by viewModel.addMusicSearchState.collectAsStateWithLifecycle()
     val isSavingInfo by viewModel.isSavingInfo.collectAsStateWithLifecycle()
+    val selection by viewModel.selection.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -176,6 +179,9 @@ fun PlaylistScreen(
     var showAddMusicSheet by remember { mutableStateOf(false) }
     var showDownloadQualitySheet by remember { mutableStateOf(false) }
     var pendingDownloadTrack by remember { mutableStateOf<Track?>(null) }
+    var showBatchTargetSheet by remember { mutableStateOf(false) }
+    var showBatchDownloadSheet by remember { mutableStateOf(false) }
+    var showBatchRemoveConfirm by remember { mutableStateOf(false) }
     var isReorderMode by remember { mutableStateOf(false) }
     var isSavingOrder by remember { mutableStateOf(false) }
     var showDiscardConfirmDialog by remember { mutableStateOf(false) }
@@ -634,7 +640,33 @@ fun PlaylistScreen(
                     onSelectedHistoryDateChange = { selectedHistoryDate = it },
                     onLoadHistoryDetail = { viewModel.loadHistoryDetail(it) },
                     onLoadDailyRecommend = { viewModel.loadPlaylist(-1L) },
-                    onCreatorClick = onNavigateToProfile
+                    onCreatorClick = onNavigateToProfile,
+                    selectionUi = TrackSelectionUi(
+                        active = selection.active,
+                        selectedIds = selection.selectedIds,
+                        onEnter = viewModel::enterSelection,
+                        onToggle = viewModel::toggleSelected
+                    ),
+                    selectionActions = buildList {
+                        add(SelectionAction("下一首播放", Icons.AutoMirrored.Filled.QueueMusic) { viewModel.batchPlayNext() })
+                        add(SelectionAction("添加到歌单", Icons.AutoMirrored.Filled.PlaylistAdd) {
+                            if (userProfile == null) {
+                                showLoginSheet = true
+                            } else {
+                                viewModel.prepareImportTargets(state.playlist.id)
+                                showBatchTargetSheet = true
+                            }
+                        })
+                        add(SelectionAction("喜欢", Icons.Default.FavoriteBorder) {
+                            if (userProfile == null) showLoginSheet = true else viewModel.batchLike()
+                        })
+                        add(SelectionAction("下载", Icons.Default.Download) { showBatchDownloadSheet = true })
+                        if (isOwnedPlaylist) {
+                            add(SelectionAction("删除", Icons.Default.Delete) { showBatchRemoveConfirm = true })
+                        }
+                    },
+                    onToggleSelectAll = viewModel::toggleSelectAll,
+                    onExitSelection = viewModel::exitSelection
                 )
             }
             }
@@ -741,6 +773,68 @@ fun PlaylistScreen(
                 headline = playlist.name,
                 supportingText = "共 ${batchSongIds.size} 首",
                 batchSongIds = batchSongIds
+            )
+        }
+
+        if (showBatchTargetSheet) {
+            PlaylistImportTargetSheet(
+                importState = importState,
+                onDismiss = { showBatchTargetSheet = false },
+                onSelectTarget = { targetId ->
+                    viewModel.batchAddToPlaylist(targetId)
+                    showBatchTargetSheet = false
+                },
+                onCreateAndImport = { name ->
+                    viewModel.batchCreatePlaylistAndAdd(name)
+                    showBatchTargetSheet = false
+                }
+            )
+        }
+
+        if (showBatchDownloadSheet) {
+            com.lin0721.linmusic.core.download.ui.DownloadQualityPickerSheet(
+                onQualitySelected = { level ->
+                    viewModel.batchDownload(level)
+                    showBatchDownloadSheet = false
+                },
+                onDismiss = { showBatchDownloadSheet = false },
+                headline = "批量下载",
+                supportingText = "共 ${selection.count} 首",
+                batchSongIds = selection.selectedIds.toList()
+            )
+        }
+
+        if (showBatchRemoveConfirm) {
+            AlertDialog(
+                onDismissRequest = { showBatchRemoveConfirm = false },
+                title = {
+                    Text(
+                        text = "从歌单中删除",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = "确定要从歌单中删除选中的 ${selection.count} 首歌曲吗？",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 14.sp
+                    )
+                },
+                confirmButton = {
+                    MelodiaTextButton(
+                        onClick = {
+                            showBatchRemoveConfirm = false
+                            viewModel.batchRemove()
+                        }
+                    ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    MelodiaTextButton(onClick = { showBatchRemoveConfirm = false }) {
+                        Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
 

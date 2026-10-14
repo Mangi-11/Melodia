@@ -429,6 +429,12 @@ class LocalMusicViewModel(
         )
     }
 
+    // 强制退出多选：离开页面或返回键使用，不像 toggleSelectionMode 那样依赖当前状态翻转
+    fun exitSelectionMode() {
+        val state = currentSuccess() ?: return
+        if (state.isSelectionMode) _uiState.value = state.copy(isSelectionMode = false, selectedUris = emptySet())
+    }
+
     fun toggleSelected(track: LocalTrack) {
         val state = currentSuccess() ?: return
         val key = track.uri.toString()
@@ -530,8 +536,7 @@ class LocalMusicViewModel(
 
     private fun finishPlaylistPick() {
         _playlistPickerTracks.value = null
-        val state = currentSuccess() ?: return
-        if (state.isSelectionMode) _uiState.value = state.copy(isSelectionMode = false, selectedUris = emptySet())
+        exitSelectionMode()
     }
 
     private fun currentSuccess(): LocalMusicUiState.Success? = _uiState.value as? LocalMusicUiState.Success

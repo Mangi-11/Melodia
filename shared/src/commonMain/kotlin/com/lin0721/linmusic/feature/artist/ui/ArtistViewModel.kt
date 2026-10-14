@@ -20,7 +20,16 @@ import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.network.AppString
 import com.lin0721.linmusic.core.network.ResourceProvider
 import com.lin0721.linmusic.core.network.toUserMessage
+import com.lin0721.linmusic.feature.playlist.domain.TrackBatchActionsDelegate
+import com.lin0721.linmusic.feature.playlist.presentation.TrackSelection
+import com.lin0721.linmusic.feature.playlist.ui.PlaylistImportState
+import com.lin0721.linmusic.feature.search.data.SearchRepository
+import com.lin0721.linmusic.feature.search.domain.SearchResultItem
+import com.lin0721.linmusic.feature.search.domain.SearchType
+import com.lin0721.linmusic.feature.create.data.playlistPrivacyOf
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -38,7 +47,9 @@ class ArtistViewModel(
     private val songLikeRepository: SongLikeRepository,
     val playerManager: PlaybackController,
     private val userPreferences: UserPreferences,
-    private val resourceProvider: ResourceProvider
+    private val resourceProvider: ResourceProvider,
+    private val searchRepository: SearchRepository,
+    private val trackBatchActions: TrackBatchActionsDelegate
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ArtistUiState>(ArtistUiState.Loading)
@@ -94,6 +105,10 @@ class ArtistViewModel(
     }
 
     fun loadArtistData(artistId: Long) {
+        if (currentArtistId != artistId) {
+            resetSongSearch()
+            _selection.value = TrackSelection()
+        }
         currentArtistId = artistId
         albumOffset = 0
         allSongsOffset = 0
@@ -292,6 +307,149 @@ class ArtistViewModel(
                 }
             }
         }
+    }
+
+    // ---------- 歌曲搜索（仅「全部」子 Tab） ----------
+
+    private val _songSearch = MutableStateFlow(ArtistSongSearchState())
+    val songSearch: StateFlow<ArtistSongSearchState> = _songSearch.asStateFlow()
+
+    private var songSearchJob: Job? = null
+    private var songSearchOffset = 0
+
+    private fun resetSongSearch() {
+        songSearchJob?.cancel()
+        songSearchOffset = 0
+        _songSearch.value = ArtistSongSearchState()
+    }
+
+    fun updateSongSearchQuery(query: String) {
+        songSearchJob?.cancel()
+        songSearchOffset = 0
+        if (query.isBlank()) {
+            _songSearch.value = ArtistSongSearchState(query = query)
+            return
+        }
+        _songSearch.value = ArtistSongSearchState(query = query, isLoading = true)
+        songSearchJob = viewModelScope.launch {
+            delay(ArtistSongSearch.DEBOUNCE_MS)
+            fetchSongSearchPage(query, append = false)
+        }
+    }
+
+    fun loadMoreSongSearch() {
+        val state = _songSearch.value
+        if (!state.active || !state.hasMore || state.isLoading || state.loadingMore) return
+        _songSearch.value = state.copy(loadingMore = true, errorMessage = null)
+        songSearchJob = viewModelScope.launch { fetchSongSearchPage(state.query, append = true) }
+    }
+
+    // 云搜索按原始条数翻页，过滤后结果过少时连翻几页，避免列表短到无法触发加载更多
+    private suspend fun fetchSongSearchPage(query: String, append: Boolean) {
+        val artist = (_uiState.value as? ArtistUiState.Success)?.artist ?: return
+        val keyword = ArtistSongSearch.keyword(artist.name, query)
+        val collected = mutableListOf<Track>()
+        var hasMore = true
+        var pages = 0
+        while (hasMore && pages < ArtistSongSearch.MAX_PAGES_PER_FETCH && collected.size < ArtistSongSearch.MIN_RESULTS_PER_FETCH) {
+            val page = searchRepository.search(keyword, SearchType.SONG, songSearchOffset, ArtistSongSearch.PAGE_SIZE)
+                .first()
+                .getOrElse { e ->
+                    AppLogger.w(TAG, "歌手歌曲搜索失败 artistId=${artist.id}", e)
+                    _songSearch.update {
+                        if (it.query != query) it
+                        else it.copy(isLoading = false, loadingMore = false, errorMessage = e.toUserMessage(resourceProvider))
+                    }
+                    return
+                }
+            songSearchOffset += page.rawFetchedCount
+            val songs = page.items.filterIsInstance<SearchResultItem.SongItem>().map { it.track }
+            collected += ArtistSongSearch.filterByArtist(songs, artist.id)
+            hasMore = page.hasMore && page.rawFetchedCount > 0
+            pages++
+        }
+        _songSearch.update {
+            if (it.query != query) it
+            else it.copy(
+                results = if (append) (it.results + collected).distinctBy { track -> track.id } else collected.distinctBy { track -> track.id },
+                isLoading = false,
+                loadingMore = false,
+                hasMore = hasMore,
+                errorMessage = null
+            )
+        }
+    }
+
+    // ---------- 多选与批量操作 ----------
+
+    private val _selection = MutableStateFlow(TrackSelection())
+    val selection: StateFlow<TrackSelection> = _selection.asStateFlow()
+
+    private val _importState = MutableStateFlow(PlaylistImportState())
+    val importState: StateFlow<PlaylistImportState> = _importState.asStateFlow()
+
+    fun enterSelection(firstTrackId: Long? = null) {
+        _selection.update { if (it.active) it else it.enter(firstTrackId) }
+    }
+
+    fun toggleSelected(trackId: Long) {
+        _selection.update { it.toggle(trackId) }
+    }
+
+    fun toggleSelectAll(visibleTrackIds: List<Long>) {
+        _selection.update { it.toggleAll(visibleTrackIds) }
+    }
+
+    fun exitSelection() {
+        _selection.value = TrackSelection()
+    }
+
+    // 热门、全部、搜索结果三处的歌曲合并去重后，按已选 id 取出
+    private fun selectedTracks(): List<Track> {
+        val state = _uiState.value as? ArtistUiState.Success ?: return emptyList()
+        val pool = (state.topSongs + state.allSongs + _songSearch.value.results).distinctBy { it.id }
+        return _selection.value.pick(pool)
+    }
+
+    private fun runBatch(needLogin: Boolean = false, block: suspend (List<Track>) -> Boolean) {
+        val tracks = selectedTracks()
+        if (tracks.isEmpty()) return
+        viewModelScope.launch {
+            if (needLogin && userPreferences.userProfile.first() == null) {
+                _toastEvent.emit("请先登录账号")
+                return@launch
+            }
+            if (block(tracks)) exitSelection()
+        }
+    }
+
+    fun prepareImportTargets() {
+        viewModelScope.launch {
+            _importState.update { it.copy(isLoading = true) }
+            val items = trackBatchActions.loadTargetPlaylists(null) { _toastEvent.emit(it) }
+            _importState.value = PlaylistImportState(items = items ?: _importState.value.items, isLoading = false)
+        }
+    }
+
+    fun batchPlayNext() = runBatch { tracks ->
+        trackBatchActions.playNext(tracks, emptySet()) { _toastEvent.emit(it) }
+    }
+
+    fun batchAddToPlaylist(targetPlaylistId: Long) = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.addToPlaylist(targetPlaylistId, tracks) { _toastEvent.emit(it) }
+    }
+
+    fun batchCreatePlaylistAndAdd(name: String, isPrivate: Boolean = false) = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.createPlaylistAndAdd(name, playlistPrivacyOf(isPrivate), tracks) { _toastEvent.emit(it) }
+    }
+
+    fun batchLike() = runBatch(needLogin = true) { tracks ->
+        trackBatchActions.like(tracks) { _toastEvent.emit(it) } > 0
+    }
+
+    fun batchDownload(level: String) = runBatch { tracks ->
+        val artist = (_uiState.value as? ArtistUiState.Success)?.artist ?: return@runBatch false
+        trackBatchActions.download(tracks, level, "artist_${artist.id}", artist.name) { _toastEvent.emit(it) }
     }
 
     fun handleLoginSuccess(cookies: String) {

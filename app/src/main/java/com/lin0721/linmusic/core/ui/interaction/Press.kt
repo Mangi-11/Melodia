@@ -1,9 +1,11 @@
 package com.lin0721.linmusic.core.ui.interaction
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -112,23 +114,39 @@ private class PressHighlightNode(
 //
 // 必须放在 clip / background 之前，否则底色不参与缩放。传入 shape 后本 modifier
 // 自带裁剪，调用点原有的 clip 应当去掉，避免重复建层：
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.pressable(
     style: PressStyle = MelodiaPress.Row,
     shape: Shape = RectangleShape,
     enabled: Boolean = true,
     role: Role? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
+    val indication = rememberPressIndication(style)
     return this
         .pressDecoration(style, shape, interactionSource)
-        .clickable(
-            interactionSource = interactionSource,
-            indication = rememberPressIndication(style),
-            enabled = enabled,
-            role = role,
-            onClick = onClick
+        .then(
+            if (onLongClick == null) {
+                Modifier.clickable(
+                    interactionSource = interactionSource,
+                    indication = indication,
+                    enabled = enabled,
+                    role = role,
+                    onClick = onClick
+                )
+            } else {
+                Modifier.combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = indication,
+                    enabled = enabled,
+                    role = role,
+                    onLongClick = onLongClick,
+                    onClick = onClick
+                )
+            }
         )
 }
 

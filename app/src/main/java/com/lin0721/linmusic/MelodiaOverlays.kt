@@ -14,6 +14,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +61,32 @@ private val ExpandedNavigationBarMaxWidth = 560.dp
 // 导致返回键没有先关掉全局浮层，而是直接改动了浮层底下页面的内部状态
 val LocalGlobalOverlayOpen = staticCompositionLocalOf { false }
 
+// 页面进入多选等需要独占底部的操作态时，请求收起迷你播放器；按请求计数，多个页面同时请求不会互相覆盖
+class MiniPlayerSuppressor {
+    var requestCount by mutableIntStateOf(0)
+        private set
+
+    fun acquire() {
+        requestCount++
+    }
+
+    fun release() {
+        requestCount = (requestCount - 1).coerceAtLeast(0)
+    }
+}
+
+val LocalMiniPlayerSuppressor = staticCompositionLocalOf { MiniPlayerSuppressor() }
+
+// active 为 true 期间收起迷你播放器，离开组合时自动归还
+@Composable
+fun SuppressMiniPlayer(active: Boolean) {
+    val suppressor = LocalMiniPlayerSuppressor.current
+    DisposableEffect(active, suppressor) {
+        if (active) suppressor.acquire()
+        onDispose { if (active) suppressor.release() }
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // 底部浮层：创建菜单弹出层 + 悬浮播放卡片 + M3 导航栏
 // ────────────────────────────────────────────────────────────────────────────
@@ -66,6 +96,8 @@ fun MelodiaBottomOverlay(
     currentScreen: Screen,
     showCreateSheet: Boolean,
     isLoginScreenVisible: Boolean,
+    // 多选等操作态下收起迷你播放器
+    isMiniPlayerHidden: Boolean = false,
     // 平板播放面板是否已让位（内容区已收窄、面板常驻右侧）
     isPanelDocked: Boolean = false,
     currentTrack: MediaItem?,
@@ -195,7 +227,7 @@ fun MelodiaBottomOverlay(
                         // 与导航栏的间距放在迷你条自身而非 spacedBy，否则入场/退场首尾会各有一次 8dp 突变
                         if (!isPanelDocked) {
                             AnimatedVisibility(
-                                visible = currentTrack != null && !isLoginScreenVisible,
+                                visible = currentTrack != null && !isLoginScreenVisible && !isMiniPlayerHidden,
                                 enter = fadeIn() + expandHorizontally(),
                                 exit = fadeOut() + shrinkHorizontally(),
                                 modifier = Modifier.fillMaxHeight()
@@ -231,9 +263,10 @@ fun MelodiaBottomOverlay(
                 } else {
                     // 手机：迷你播放卡在上、导航栏在下，垂直堆叠（现状不变）
                     AnimatedVisibility(
-                        visible = currentTrack != null && !isLoginScreenVisible,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        visible = currentTrack != null && !isLoginScreenVisible && !isMiniPlayerHidden,
+                        // 同时伸缩高度：底栏占用高度随之平滑变化，悬浮在其上的多选操作栏才不会在动画结束时突然掉落
+                        enter = slideInVertically(initialOffsetY = { it }) + expandVertically() + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + shrinkVertically() + fadeOut(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         MiniPlayerCard(

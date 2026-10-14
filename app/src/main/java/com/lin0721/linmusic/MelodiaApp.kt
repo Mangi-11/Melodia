@@ -217,6 +217,7 @@ fun MelodiaApp() {
     var isLoginScreenVisible by remember { mutableStateOf(false) }
     // 悬浮播放卡片 + 导航栏的实际高度，下发给各页面用作列表底部留白
     var bottomOverlayHeight by remember { mutableStateOf(0.dp) }
+    val miniPlayerSuppressor = remember { MiniPlayerSuppressor() }
     // 平板适配断点，顶层下发供 MelodiaBottomOverlay 及后续各阶段消费
     val windowSizeClass = rememberMelodiaWindowSizeClass()
     // 方向维度，与宽度断点独立组合
@@ -444,6 +445,7 @@ fun MelodiaApp() {
                 )
                 CompositionLocalProvider(
                     LocalBottomOverlayInset provides bottomOverlayHeight,
+                    LocalMiniPlayerSuppressor provides miniPlayerSuppressor,
                     LocalGlobalOverlayOpen provides (playerSheet.isOpen || sidebar.isOpen || showCreateSheet)
                 ) {
                     Box(
@@ -511,6 +513,7 @@ fun MelodiaApp() {
                             currentScreen = navigation.currentScreen,
                             showCreateSheet = showCreateSheet,
                             isLoginScreenVisible = isLoginScreenVisible,
+                            isMiniPlayerHidden = miniPlayerSuppressor.requestCount > 0,
                             isPanelDocked = isPanelDocked,
                             currentTrack = currentTrack,
                             isPlaying = miniPlayerShowPause,

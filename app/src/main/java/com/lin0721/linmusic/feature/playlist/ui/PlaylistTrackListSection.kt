@@ -21,6 +21,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
+import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
 // 切歌单排序方式时的行位移动画：与 Library 筛选胶囊的增删动效同一套规格
@@ -46,9 +47,11 @@ fun LazyListScope.playlistTrackItems(
     onToggleLike: (Long, Boolean) -> Unit = { _, _ -> },
     onMoreClick: (Track) -> Unit,
     trackPlayCounts: Map<Long, Int> = emptyMap(),
-    unplayableIds: Set<Long> = emptySet()
+    unplayableIds: Set<Long> = emptySet(),
+    selectionUi: TrackSelectionUi = TrackSelectionUi()
 ) {
     items(tracks, key = { it.id }) { track ->
+        val selecting = selectionUi.active
         // SongRow 本身不接受外部 modifier，外层套 Box 挂 animateItem：
         // 切排序方式时 key 不变、位置变了，行会顺着新位置滑过去
         Box(modifier = Modifier.animateItem(trackFadeInSpec, trackPlacementSpec, trackFadeOutSpec)) {
@@ -62,10 +65,13 @@ fun LazyListScope.playlistTrackItems(
                 ),
                 isActive = currentTrackId == track.id.toString(),
                 isPlaying = isPlaying,
-                enabled = track.id !in unplayableIds,
-                copyable = true,
-                onClick = { onPlaySong(track) },
-                trailingSlot = {
+                // 多选态下不可播放的歌曲也能勾选
+                enabled = selecting || track.id !in unplayableIds,
+                copyable = !selecting,
+                selectionChecked = if (selecting) track.id in selectionUi.selectedIds else null,
+                onClick = { if (selecting) selectionUi.onToggle(track.id) else onPlaySong(track) },
+                trailingSlot = trailing@{
+                    if (selecting) return@trailing
                     val playCount = trackPlayCounts[track.id]
                     if (playCount != null) {
                         Text(
@@ -91,6 +97,7 @@ fun LazyListScope.playlistTrackItems(
                     }
                     MelodiaIconButton(
                         onClick = { onMoreClick(track) },
+                        onLongClick = { selectionUi.onEnter(track.id) },
                         modifier = Modifier.size(32.dp).padding(end = MelodiaSpacing.xs)
                     ) {
                         Icon(

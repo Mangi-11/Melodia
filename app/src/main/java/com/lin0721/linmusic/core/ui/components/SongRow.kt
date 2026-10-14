@@ -1,6 +1,11 @@
 package com.lin0721.linmusic.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -30,12 +35,15 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -87,6 +95,9 @@ data class SongRowData(
 // 离线不可播放的歌曲行置灰程度
 private const val DISABLED_ROW_ALPHA = 0.38f
 
+// 多选复选框展开/收起时长，与多选浮层的进出动画一致
+private const val SELECTION_ANIM_MS = 250
+
 // 通用歌曲行：Playlist/Artist/Home/Search 共用，compact 控制紧凑尺寸，index 控制是否显示序号列，enabled 为假时置灰且不响应点击，
 // copyable 为真时长按歌名/歌手文字分别复制
 @Composable
@@ -101,6 +112,8 @@ fun SongRow(
     showDownloadBadge: Boolean = true,
     enabled: Boolean = true,
     copyable: Boolean = false,
+    // 非 null 表示处于多选态：行首显示复选框，勾选态由调用方随 onClick 切换
+    selectionChecked: Boolean? = null,
     trailingSlot: @Composable RowScope.() -> Unit = {}
 ) {
     // 平板 Expanded 断点下行高/封面/字号统一加码，结构不变
@@ -145,6 +158,20 @@ fun SongRow(
             .padding(horizontal = MelodiaSpacing.md, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 退出动画期间 selectionChecked 已为 null，保留最后的勾选态避免复选框收起时闪一下
+        var lastChecked by remember { mutableStateOf(false) }
+        if (selectionChecked != null) lastChecked = selectionChecked
+        AnimatedVisibility(
+            visible = selectionChecked != null,
+            enter = expandHorizontally(tween(SELECTION_ANIM_MS)) + fadeIn(tween(SELECTION_ANIM_MS)),
+            exit = shrinkHorizontally(tween(SELECTION_ANIM_MS)) + fadeOut(tween(SELECTION_ANIM_MS))
+        ) {
+            Checkbox(
+                checked = lastChecked,
+                onCheckedChange = null,
+                modifier = Modifier.padding(end = MelodiaSpacing.md)
+            )
+        }
         if (index != null) {
             Text(
                 text = index.toString(),

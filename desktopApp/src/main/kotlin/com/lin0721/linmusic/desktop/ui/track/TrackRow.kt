@@ -24,6 +24,8 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -94,6 +96,13 @@ internal val ADDED_COLUMN_WIDTH = 120.dp
 
 internal val DangerColor = Color(0xFFFF6B6B)
 
+// 多选态下的行勾选状态与切换回调
+@Immutable
+class TrackRowSelection(
+    val checked: Boolean,
+    val onToggle: () -> Unit
+)
+
 // 行内长按拖动排序：偏移与手势回调由列表页的 QueueReorderState 驱动
 @Immutable
 class TrackReorder(
@@ -119,8 +128,11 @@ fun TrackRow(
     // 非 null 时整行可长按拖动
     reorder: TrackReorder? = null,
     // 无 actions 时行尾的自定义操作（推荐区的添加按钮）
-    trailingAction: (@Composable () -> Unit)? = null
+    trailingAction: (@Composable () -> Unit)? = null,
+    // 非 null 表示多选态：首列显示复选框，点击整行切换勾选，悬停操作与右键菜单停用
+    selection: TrackRowSelection? = null
 ) {
+    val activeActions = actions.takeIf { selection == null }
     val navigator = LocalDesktopNavigator.current
     val density = LocalDensity.current
     var hovered by remember { mutableStateOf(false) }
@@ -161,15 +173,22 @@ fun TrackRow(
                 .onPointerEvent(PointerEventType.Enter) { hovered = true }
                 .onPointerEvent(PointerEventType.Exit) { hovered = false }
                 .onPointerEvent(PointerEventType.Press) { event ->
-                    if (actions != null && event.buttons.isSecondaryPressed) {
+                    if (activeActions != null && event.buttons.isSecondaryPressed) {
                         val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
                         contextMenuOffset = with(density) {
                             DpOffset(position.x.toDp(), (position.y - rowHeightPx).toDp())
                         }
-                    } else if (enabled && event.awtEventOrNull?.clickCount == 2) {
+                    } else if (selection == null && enabled && event.awtEventOrNull?.clickCount == 2) {
                         onPlay()
                     }
                 }
+                .then(
+                    if (selection != null) {
+                        Modifier.pointerHoverIcon(PointerIcon.Hand).clickable(onClick = selection.onToggle)
+                    } else {
+                        Modifier
+                    }
+                )
                 .then(
                     if (reorder != null) {
                         Modifier.pointerInput(Unit) {
@@ -186,7 +205,18 @@ fun TrackRow(
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (enabled && hovered && !dragging) {
+            if (selection != null) {
+                Checkbox(
+                    checked = selection.checked,
+                    onCheckedChange = null,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = DesktopColors.Accent,
+                        uncheckedColor = DesktopColors.TextGray,
+                        checkmarkColor = DesktopColors.TextPrimary
+                    ),
+                    modifier = Modifier.width(32.dp)
+                )
+            } else if (enabled && hovered && !dragging) {
                 Box(
                     Modifier.width(32.dp).height(32.dp).pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onPlay),
                     contentAlignment = Alignment.CenterEnd
@@ -242,11 +272,11 @@ fun TrackRow(
                     modifier = Modifier.width(ADDED_COLUMN_WIDTH)
                 )
             }
-            if (actions != null) {
+            if (activeActions != null) {
                 // 已喜欢的红心常亮，其余仅悬停时出现
                 val showLike = hovered || isLiked
                 IconButton(
-                    onClick = { actions.onToggleLike(track) },
+                    onClick = { activeActions.onToggleLike(track) },
                     enabled = showLike,
                     modifier = Modifier.size(32.dp)
                 ) {
@@ -267,8 +297,8 @@ fun TrackRow(
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(48.dp)
             )
-            if (actions == null) trailingAction?.invoke()
-            if (actions != null) {
+            if (activeActions == null) trailingAction?.invoke()
+            if (activeActions != null) {
                 Box {
                     IconButton(
                         onClick = { moreMenuOpen = true },
@@ -283,19 +313,19 @@ fun TrackRow(
                         expanded = moreMenuOpen,
                         offset = DpOffset.Zero,
                         track = track,
-                        actions = actions,
+                        actions = activeActions,
                         onPlay = onPlay,
                         onDismiss = { moreMenuOpen = false }
                     )
                 }
             }
         }
-        if (actions != null) {
+        if (activeActions != null) {
             TrackMenu(
                 expanded = contextMenuOffset != null,
                 offset = contextMenuOffset ?: DpOffset.Zero,
                 track = track,
-                actions = actions,
+                actions = activeActions,
                 onPlay = onPlay,
                 onDismiss = { contextMenuOffset = null }
             )

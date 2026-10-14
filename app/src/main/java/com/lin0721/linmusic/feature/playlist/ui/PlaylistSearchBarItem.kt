@@ -9,10 +9,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -34,7 +38,10 @@ fun SearchBarItem(
     onQueryChange: (String) -> Unit,
     topPadding: Dp,
     backgroundColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    placeholder: String = "在歌单中搜索",
+    // true 时聚焦输入框弹出键盘，回到 false 时收起键盘，随搜索栏展开状态联动
+    requestFocus: Boolean = false
 ) {
     // 取色完成时颜色平滑过渡
     val animatedBackground by animateColorAsState(
@@ -43,6 +50,11 @@ fun SearchBarItem(
         label = "search_bar_color"
     )
     val fillColor = remember(animatedBackground) { animatedBackground.darken(0.35f) }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(requestFocus) {
+        if (requestFocus) focusRequester.requestFocus() else focusManager.clearFocus()
+    }
     Column(modifier = modifier.fillMaxWidth().background(fillColor)) {
         // 占据 overlay 的高度，防止下拉后搜索栏被返回键等遮挡
         Spacer(modifier = Modifier.height(topPadding))
@@ -75,11 +87,11 @@ fun SearchBarItem(
                     cursorBrush = SolidColor(Color.White),
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (query.isEmpty()) Text("在歌单中搜索", color = Color.White, fontSize = 14.sp)
+                            if (query.isEmpty()) Text(placeholder, color = Color.White, fontSize = 14.sp)
                             inner()
                         }
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).focusRequester(focusRequester)
                 )
                 Spacer(Modifier.width(14.dp))
             }

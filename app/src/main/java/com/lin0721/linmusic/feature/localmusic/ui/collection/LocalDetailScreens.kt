@@ -1,5 +1,6 @@
 package com.lin0721.linmusic.feature.localmusic.ui.collection
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +29,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,11 +57,14 @@ import com.lin0721.linmusic.feature.localmusic.domain.albumName
 import com.lin0721.linmusic.feature.localmusic.domain.displayTrackNumber
 import com.lin0721.linmusic.feature.localmusic.ui.LocalLibraryStateGate
 import com.lin0721.linmusic.feature.localmusic.ui.LocalMusicNavigation
+import com.lin0721.linmusic.feature.localmusic.ui.LocalMusicUiState
 import com.lin0721.linmusic.feature.localmusic.ui.LocalMusicViewModel
 import com.lin0721.linmusic.feature.localmusic.ui.LocalTrackActionsHost
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalAlbumCard
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalCover
+import com.lin0721.linmusic.feature.localmusic.ui.components.LocalBatchDeleteDialog
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalHeroHeader
+import com.lin0721.linmusic.feature.localmusic.ui.components.LocalSelectionActions
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalPlayShuffleButtons
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalSectionHeader
 import com.lin0721.linmusic.feature.localmusic.ui.components.LocalTrackRow
@@ -76,20 +83,28 @@ fun LocalArtistScreen(
     val library by viewModel.library.collectAsStateWithLifecycle()
     val playingMediaId by viewModel.playingMediaId.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val success = uiState as? LocalMusicUiState.Success
+    var confirmDelete by remember { mutableStateOf(false) }
+    LocalSelectionLifecycle(viewModel, selecting = success?.isSelectionMode == true)
     val artist = library.artist(name)
     val albums = remember(artist, library) {
         artist?.tracks?.mapNotNull { library.album(it.albumKey) }?.filterNot { it.isUnknown }?.distinctBy { it.key }.orEmpty()
     }
 
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
-        LocalLibraryStateGate(viewModel) {
+        LocalLibraryStateGate(viewModel) { state ->
             if (artist == null) {
                 MissingContent(title = "该歌手已没有本地歌曲", onBack = navigation.onBack)
                 return@LocalLibraryStateGate
             }
             LazyColumn(contentPadding = PaddingValues(bottom = LocalBottomOverlayInset.current + MelodiaSpacing.md)) {
                 item(key = "hero") {
-                    LocalHeroHeader(coverSourceUri = artist.tracks.first().uri, onBack = navigation.onBack) {
+                    LocalHeroHeader(
+                        coverSourceUri = artist.tracks.first().uri,
+                        onBack = navigation.onBack,
+                        actions = { LocalSelectionActions(state, artist.tracks, viewModel) { confirmDelete = true } }
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             LocalCover(
                                 sourceUri = artist.tracks.first().uri,
@@ -146,13 +161,25 @@ fun LocalArtistScreen(
                     subtitleOf = { it.albumName },
                     playingMediaId = playingMediaId,
                     isPlaying = isPlaying,
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    state = state
                 )
             }
         }
     }
 
     LocalTrackActionsHost(viewModel = viewModel, navigation = navigation)
+
+    if (confirmDelete) {
+        LocalBatchDeleteDialog(
+            count = success?.selectedUris?.size ?: 0,
+            onConfirm = {
+                viewModel.deleteSelected()
+                confirmDelete = false
+            },
+            onDismiss = { confirmDelete = false }
+        )
+    }
 }
 
 @Composable
@@ -164,17 +191,25 @@ fun LocalAlbumScreen(
     val library by viewModel.library.collectAsStateWithLifecycle()
     val playingMediaId by viewModel.playingMediaId.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val success = uiState as? LocalMusicUiState.Success
+    var confirmDelete by remember { mutableStateOf(false) }
+    LocalSelectionLifecycle(viewModel, selecting = success?.isSelectionMode == true)
     val album = library.album(albumKey)
 
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
-        LocalLibraryStateGate(viewModel) {
+        LocalLibraryStateGate(viewModel) { state ->
             if (album == null) {
                 MissingContent(title = "该专辑已没有本地歌曲", onBack = navigation.onBack)
                 return@LocalLibraryStateGate
             }
             LazyColumn(contentPadding = PaddingValues(bottom = LocalBottomOverlayInset.current + MelodiaSpacing.md)) {
                 item(key = "hero") {
-                    LocalHeroHeader(coverSourceUri = album.coverSourceUri, onBack = navigation.onBack) {
+                    LocalHeroHeader(
+                        coverSourceUri = album.coverSourceUri,
+                        onBack = navigation.onBack,
+                        actions = { LocalSelectionActions(state, album.tracks, viewModel) { confirmDelete = true } }
+                    ) {
                         Row(verticalAlignment = Alignment.Bottom) {
                             LocalCover(
                                 sourceUri = album.coverSourceUri,
@@ -225,6 +260,7 @@ fun LocalAlbumScreen(
                     playingMediaId = playingMediaId,
                     isPlaying = isPlaying,
                     viewModel = viewModel,
+                    state = state,
                     showTrackNumber = true
                 )
             }
@@ -232,6 +268,17 @@ fun LocalAlbumScreen(
     }
 
     LocalTrackActionsHost(viewModel = viewModel, navigation = navigation)
+
+    if (confirmDelete) {
+        LocalBatchDeleteDialog(
+            count = success?.selectedUris?.size ?: 0,
+            onConfirm = {
+                viewModel.deleteSelected()
+                confirmDelete = false
+            },
+            onDismiss = { confirmDelete = false }
+        )
+    }
 }
 
 @Composable
@@ -243,11 +290,23 @@ fun LocalFolderScreen(
     val library by viewModel.library.collectAsStateWithLifecycle()
     val playingMediaId by viewModel.playingMediaId.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val success = uiState as? LocalMusicUiState.Success
+    var confirmDelete by remember { mutableStateOf(false) }
+    LocalSelectionLifecycle(viewModel, selecting = success?.isSelectionMode == true)
     val folder = library.folder(path)
 
-    SecondaryScreenScaffold(title = folder?.name ?: path.substringAfterLast('/'), onBack = navigation.onBack) {
+    SecondaryScreenScaffold(
+        title = folder?.name ?: path.substringAfterLast('/'),
+        onBack = navigation.onBack,
+        actions = {
+            if (success != null && folder != null) {
+                LocalSelectionActions(success, folder.tracks, viewModel) { confirmDelete = true }
+            }
+        }
+    ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            LocalLibraryStateGate(viewModel) {
+            LocalLibraryStateGate(viewModel) { state ->
                 if (folder == null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         EmptyState(icon = Icons.Rounded.LibraryMusic, title = "该文件夹已没有本地歌曲")
@@ -274,7 +333,8 @@ fun LocalFolderScreen(
                         subtitleOf = { it.artist },
                         playingMediaId = playingMediaId,
                         isPlaying = isPlaying,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        state = state
                     )
                 }
             }
@@ -282,6 +342,17 @@ fun LocalFolderScreen(
     }
 
     LocalTrackActionsHost(viewModel = viewModel, navigation = navigation)
+
+    if (confirmDelete) {
+        LocalBatchDeleteDialog(
+            count = success?.selectedUris?.size ?: 0,
+            onConfirm = {
+                viewModel.deleteSelected()
+                confirmDelete = false
+            },
+            onDismiss = { confirmDelete = false }
+        )
+    }
 }
 
 private fun LazyListScope.trackItems(
@@ -290,6 +361,7 @@ private fun LazyListScope.trackItems(
     playingMediaId: String?,
     isPlaying: Boolean,
     viewModel: LocalMusicViewModel,
+    state: LocalMusicUiState.Success,
     showTrackNumber: Boolean = false
 ) {
     items(tracks, key = { "track_${it.uri}" }) { track ->
@@ -299,9 +371,23 @@ private fun LazyListScope.trackItems(
             playingMediaId = playingMediaId,
             isPlaying = isPlaying,
             index = if (showTrackNumber) track.displayTrackNumber else null,
-            onClick = { viewModel.playTracks(tracks, start = track) },
+            selectionMode = state.isSelectionMode,
+            selected = track.uri.toString() in state.selectedUris,
+            onClick = {
+                if (state.isSelectionMode) viewModel.toggleSelected(track)
+                else viewModel.playTracks(tracks, start = track)
+            },
             onMoreClick = { coverUrl -> viewModel.openTrackMenu(track, tracks, coverUrl) }
         )
+    }
+}
+
+// 多选状态在 ViewModel 里跨页共享：返回键先退出多选，离开页面时也要复位，避免带到上一页
+@Composable
+private fun LocalSelectionLifecycle(viewModel: LocalMusicViewModel, selecting: Boolean) {
+    BackHandler(enabled = selecting) { viewModel.exitSelectionMode() }
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.exitSelectionMode() }
     }
 }
 

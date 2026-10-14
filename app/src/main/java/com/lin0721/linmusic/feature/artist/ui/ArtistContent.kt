@@ -1,5 +1,11 @@
 package com.lin0721.linmusic.feature.artist.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
@@ -10,8 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.LocalBottomOverlayInset
@@ -19,6 +28,14 @@ import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
+import com.lin0721.linmusic.core.ui.components.SelectionAction
+import com.lin0721.linmusic.core.ui.components.TrackSelectionOverlay
+import com.lin0721.linmusic.core.ui.components.rememberSelectionBottomPadding
+import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
+import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.feature.playlist.ui.SearchBarItem
+import com.lin0721.linmusic.feature.playlist.ui.rememberSearchBarRevealState
 import com.lin0721.linmusic.core.model.ArtistAlbum
 import com.lin0721.linmusic.core.model.ArtistDetailInfo
 import com.lin0721.linmusic.core.model.ArtistInfo
@@ -56,10 +73,21 @@ fun ArtistContent(
     onSaveCollection: (Long, List<PlaylistCollectItem>) -> Unit,
     onSaveNewCollection: (String, Long) -> Unit,
     onRequireLogin: () -> Unit,
-    onLoadMoreAlbums: () -> Unit
+    onLoadMoreAlbums: () -> Unit,
+    songSearch: ArtistSongSearchState,
+    onSongSearchQueryChange: (String) -> Unit,
+    onLoadMoreSongSearch: () -> Unit,
+    selectionUi: TrackSelectionUi,
+    selectionActions: List<SelectionAction>,
+    onToggleSelectAll: (List<Long>) -> Unit,
+    onExitSelection: () -> Unit
 ) {
     val density = LocalDensity.current
     val listState = rememberLazyListState()
+    // 与歌单页同一套搜索栏下拉展开：手势下拉或右上角按钮都走它，展开期间头部整体收起
+    val searchBarRevealState = rememberSearchBarRevealState(listState = listState, isDailyRecommend = false)
+    val searchOpen = searchBarRevealState.isOpen
+    val overlayHeight = 56.dp + melodiaStatusBarTopPadding()
 
     var showMoreMenuSheet by remember { mutableStateOf(false) }
 
@@ -81,6 +109,8 @@ fun ArtistContent(
     // 已滚动越过头图区域的像素数：用于驱动下方不透明背板，彻底盖住固定不动的背景图，避免歌曲行等透明区域漏色
     val backdropCoveredPx by remember {
         derivedStateOf {
+            // 搜索展开时头图已收起，背板直接铺满，避免背景图从结果行下漏出
+            if (searchBarRevealState.isOpen) return@derivedStateOf backdropCoverThresholdPx
             val index = listState.firstVisibleItemIndex
             val offset = listState.firstVisibleItemScrollOffset.toFloat()
             when {
@@ -108,8 +138,21 @@ fun ArtistContent(
     LaunchedEffect(shouldLoadMore, selectedTab) {
         if (!shouldLoadMore) return@LaunchedEffect
         when (selectedTab) {
+            0 -> if (songSearch.active) onLoadMoreSongSearch()
             1 -> onLoadMoreAlbums()
         }
+    }
+
+    // 搜索栏收起（返回键、顶栏按钮、手势）后清掉关键词，列表回到热门歌曲
+    LaunchedEffect(searchOpen) {
+        if (!searchOpen) onSongSearchQueryChange("")
+    }
+    // 搜索展开中拦截系统返回：先关搜索，不直接退出歌手页
+    BackHandler(enabled = searchOpen) {
+        searchBarRevealState.close()
+    }
+    BackHandler(enabled = selectionUi.active) {
+        onExitSelection()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -133,31 +176,53 @@ fun ArtistContent(
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = LocalBottomOverlayInset.current + 16.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationY = searchBarRevealState.revealPx }
+                    .nestedScroll(searchBarRevealState.connection),
+                contentPadding = PaddingValues(bottom = LocalBottomOverlayInset.current + 16.dp + rememberSelectionBottomPadding(selectionUi.active))
             ) {
+                // 头图、操作栏、Tab 栏在搜索展开意图确定后淡出收起，把空间让给搜索结果
                 item(key = "header_placeholder") {
-                    ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                    AnimatedVisibility(
+                        visible = !searchOpen,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                    ) {
+                        ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
+                    }
                 }
 
                 item(key = "action_bar") {
-                    ArtistActionBar(
-                        artist = artist,
-                        fansCount = fansCount,
-                        isFollowed = isFollowed,
-                        onFollowClick = onFollowClick,
-                        onMoreClick = { showMoreMenuSheet = true },
-                        onPlayAll = {
-                            topSongs.firstOrNull()?.let { onPlaySong(it, topSongs) }
-                        }
-                    )
+                    AnimatedVisibility(
+                        visible = !searchOpen,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                    ) {
+                        ArtistActionBar(
+                            artist = artist,
+                            fansCount = fansCount,
+                            isFollowed = isFollowed,
+                            onFollowClick = onFollowClick,
+                            onMoreClick = { showMoreMenuSheet = true },
+                            onPlayAll = {
+                                topSongs.firstOrNull()?.let { onPlaySong(it, topSongs) }
+                            }
+                        )
+                    }
                 }
 
                 item(key = "tab_bar") {
-                    ArtistTabBar(
-                        selectedTab = selectedTab,
-                        onTabSelected = { selectedTab = it }
-                    )
+                    AnimatedVisibility(
+                        visible = !searchOpen,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                    ) {
+                        ArtistTabBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it }
+                        )
+                    }
                 }
 
                 // 根据选中的 Tab 呈现对应内容
@@ -168,6 +233,8 @@ fun ArtistContent(
                         currentTrackId = currentTrackId,
                         isPlaying = isPlaying,
                         isLoggedIn = isLoggedIn,
+                        songSearch = songSearch,
+                        selectionUi = selectionUi,
                         onPlaySong = onPlaySong,
                         onLikeClick = onLikeClick,
                         onOpenCollectSheet = { collectSongId = it },
@@ -191,11 +258,39 @@ fun ArtistContent(
             }
         }
 
+        // 搜索栏浮层，随 revealPx 跟手展开
+        SearchBarItem(
+            query = songSearch.query,
+            onQueryChange = onSongSearchQueryChange,
+            topPadding = overlayHeight,
+            backgroundColor = dominantColor,
+            placeholder = "搜索歌手的歌曲",
+            requestFocus = searchOpen,
+            modifier = Modifier
+                .onSizeChanged { searchBarRevealState.searchBarHeightPx = it.height.toFloat() }
+                .graphicsLayer {
+                    translationY = searchBarRevealState.revealPx - searchBarRevealState.searchBarHeightPx
+                }
+        )
+
         ArtistTopBarOverlay(
             artistName = artist.name,
-            progress = progress,
+            progress = if (searchOpen) 1f else progress,
             dominantColor = dominantColor,
-            onBack = onBack
+            onBack = { if (searchOpen) searchBarRevealState.close() else onBack() },
+            showSearch = selectedTab == 0,
+            searchOpen = searchOpen,
+            onSearchClick = { if (searchOpen) searchBarRevealState.close() else searchBarRevealState.open() }
+        )
+
+        // 全选范围为当前列表（搜索中为搜索结果）
+        TrackSelectionOverlay(
+            selectionUi = selectionUi,
+            actions = selectionActions,
+            visibleIds = (if (songSearch.active) songSearch.results else topSongs).map { it.id },
+            headerColor = dominantColor.darken(0.35f),
+            onToggleSelectAll = onToggleSelectAll,
+            onExit = onExitSelection
         )
 
         // 详情 Bottom Sheet (批量收藏)

@@ -95,6 +95,26 @@ class SearchBarRevealState internal constructor(
         }
     }
 
+    // 非手势入口（如顶栏的搜索按钮）直接展开，走与松手收尾同样的弹簧动画
+    fun open() {
+        val max = searchBarHeightPx
+        if (max <= 0f || isOpen) return
+        isOpen = true
+        settleJob?.cancel()
+        settleJob = scope.launch {
+            animate(
+                initialValue = revealPx,
+                targetValue = max,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) { value, _ ->
+                revealPx = value.coerceIn(0f, max)
+            }
+        }
+    }
+
     // 搜索返回箭头专用：展开态下唯一允许把它关掉的入口
     fun close() {
         val max = searchBarHeightPx
