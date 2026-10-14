@@ -77,7 +77,7 @@ class AudioSourceRouter(
                         durationMs = track.dt,
                         quality = quality
                     )
-                    if (r != null && r.url.isNotBlank()) {
+                    if (r != null && r.url.isNotBlank() && !r.isTrial && !isTrialPlayUrl(r.url)) {
                         return Pair(r.url, "社区源 (${p.platform.displayName})")
                     }
                 } catch (e: Exception) {
@@ -94,7 +94,7 @@ class AudioSourceRouter(
             if (!remoteFallbackEnabled || serverUrl.isBlank()) return null
             AppLogger.d(TAG, "尝试远程 UNM 服务: $serverUrl songId=$songId")
             val remoteResult = unmApiClient.matchSong(serverUrl, songId, null)
-            if (remoteResult != null && remoteResult.url.isNotBlank()) {
+            if (remoteResult != null && remoteResult.url.isNotBlank() && !isTrialPlayUrl(remoteResult.url)) {
                 AppLogger.i(TAG, "远程 UNM 服务解析成功: songId=$songId 来源=${remoteResult.source}")
                 return Pair(remoteResult.url, "远程UNM (${remoteResult.source ?: "auto"})")
             }

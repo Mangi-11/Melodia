@@ -25,15 +25,26 @@ object SourceHttpClient {
         .followRedirects(true)
         .build()
 
+    // UNM 服务需要上游实时解析，耗时明显长于普通接口，超时不能比官方 API（30s）更短
+    val unmClient: OkHttpClient = client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     private val noRedirectClient: OkHttpClient = client.newBuilder()
         .followRedirects(false)
         .build()
 
-    suspend fun get(url: String, headers: Map<String, String> = emptyMap()): String =
+    suspend fun get(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        httpClient: OkHttpClient = client
+    ): String =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder().url(url).get()
             headers.forEach { (k, v) -> builder.addHeader(k, v) }
-            client.newCall(builder.build()).execute().use { response ->
+            httpClient.newCall(builder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw SourceException("HTTP ${response.code}: $url")
                 }
