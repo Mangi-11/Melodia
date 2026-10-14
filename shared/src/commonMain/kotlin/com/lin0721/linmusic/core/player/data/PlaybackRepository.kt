@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.SharedFlow
 data class SongPlaybackInfo(
     val url: String,
     val isFreeTrial: Boolean = false,
-    val level: String? = null
+    val level: String? = null,
+    // 官方只有试听且换源全部未命中，只能退回播放官方试听片段
+    val trialFallback: Boolean = false
 )
 
 // 播放引擎数据仓储（core 共享能力，服务于 PlayerManager/FloatingLyricService 及多个域的推荐入口）

@@ -58,7 +58,9 @@ class LxAudioSourceProvider(
                         durationMs = durationMs,
                         quality = quality
                     )
-                    if (!url.isNullOrBlank()) {
+                    if (!url.isNullOrBlank() && isTrialPlayUrl(url)) {
+                        AppLogger.w(TAG, "插件 [${plugin.name}] 通过 [$source] 返回的是试听链接，继续尝试下一个: $songName")
+                    } else if (!url.isNullOrBlank()) {
                         AppLogger.i(TAG, "插件 [${plugin.name}] 成功通过 [$source] 解析直链: $songName")
                         return SourceResult(
                             url = url,

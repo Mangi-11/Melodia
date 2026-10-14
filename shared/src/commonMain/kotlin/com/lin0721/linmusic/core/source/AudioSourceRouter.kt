@@ -77,7 +77,7 @@ class AudioSourceRouter(
                         durationMs = track.dt,
                         quality = quality
                     )
-                    if (r != null && r.url.isNotBlank()) {
+                    if (r != null && r.url.isNotBlank() && !r.isTrial && !isTrialPlayUrl(r.url)) {
                         return Pair(r.url, "社区源 (${p.platform.displayName})")
                     }
                 } catch (e: Exception) {
@@ -94,7 +94,7 @@ class AudioSourceRouter(
             if (!remoteFallbackEnabled || serverUrl.isBlank()) return null
             AppLogger.d(TAG, "尝试远程 UNM 服务: $serverUrl songId=$songId")
             val remoteResult = unmApiClient.matchSong(serverUrl, songId, null)
-            if (remoteResult != null && remoteResult.url.isNotBlank()) {
+            if (remoteResult != null && remoteResult.url.isNotBlank() && !isTrialPlayUrl(remoteResult.url)) {
                 AppLogger.i(TAG, "远程 UNM 服务解析成功: songId=$songId 来源=${remoteResult.source}")
                 return Pair(remoteResult.url, "远程UNM (${remoteResult.source ?: "auto"})")
             }
@@ -137,7 +137,7 @@ class AudioSourceRouter(
             AppLogger.w(TAG, "所有换源均未命中: songId=$songId")
             if (officialInfo != null && officialInfo.url.isNotBlank()) {
                 AppLogger.i(TAG, "兜底返回官方试听链接: songId=$songId")
-                emit(Result.success(officialInfo))
+                emit(Result.success(officialInfo.copy(trialFallback = officialInfo.isFreeTrial)))
             } else {
                 emit(Result.failure(officialInfoResult.exceptionOrNull() ?: AppError.BizError(-1, "换源未能获取到可用播放链接")))
             }

@@ -84,6 +84,22 @@ class LxAudioSourceProviderTest {
     }
 
     @Test
+    fun `插件返回试听链接时视为未命中并继续尝试其他平台`() = runBlocking {
+        val runtime = RecordingRuntime(
+            listOf("wy", "kw"),
+            mapOf(
+                ("wy" to "100") to "http://m701.music.126.net/musicrep-ts/trial.mp3",
+                ("kw" to "KW9") to "http://kw/9"
+            )
+        )
+        val kuwo = FakeSearch(MusicPlatform.KUWO, listOf(track(MusicPlatform.KUWO, "KW9")))
+        val provider = LxAudioSourceProvider(runtime, prefs, listOf(kuwo))
+
+        assertEquals("http://kw/9", resolve(provider, "100")?.url)
+        assertEquals(listOf("wy" to "100", "kw" to "KW9"), runtime.calls)
+    }
+
+    @Test
     fun `网易云解析失败后换平台时用匹配出的标识而不是网易云 id`() = runBlocking {
         val runtime = RecordingRuntime(listOf("wy", "kw"), mapOf(("kw" to "KW9") to "http://kw/9"))
         val kuwo = FakeSearch(MusicPlatform.KUWO, listOf(track(MusicPlatform.KUWO, "KW9")))
