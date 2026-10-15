@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -429,6 +430,12 @@ class PlayerViewModel(
             }
         }
         _songDetailState.update { it.copy(isLyricsLoading = false) }
+    }
+
+    // 已加载的详情直接用，否则现取一次；失败返回 null
+    suspend fun resolveSongDetail(songId: Long): Track? {
+        _songDetailState.value.songDetail?.takeIf { it.id == songId }?.let { return it }
+        return playerRepository.getSongDetail(songId).firstOrNull()?.getOrNull()
     }
 
     private suspend fun loadSongDetail(songId: Long) {

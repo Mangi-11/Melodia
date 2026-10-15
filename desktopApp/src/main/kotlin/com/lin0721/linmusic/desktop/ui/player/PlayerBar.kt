@@ -54,7 +54,6 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +65,7 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.PlayPauseIcon
 import com.lin0721.linmusic.desktop.ui.icons.PlayerBarIcons
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingArtists
+import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingSongTitle
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
@@ -127,7 +127,7 @@ fun PlayerBar(
                     }
                 }
                 Column(Modifier.weight(1f, fill = false).padding(start = 12.dp)) {
-                    Text(track.title, color = DesktopColors.TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    NowPlayingSongTitle(track, playerViewModel, fontSize = 14.sp)
                     NowPlayingArtists(track, playerViewModel, 12.sp)
                 }
                 if (podcast.isPodcast) {

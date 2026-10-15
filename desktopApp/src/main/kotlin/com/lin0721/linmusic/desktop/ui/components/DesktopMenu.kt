@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,8 +89,11 @@ class MenuScope internal constructor() {
     internal var subMaxHeightPx by mutableIntStateOf(Int.MAX_VALUE)
     internal var mainHeightPx = 0
 
-    // 组合阶段登记，供定位弹层预留宽度
-    internal var subWidth: Dp = 0.dp
+    // 组合阶段登记，供定位弹层与左侧预留位计算宽度；只在布局阶段读取
+    internal var subWidth by mutableStateOf(0.dp)
+
+    // 主菜单靠右对齐锚点时，二级菜单改在主菜单左侧展开
+    internal var subOnLeft by mutableStateOf(false)
 }
 
 // 统一的紧凑菜单：34dp 行高、16dp 图标；二级菜单与主菜单同属一个弹层，悬停条目时在右侧展开
@@ -119,13 +123,27 @@ fun DesktopMenu(
             horizontalArrangement = Arrangement.spacedBy(PanelGap),
             verticalAlignment = Alignment.Top
         ) {
-            Column(Modifier.onSizeChanged { scope.mainHeightPx = it.height }.menuPanel(width)) { scope.content() }
-            scope.activeSub?.let { slot ->
-                val maxHeight = if (scope.subMaxHeightPx == Int.MAX_VALUE) Dp.Infinity else with(density) { scope.subMaxHeightPx.toDp() }
-                CompositionLocalProvider(LocalSubMenuMaxHeight provides maxHeight) {
-                    Column(Modifier.menuPanel(slot.width)) { slot.content.value() }
+            val subPanel: @Composable () -> Unit = {
+                scope.activeSub?.let { slot ->
+                    val maxHeight = if (scope.subMaxHeightPx == Int.MAX_VALUE) Dp.Infinity else with(density) { scope.subMaxHeightPx.toDp() }
+                    CompositionLocalProvider(LocalSubMenuMaxHeight provides maxHeight) {
+                        Column(Modifier.menuPanel(slot.width)) { slot.content.value() }
+                    }
                 }
             }
+            // 左侧预留位始终占住二级菜单的宽度，主菜单位置不随二级菜单展开收起而移动
+            if (scope.subOnLeft) {
+                Box(
+                    Modifier.layout { measurable, constraints ->
+                        val reserved = scope.subWidth.roundToPx()
+                        val placeable = measurable.measure(constraints.copy(minWidth = reserved, maxWidth = reserved))
+                        layout(reserved, placeable.height) { placeable.place(0, 0) }
+                    },
+                    contentAlignment = Alignment.TopEnd
+                ) { subPanel() }
+            }
+            Column(Modifier.onSizeChanged { scope.mainHeightPx = it.height }.menuPanel(width)) { scope.content() }
+            if (!scope.subOnLeft) subPanel()
         }
     }
 }
@@ -157,18 +175,25 @@ private class MenuPositionProvider(
             val margin = PanelShadowMargin.roundToPx()
             val hasSub = scope.subWidth > 0.dp
             val subExtra = if (hasSub) (PanelGap + scope.subWidth).roundToPx() else 0
-            val panelWidth = maxOf(popupContentSize.width - 2 * margin, menuWidth.roundToPx() + subExtra)
+            val mainWidth = menuWidth.roundToPx()
             val panelHeight = if (scope.mainHeightPx > 0) scope.mainHeightPx else popupContentSize.height - 2 * margin
             val offsetX = offset.x.roundToPx()
             val offsetY = offset.y.roundToPx()
             val verticalMargin = ScreenMargin.roundToPx()
 
-            val horizontal = listOf(
-                anchorBounds.left + offsetX,
-                anchorBounds.right - panelWidth - offsetX,
-                windowSize.width - panelWidth
-            )
-            val x = horizontal.firstOrNull { it >= 0 && it + panelWidth <= windowSize.width } ?: horizontal.last()
+            // 优先与锚点左缘对齐、二级菜单在右；放不下则与锚点右缘对齐、二级菜单在左
+            val leftAligned = anchorBounds.left + offsetX
+            val rightAligned = anchorBounds.right - mainWidth - offsetX
+            var subOnLeft = false
+            val x = when {
+                leftAligned >= 0 && leftAligned + mainWidth + subExtra <= windowSize.width -> leftAligned
+                rightAligned - subExtra >= 0 && rightAligned + mainWidth <= windowSize.width -> {
+                    subOnLeft = hasSub
+                    rightAligned
+                }
+                else -> (windowSize.width - mainWidth - subExtra).coerceAtLeast(0)
+            }
+            if (scope.subOnLeft != subOnLeft) scope.subOnLeft = subOnLeft
             // offset.y 为负是锚点内的点击位置，向上翻转时底边贴着该点，否则贴着锚点上沿
             val flippedBottom = if (offsetY < 0) anchorBounds.bottom + offsetY else anchorBounds.top
             val vertical = listOf(
@@ -179,7 +204,7 @@ private class MenuPositionProvider(
             val y = vertical.firstOrNull { it >= verticalMargin && it + panelHeight <= windowSize.height - verticalMargin }
                 ?: vertical[1].coerceAtLeast(verticalMargin)
             if (hasSub) scope.subMaxHeightPx = windowSize.height - y - verticalMargin
-            IntOffset(x - margin, y - margin)
+            IntOffset(x - margin - if (subOnLeft) subExtra else 0, y - margin)
         }
         lockedKey = key
         lockedPosition = position
