@@ -156,13 +156,17 @@ fun WindowScope.TitleBar(
 ) {
     Box(Modifier.fillMaxWidth().height(DesktopDimens.TitleBarHeight)) {
         // 整条标题栏作拖动区，按钮叠在上层自行消费点击；
-        // 双击取 AWT 自带的 clickCount 判断，不消费事件，避免手势检测吞掉紧随其后的拖动
-        WindowDraggableArea(
-            Modifier.fillMaxSize().onPointerEvent(PointerEventType.Press) { event ->
-                if (event.awtEventOrNull?.clickCount == 2) onToggleMaximize()
+        // 双击取 AWT 自带的 clickCount 判断，不消费事件；
+        // 须在松开时切换：按下时切换会被拖动逻辑按旧位置把窗口挪回去，最大化时也不启用拖动
+        val doubleClickToggle = Modifier.fillMaxSize().onPointerEvent(PointerEventType.Release) { event ->
+            if (event.awtEventOrNull?.clickCount == 2) onToggleMaximize()
+        }
+        if (isMaximized) {
+            Box(doubleClickToggle)
+        } else {
+            WindowDraggableArea(doubleClickToggle) {
+                Box(Modifier.fillMaxSize())
             }
-        ) {
-            Box(Modifier.fillMaxSize())
         }
         Row(
             Modifier.align(Alignment.CenterStart).padding(start = 12.dp),

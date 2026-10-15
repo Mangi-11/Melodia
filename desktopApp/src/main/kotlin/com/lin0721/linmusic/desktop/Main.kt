@@ -57,6 +57,7 @@ import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
+import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
 import com.lin0721.linmusic.desktop.ui.shell.WindowChromeEffect
 import com.lin0721.linmusic.desktop.ui.shell.rememberFullscreenState
@@ -340,6 +341,7 @@ fun main() {
             }
             // 全屏与最大化一样不要圆角和边框线
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
+            CanvasClearColorEffect()
             MelodiaDesktopTheme(uiScale = uiScaleFactor) {
                 MelodiaDesktopApp(
                     deps = appDependencies,
