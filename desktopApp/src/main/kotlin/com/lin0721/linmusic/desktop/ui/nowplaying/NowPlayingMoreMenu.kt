@@ -1,6 +1,11 @@
 package com.lin0721.linmusic.desktop.ui.nowplaying
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -19,14 +24,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.model.Album
 import com.lin0721.linmusic.core.model.Artist
+import com.lin0721.linmusic.core.model.DOWNLOAD_QUALITY_LEVELS
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.model.getQualityDisplayName
+import com.lin0721.linmusic.core.model.qualityRank
 import com.lin0721.linmusic.core.player.NowPlaying
+import com.lin0721.linmusic.core.player.MAX_SLEEP_TIMER_MINUTES
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.PlaybackController.Companion.CONTEXT_INTELLIGENCE
 import com.lin0721.linmusic.core.player.SimilarRoamingController
@@ -37,6 +54,7 @@ import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
 import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
+import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.track.CollectSubmenuContent
@@ -47,6 +65,7 @@ import kotlinx.coroutines.launch
 private val SleepTimerOptions = listOf(15, 30, 60, 90)
 private val QualityKeys = listOf("standard", "exhigh", "lossless", "hires", "jymaster")
 private val MoreMenuWidth = 220.dp
+private val CustomInputHeight = 36.dp
 
 // 与移动端播放页「更多」面板对齐；桌面没有系统分享，分享落成复制歌曲链接
 @Composable
@@ -166,18 +185,28 @@ internal fun NowPlayingMoreMenu(
                 val ok = copyTextToClipboard("https://music.163.com/song?id=$cloudSongId")
                 navigator.showMessage(if (ok) "已复制链接" else "复制失败")
             })
-            MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
-                onDismiss()
-                scope.launch {
-                    val target = playerViewModel.resolveSongDetail(cloudSongId) ?: Track(
-                        id = cloudSongId,
-                        name = track.title,
-                        ar = listOf(Artist(name = track.artist)),
-                        al = Album(picUrl = track.artworkUri.orEmpty())
+            // 账号权限未知时不限制，超出可下载上限的档位置灰
+            val maxDownloadRank = qualityRank(detail?.privilege?.dlLevel).takeIf { it >= 0 }
+            SubMenuItem("下载", icon = Icons.Rounded.Download) {
+                DOWNLOAD_QUALITY_LEVELS.forEach { level ->
+                    SimpleMenuItem(
+                        getQualityDisplayName(level),
+                        enabled = maxDownloadRank == null || qualityRank(level) <= maxDownloadRank,
+                        onClick = {
+                            onDismiss()
+                            scope.launch {
+                                val target = playerViewModel.resolveSongDetail(cloudSongId) ?: Track(
+                                    id = cloudSongId,
+                                    name = track.title,
+                                    ar = listOf(Artist(name = track.artist)),
+                                    al = Album(picUrl = track.artworkUri.orEmpty())
+                                )
+                                navigator.downloadTrackAt(target, level)
+                            }
+                        }
                     )
-                    navigator.downloadTrack(target)
                 }
-            })
+            }
             SubMenuItem("音质: ${getQualityDisplayName(currentQuality)}", icon = Icons.Rounded.Tune) {
                 QualityKeys.forEach { key ->
                     val selected = key == currentQuality
@@ -213,6 +242,47 @@ internal fun NowPlayingMoreMenu(
                     playerViewModel.setSleepTimer(0)
                 })
             }
+            MenuDivider()
+            CustomSleepTimerInput { minutes ->
+                onDismiss()
+                playerViewModel.setSleepTimer(minutes)
+            }
         }
+    }
+}
+
+// 自定义分钟数：只收数字，回车确认，超过上限按上限算
+@Composable
+private fun CustomSleepTimerInput(onConfirm: (Int) -> Unit) {
+    var input by remember { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+    Box(
+        Modifier.fillMaxWidth().height(CustomInputHeight).clip(RoundedCornerShape(6.dp))
+            .background(DesktopColors.SurfaceLight.copy(alpha = 0.6f))
+    ) {
+        LibrarySearchInput(
+            query = input,
+            startPadding = 10.dp,
+            showClear = input.isNotEmpty(),
+            onQueryChange = {
+                input = it.filter(Char::isDigit).take(MAX_SLEEP_TIMER_MINUTES.toString().length)
+                invalid = false
+            },
+            onClear = {
+                input = ""
+                invalid = false
+            },
+            placeholder = if (invalid) "请输入 1-$MAX_SLEEP_TIMER_MINUTES" else "自定义分钟数",
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                val isEnter = event.key == Key.Enter || event.key == Key.NumPadEnter
+                if (event.type == KeyEventType.KeyDown && isEnter) {
+                    val minutes = input.toIntOrNull()?.takeIf { it > 0 }
+                    if (minutes == null) invalid = true else onConfirm(minOf(minutes, MAX_SLEEP_TIMER_MINUTES))
+                    true
+                } else {
+                    false
+                }
+            }
+        )
     }
 }

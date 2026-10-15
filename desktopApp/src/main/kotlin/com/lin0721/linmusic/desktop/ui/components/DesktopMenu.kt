@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import kotlin.math.roundToInt
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.track.DangerColor
 
@@ -88,6 +91,10 @@ class MenuScope internal constructor() {
     internal var activeSub by mutableStateOf<SubMenuSlot?>(null)
     internal var subMaxHeightPx by mutableIntStateOf(Int.MAX_VALUE)
     internal var mainHeightPx = 0
+
+    // 主菜单顶边的窗口坐标，与悬停条目的窗口坐标相减得到二级菜单的垂直偏移
+    internal var mainTopPx = 0f
+    internal var subTopOffsetPx by mutableIntStateOf(0)
 
     // 组合阶段登记，供定位弹层与左侧预留位计算宽度；只在布局阶段读取
     internal var subWidth by mutableStateOf(0.dp)
@@ -127,7 +134,17 @@ fun DesktopMenu(
                 scope.activeSub?.let { slot ->
                     val maxHeight = if (scope.subMaxHeightPx == Int.MAX_VALUE) Dp.Infinity else with(density) { scope.subMaxHeightPx.toDp() }
                     CompositionLocalProvider(LocalSubMenuMaxHeight provides maxHeight) {
-                        Column(Modifier.menuPanel(slot.width)) { slot.content.value() }
+                        // 顶边对齐触发条目，放不下时整体上移到窗口可用范围内
+                        Box(
+                            Modifier.layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                                val maxY = (scope.subMaxHeightPx - placeable.height).coerceAtLeast(0)
+                                val y = scope.subTopOffsetPx.coerceIn(0, maxY)
+                                layout(placeable.width, y + placeable.height) { placeable.place(0, y) }
+                            }
+                        ) {
+                            Column(Modifier.menuPanel(slot.width)) { slot.content.value() }
+                        }
                     }
                 }
             }
@@ -142,7 +159,11 @@ fun DesktopMenu(
                     contentAlignment = Alignment.TopEnd
                 ) { subPanel() }
             }
-            Column(Modifier.onSizeChanged { scope.mainHeightPx = it.height }.menuPanel(width)) { scope.content() }
+            Column(
+                Modifier.onSizeChanged { scope.mainHeightPx = it.height }
+                    .onGloballyPositioned { scope.mainTopPx = it.positionInWindow().y }
+                    .menuPanel(width)
+            ) { scope.content() }
             if (!scope.subOnLeft) subPanel()
         }
     }
@@ -242,8 +263,12 @@ fun MenuScope.SubMenuItem(
     if (width > subWidth) subWidth = width
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
+    val itemTop = remember { FloatArray(1) }
+    val panelPaddingPx = with(LocalDensity.current) { PanelVerticalPadding.toPx() }
     val open = {
         if (activeSub !== slot) {
+            // 二级面板与主面板的上内边距相同，减去后两边的首个条目对齐
+            subTopOffsetPx = (itemTop[0] - mainTopPx - panelPaddingPx).roundToInt().coerceAtLeast(0)
             activeSub = slot
             onOpen()
         }
@@ -257,7 +282,7 @@ fun MenuScope.SubMenuItem(
         highlighted = hovered || activeSub === slot,
         source = source,
         onClick = open,
-        modifier = modifier,
+        modifier = modifier.onGloballyPositioned { itemTop[0] = it.positionInWindow().y },
         trailing = {
             Icon(Icons.Rounded.ChevronRight, null, tint = DesktopColors.TextGray, modifier = Modifier.size(16.dp))
         }
