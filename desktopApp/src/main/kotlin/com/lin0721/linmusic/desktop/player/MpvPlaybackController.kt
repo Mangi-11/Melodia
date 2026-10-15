@@ -15,6 +15,8 @@ import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.SleepTimer
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.desktop.data.CacheLimits
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.desktop.player.mpv.MpvEngine
@@ -73,7 +75,8 @@ class MpvPlaybackController(
     private val scope: CoroutineScope,
     // 仅测试用
     engineOptions: Map<String, String> = emptyMap(),
-    private val audioCache: AudioCache? = null
+    private val audioCache: AudioCache? = null,
+    private val cacheManager: DesktopCacheManager? = null
 ) : DesktopPlaybackController, MpvEngine.Listener {
 
     private val playbackQueue = PlaybackQueue()
@@ -558,16 +561,14 @@ class MpvPlaybackController(
         return resolvePlayback(item.songId)
     }
 
-    // 已下载 > 缓存命中 > 联网；联网失败退回任意音质缓存
-    // 缓存命中不受开关影响，开关只管是否录制
+    // 已下载 > 缓存命中 > 联网（同时录制缓存）；联网失败退回任意音质缓存
     private suspend fun resolvePlayback(songId: Long): Result<Playback> {
         localAudioOf(songId)?.let { return Result.success(Playback(it, null)) }
         val level = settingsPreferences.wifiQuality.first()
         audioCache?.completeFile(songId, level)?.let { return Result.success(Playback(it.absolutePath, null)) }
         return repository.getSongUrl(songId).first().fold(
             onSuccess = { url ->
-                val record = audioCache?.takeIf { settingsPreferences.streamCacheEnabled.first() }
-                    ?.let { RecordRequest(songId, it.tempFile(songId, level).absolutePath) }
+                val record = audioCache?.let { RecordRequest(songId, it.tempFile(songId, level).absolutePath) }
                 Result.success(Playback(url, record))
             },
             onFailure = { error ->
@@ -581,7 +582,7 @@ class MpvPlaybackController(
     private fun commitRecording(songId: Long, path: String) {
         val cache = audioCache ?: return
         scope.launch(Dispatchers.IO) {
-            if (cache.commit(File(path), settingsPreferences.audioCacheMaxSize.first())) {
+            if (cache.commit(File(path))) {
                 AppLogger.i(TAG, "已缓存 songId=$songId")
             }
         }
@@ -621,6 +622,7 @@ class MpvPlaybackController(
     // 到点时下一首仍是计划中的才交接，否则走常规切歌
     private fun startCrossfade() {
         val plan = crossfadePlan ?: return
+                cacheManager?.enforce(CacheLimits.normalize(settingsPreferences.audioCacheMaxSize.first()))
         crossfadePlan = null
         val stillNext = nextIndex(fromUser = false) == plan.index &&
             playbackQueue.itemAt(plan.index)?.songId == plan.songId

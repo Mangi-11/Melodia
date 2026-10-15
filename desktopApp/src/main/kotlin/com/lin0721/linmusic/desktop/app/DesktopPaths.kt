@@ -21,6 +21,8 @@ object DesktopPaths {
     val audioCacheDir: File by lazy { File(localCacheDir, "audio_cache") }
     val metadataCacheDir: File by lazy { File(localCacheDir, "meta_cache") }
 
+    val lyricsCacheDir: File by lazy { File(localCacheDir, "lyrics") }
+
     val downloadTempDir: File by lazy { File(localCacheDir, "download_tmp") }
 
     val defaultDownloadDir: File by lazy { File(File(System.getProperty("user.home"), "Music"), "Melodia") }

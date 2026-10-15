@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
@@ -86,9 +87,6 @@ import java.io.File
 import kotlin.math.roundToInt
 import javax.swing.JFileChooser
 import java.awt.event.KeyEvent as AwtKeyEvent
-
-// 与 Android 音质设置保持同一组选项
-private val CacheSizeOptions = listOf(500L, 1024L, 2048L, 5120L, 10240L).map { it * 1024 * 1024 }
 
 private val CrossfadeDurationOptionsMs = listOf(1_000, 2_000, 3_000, 4_000, 6_000, 8_000, 10_000, 12_000)
 
@@ -123,10 +121,8 @@ fun SettingsPage(
     val showDesktopLyric by common.showDesktopLrc.collectAsState()
     val logLevelName by common.logLevel.collectAsState()
     val logBytes by desktop.logBytes.collectAsState()
-    val streamCacheEnabled by common.streamCacheEnabled.collectAsState()
     val cacheMaxSize by common.audioCacheMaxSize.collectAsState()
-    val cacheUsedBytes by desktop.audioCacheBytes.collectAsState()
-    val imageCacheBytes by desktop.imageCacheBytes.collectAsState()
+    val cacheUsage by desktop.cacheUsage.collectAsState()
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
@@ -217,22 +213,18 @@ fun SettingsPage(
             }
 
             SettingsCard("缓存") {
-                SettingRow("边听边存", subtitle = "在线播放完整听完的歌曲保存到本地，下次直接播放，离线时也可播放") {
-                    SettingSwitch(streamCacheEnabled, onChange = common::updateStreamCacheEnabled)
-                }
-                SettingRow("缓存容量上限") {
-                    CacheSizeSelector(cacheMaxSize) { size ->
+                SettingRow("缓存容量上限", subtitle = "歌曲、图片、歌词与离线数据合计，超出后淘汰最久未使用的缓存") {
+                    CacheSizeSelector(CacheLimits.normalize(cacheMaxSize)) { size ->
                         common.updateAudioCacheMaxSize(size)
-                        desktop.trimAudioCache(size)
+                        desktop.enforceCacheLimit(size)
                     }
                 }
-                SettingRow("图片缓存", subtitle = "${formatFileSize(imageCacheBytes)} / ${formatFileSize(desktop.imageCacheMaxBytes)}") {
-                    TextButton(onClick = desktop::clearImageCache) {
-                        Text("清除图片缓存", color = DesktopColors.Accent)
-                    }
-                }
-                SettingRow("已用空间", subtitle = formatFileSize(cacheUsedBytes)) {
-                    TextButton(onClick = desktop::clearAudioCache) {
+                SettingRow(
+                    "已用空间",
+                    subtitle = "${formatFileSize(cacheUsage.total)}（歌曲 ${formatFileSize(cacheUsage.audio)} · 图片 ${formatFileSize(cacheUsage.image)} · " +
+                        "歌词 ${formatFileSize(cacheUsage.lyrics)} · 离线数据 ${formatFileSize(cacheUsage.metadata)}）"
+                ) {
+                    TextButton(onClick = desktop::clearCaches) {
                         Text("清除缓存", color = DesktopColors.Accent)
                     }
                 }
@@ -459,18 +451,21 @@ private fun openDirectory(dir: File): Boolean = try {
     false
 }
 
+private fun cacheLimitLabel(bytes: Long): String =
+    if (bytes == CacheLimits.UNLIMITED) "无限制" else formatFileSize(bytes)
+
 @Composable
 private fun CacheSizeSelector(currentBytes: Long, onSelect: (Long) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { expanded = true }) {
-            Text(formatFileSize(currentBytes), color = DesktopColors.TextPrimary)
+            Text(cacheLimitLabel(currentBytes), color = DesktopColors.TextPrimary)
             Icon(Icons.Rounded.ArrowDropDown, null, tint = DesktopColors.TextGray)
         }
         DesktopMenu(expanded = expanded, onDismiss = { expanded = false }, width = 168.dp) {
-            CacheSizeOptions.forEach { value ->
+            CacheLimits.options.forEach { value ->
                 SimpleMenuItem(
-                    text = formatFileSize(value),
+                    text = cacheLimitLabel(value),
                     trailing = if (value == currentBytes) {
                         { Icon(Icons.Rounded.Check, null, tint = DesktopColors.Accent, modifier = Modifier.size(16.dp)) }
                     } else {

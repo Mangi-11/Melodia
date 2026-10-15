@@ -1,8 +1,10 @@
 package com.lin0721.linmusic.desktop.ui.settings
 
 import com.lin0721.linmusic.core.player.PlaybackController
+import com.lin0721.linmusic.core.player.data.LyricsCache
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.desktop.data.CloseAction
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
@@ -81,8 +83,6 @@ class DesktopSettingsViewModelTest {
     private var logBytes = 40L
 
     private val storage = LocalStorageOps(
-        imageCacheSize = { imageBytes },
-        clearImageCache = { imageBytes = 0L },
         logsSize = { logBytes },
         clearLogs = { logBytes = 0L }
     )
@@ -106,7 +106,14 @@ class DesktopSettingsViewModelTest {
         hotkeys = hotkeys,
         mediaSession = FakeMediaSession(),
         autoStart = autoStart,
-        audioCache = AudioCache(cacheDir),
+        cacheManager = DesktopCacheManager(
+            audioCache = AudioCache(cacheDir),
+            lyricsCache = LyricsCache(File(dir, "cache")),
+            lyricsDir = File(dir, "cache/lyrics"),
+            metadataDir = File(dir, "meta"),
+            imageCacheSize = { imageBytes },
+            clearImageCache = { imageBytes = 0L }
+        ),
         storage = storage,
         ioDispatcher = UnconfinedTestDispatcher()
     )
@@ -135,20 +142,22 @@ class DesktopSettingsViewModelTest {
         vm.refresh()
 
         assertEquals(true, vm.autoStartEnabled.value)
-        assertEquals(100L, vm.audioCacheBytes.value)
-        assertEquals(300L, vm.imageCacheBytes.value)
+        assertEquals(100L, vm.cacheUsage.value.audio)
+        assertEquals(300L, vm.cacheUsage.value.image)
         assertEquals(40L, vm.logBytes.value)
     }
 
     @Test
-    fun trimAudioCacheEvictsOldestAndRefreshesSize() {
+    fun enforceCacheLimitEvictsOldestAndRefreshesUsage() {
         cacheFile(1, 100, 1_000_000L)
         cacheFile(2, 100, 2_000_000L)
         val vm = viewModel()
 
-        vm.trimAudioCache(150L)
+        // 音频 200 + 图片 300 = 500，超出 450 后淘汰最旧的一首
+        vm.enforceCacheLimit(450L)
 
-        assertEquals(100L, vm.audioCacheBytes.value)
+        assertEquals(100L, vm.cacheUsage.value.audio)
+        assertEquals(400L, vm.cacheUsage.value.total)
         assertFalse(File(cacheDir, "1_standard.mka").exists())
         assertTrue(File(cacheDir, "2_standard.mka").exists())
     }
@@ -159,12 +168,11 @@ class DesktopSettingsViewModelTest {
         val vm = viewModel()
         vm.refresh()
 
-        vm.clearAudioCache()
-        vm.clearImageCache()
+        vm.clearCaches()
         vm.clearLogs()
 
-        assertEquals(0L, vm.audioCacheBytes.value)
-        assertEquals(0L, vm.imageCacheBytes.value)
+        assertEquals(0L, vm.cacheUsage.value.audio)
+        assertEquals(0L, vm.cacheUsage.value.image)
         assertEquals(0L, vm.logBytes.value)
     }
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
@@ -39,7 +40,9 @@ import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
 import com.lin0721.linmusic.desktop.app.SingleInstance
 import com.lin0721.linmusic.desktop.app.WindowBounds
 import com.lin0721.linmusic.desktop.app.currentScreenBounds
+import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopImageLoader
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.di.desktopAppDependencies
@@ -118,6 +121,14 @@ fun main() {
     // 进程内常驻记录播客收听进度
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     val settingsPreferences = koin.get<SettingsPreferences>()
+    // 旧缓存超出当前上限时，启动后在后台补一次淘汰
+    CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        try {
+            koin.get<DesktopCacheManager>().enforce(CacheLimits.normalize(settingsPreferences.audioCacheMaxSize.first()))
+        } catch (e: Exception) {
+            AppLogger.w("Main", "启动时淘汰缓存失败", e)
+        }
+    }
     val playerViewModel = koin.get<PlayerViewModel>()
     val appDependencies = koin.desktopAppDependencies()
     val desktopPreferences = koin.get<DesktopPreferences>()

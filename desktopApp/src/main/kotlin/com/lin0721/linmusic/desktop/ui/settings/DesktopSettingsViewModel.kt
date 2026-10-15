@@ -4,15 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.data.CacheUsage
 import com.lin0721.linmusic.desktop.data.CloseAction
-import com.lin0721.linmusic.desktop.data.DesktopImageLoader
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
-import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -28,10 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-// 图片缓存与日志由全局对象管理，抽成参数便于测试替换
+// 日志由全局对象管理，抽成参数便于测试替换
 class LocalStorageOps(
-    val imageCacheSize: () -> Long = DesktopImageLoader::diskCacheSize,
-    val clearImageCache: () -> Unit = DesktopImageLoader::clear,
     val logsSize: () -> Long = AppLogger::getLogsSize,
     val clearLogs: () -> Unit = { AppLogger.clearLogs() }
 )
@@ -42,7 +40,7 @@ class DesktopSettingsViewModel(
     private val hotkeys: GlobalHotkeyService,
     mediaSession: MediaSessionService,
     private val autoStart: AutoStartService,
-    private val audioCache: AudioCache,
+    private val cacheManager: DesktopCacheManager,
     private val storage: LocalStorageOps = LocalStorageOps(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
@@ -67,16 +65,12 @@ class DesktopSettingsViewModel(
     private val _autoStartEnabled = MutableStateFlow<Boolean?>(null)
     val autoStartEnabled: StateFlow<Boolean?> = _autoStartEnabled.asStateFlow()
 
-    private val _audioCacheBytes = MutableStateFlow(0L)
-    val audioCacheBytes: StateFlow<Long> = _audioCacheBytes.asStateFlow()
-
-    private val _imageCacheBytes = MutableStateFlow(0L)
-    val imageCacheBytes: StateFlow<Long> = _imageCacheBytes.asStateFlow()
+    private val _cacheUsage = MutableStateFlow(CacheUsage(0L, 0L, 0L, 0L))
+    val cacheUsage: StateFlow<CacheUsage> = _cacheUsage.asStateFlow()
 
     private val _logBytes = MutableStateFlow(0L)
     val logBytes: StateFlow<Long> = _logBytes.asStateFlow()
 
-    val imageCacheMaxBytes: Long = DesktopImageLoader.DISK_CACHE_MAX_BYTES
     val logDir: File = DesktopPaths.logDir
     val defaultDownloadDir: File = DesktopPaths.defaultDownloadDir
 
@@ -90,8 +84,7 @@ class DesktopSettingsViewModel(
         }
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                _audioCacheBytes.value = audioCache.totalSize()
-                _imageCacheBytes.value = storage.imageCacheSize()
+                _cacheUsage.value = cacheManager.usage()
                 _logBytes.value = storage.logsSize()
             }
         }
@@ -123,29 +116,20 @@ class DesktopSettingsViewModel(
     }
 
     // 容量上限调低后立即按新上限淘汰
-    fun trimAudioCache(maxBytes: Long) {
+    fun enforceCacheLimit(maxBytes: Long) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                audioCache.evict(maxBytes)
-                _audioCacheBytes.value = audioCache.totalSize()
+                cacheManager.enforce(maxBytes)
+                _cacheUsage.value = cacheManager.usage()
             }
         }
     }
 
-    fun clearAudioCache() {
+    fun clearCaches() {
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                audioCache.clear()
-                _audioCacheBytes.value = audioCache.totalSize()
-            }
-        }
-    }
-
-    fun clearImageCache() {
-        viewModelScope.launch {
-            withContext(ioDispatcher) {
-                storage.clearImageCache()
-                _imageCacheBytes.value = storage.imageCacheSize()
+                cacheManager.clear()
+                _cacheUsage.value = cacheManager.usage()
             }
         }
     }

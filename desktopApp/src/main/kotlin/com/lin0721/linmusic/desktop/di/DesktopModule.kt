@@ -27,6 +27,7 @@ import com.lin0721.linmusic.core.source.LxPluginRuntime
 import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopLibraryPreferences
 import com.lin0721.linmusic.desktop.data.DesktopOnlineStateProvider
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
@@ -83,13 +84,15 @@ private fun createPlaybackController(
     playbackPreferences: PlaybackPreferences,
     desktopPreferences: DesktopPreferences,
     downloadPreferences: DesktopDownloadPreferences,
-    audioCache: AudioCache
+    audioCache: AudioCache,
+    cacheManager: DesktopCacheManager
 ): DesktopPlaybackController = try {
     MpvPlaybackController(
         repository, settingsPreferences, playbackPreferences, desktopPreferences,
         localAudioOf = { songId -> downloadPreferences.findVerifiedRecord(songId)?.mediaStoreUri },
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
-        audioCache = audioCache
+        audioCache = audioCache,
+        cacheManager = cacheManager
     )
 } catch (e: LinkageError) {
     AppLogger.e(TAG, "libmpv 加载失败，播放不可用", e)
@@ -103,7 +106,7 @@ private fun store(name: String) = PreferencesStores.get(DesktopPaths.preferences
 
 val desktopPlatformModule = module {
     single { UserPreferences(store(PreferencesStores.USER)) }
-    single { SettingsPreferences(store(PreferencesStores.SETTINGS), streamCacheDefault = true) }
+    single { SettingsPreferences(store(PreferencesStores.SETTINGS)) }
     single { SourcePreferences(store(PreferencesStores.SOURCE)) }
     single { GraalLxPluginRuntime() } bind LxPluginRuntime::class
     single<AudioSourceProvider>(named("lx")) { LxAudioSourceProvider(get<LxPluginRuntime>(), get(), getAll<PlatformSearchProvider>()) }
@@ -125,6 +128,15 @@ val desktopPlatformModule = module {
     }
     single { DesktopDownloadPreferences(store(DesktopDownloadPreferences.STORE_NAME)) }
     single { AudioCache(DesktopPaths.audioCacheDir) }
+    single { LyricsCache(DesktopPaths.localCacheDir) }
+    single {
+        DesktopCacheManager(
+            audioCache = get(),
+            lyricsCache = get(),
+            lyricsDir = DesktopPaths.lyricsCacheDir,
+            metadataDir = DesktopPaths.metadataCacheDir
+        )
+    }
     single<CachedAudioIndex> {
         val downloadPreferences = get<DesktopDownloadPreferences>()
         val audioCache = get<AudioCache>()
@@ -144,9 +156,9 @@ val desktopPlatformModule = module {
         )
     }
     single<SongDownloader> { get<DesktopSongDownloader>() }
-    single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get()) }
+    single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get(), get()) }
     single<PlaybackController> { get<DesktopPlaybackController>() }
-    single { AmllLyricsClient(LyricsCache(DesktopPaths.localCacheDir)) }
+    single { AmllLyricsClient(get<LyricsCache>()) }
     // 桌面第一版没有本地音乐，只取在线歌词
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
