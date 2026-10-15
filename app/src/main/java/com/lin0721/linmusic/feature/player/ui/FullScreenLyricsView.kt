@@ -1,14 +1,25 @@
 package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,14 +28,20 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -35,9 +52,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.domain.LyricLine
+import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.saturateIfChromatic
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.hazeChild
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -283,37 +300,54 @@ fun FullScreenLyricsView(
             }
     ) {
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .hazeChild(state = hazeState, style = HazeStyle(blurRadius = 40.dp, noiseFactor = 0.02f))
-                .statusBarsPadding()
+        val vivid = remember(base) { base.saturateIfChromatic(0.6f) }
+        val scrimColor = remember(vivid) { vivid.darken(0.35f) }
+
+        var topContainerHeightPx by remember { mutableFloatStateOf(0f) }
+        var controlsContainerHeightPx by remember { mutableFloatStateOf(0f) }
+
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            AnimatedVisibility(
-                visible = areControlsVisible,
-                enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { -it / 3 },
-                exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
-                modifier = Modifier.pointerInput(fullScreenLyricAutoHideControls) {
-                    if (fullScreenLyricAutoHideControls) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                                scheduleAutoHide()
-                            }
-                        }
-                    }
-                }
-            ) {
-                FullScreenLyricsHeader(
-                    title = title,
-                    artist = artist,
-                    onClose = onClose,
-                    onMoreClick = onMoreClick,
-                    onDragDelta = { delta -> dragState.onHeaderDrag(delta) },
-                    onDragStart = { dragState.onHeaderDragStart() },
-                    onDragRelease = { velocity -> dragState.handleDragRelease(velocity = velocity) }
-                )
-            }
+            // 1. 歌词列表直接铺满全屏，上下边缘根据控件显隐状态自适应羽化
+            val featherDp = 38.dp
+            val featherPx = with(density) { featherDp.toPx() }
+            val statusBarHeightPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
+            val headerContentHeightDp = 56.dp
+            val headerContentHeightPx = with(density) { headerContentHeightDp.toPx() }
+            val totalTopSolidHeightPx = statusBarHeightPx + headerContentHeightPx
+            val defaultControlsContainerHeightPx = with(density) { 220.dp.toPx() }
+
+            val effectiveTopCutoffPx = totalTopSolidHeightPx
+            val effectiveControlsSolidHeightPx = if (controlsContainerHeightPx > featherPx) controlsContainerHeightPx - featherPx else defaultControlsContainerHeightPx
+
+            val isControlsShowing = areControlsVisible
+            val targetTopCutoffPx = if (isControlsShowing) effectiveTopCutoffPx else 0f
+            val targetTopFeatherPx = if (isControlsShowing) featherPx else with(density) { 60.dp.toPx() }
+
+            val targetBottomControlsHeightPx = if (areControlsVisible) effectiveControlsSolidHeightPx else 0f
+            val targetBottomFeatherPx = if (isControlsShowing) featherPx else with(density) { 80.dp.toPx() }
+
+            val animatedTopCutoffPx by animateFloatAsState(
+                targetValue = targetTopCutoffPx,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                label = "fs_top_cutoff"
+            )
+            val animatedTopFeatherPx by animateFloatAsState(
+                targetValue = targetTopFeatherPx,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                label = "fs_top_feather"
+            )
+            val animatedBottomControlsHeightPx by animateFloatAsState(
+                targetValue = targetBottomControlsHeightPx,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                label = "fs_bottom_controls_height"
+            )
+            val animatedBottomFeatherPx by animateFloatAsState(
+                targetValue = targetBottomFeatherPx,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                label = "fs_bottom_feather"
+            )
 
             FullScreenLyricsList(
                 lyrics = lyrics,
@@ -327,6 +361,55 @@ fun FullScreenLyricsView(
                 viewportHeightPx = dragState.viewportHeightPx,
                 onViewportHeightChange = { height -> dragState.onViewportHeightChange(height) },
                 gestureModifier = gestureModifier,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        if (size.height > 0f) {
+                            val topCutoffRatio = (animatedTopCutoffPx / size.height).coerceIn(0f, 0.4f)
+                            val topFeatherEndRatio = ((animatedTopCutoffPx + animatedTopFeatherPx) / size.height).coerceIn(topCutoffRatio, 0.5f)
+
+                            val bottomCutoffRatio = ((size.height - animatedBottomControlsHeightPx) / size.height).coerceIn(topFeatherEndRatio, 1f)
+                            val bottomFeatherStartRatio = ((size.height - animatedBottomControlsHeightPx - animatedBottomFeatherPx) / size.height).coerceIn(topFeatherEndRatio, bottomCutoffRatio)
+
+                            val topSpan = topFeatherEndRatio - topCutoffRatio
+                            val bottomSpan = bottomCutoffRatio - bottomFeatherStartRatio
+
+                            val stops = mutableListOf<Pair<Float, Color>>()
+                            stops.add(0.0f to Color.Transparent)
+                            if (topCutoffRatio > 0.001f) {
+                                stops.add(topCutoffRatio to Color.Transparent)
+                            }
+                            if (topSpan > 0.001f) {
+                                stops.add((topCutoffRatio + 0.12f * topSpan) to Color.Black.copy(alpha = 0.04f))
+                                stops.add((topCutoffRatio + 0.28f * topSpan) to Color.Black.copy(alpha = 0.18f))
+                                stops.add((topCutoffRatio + 0.46f * topSpan) to Color.Black.copy(alpha = 0.44f))
+                                stops.add((topCutoffRatio + 0.64f * topSpan) to Color.Black.copy(alpha = 0.70f))
+                                stops.add((topCutoffRatio + 0.80f * topSpan) to Color.Black.copy(alpha = 0.89f))
+                                stops.add((topCutoffRatio + 0.92f * topSpan) to Color.Black.copy(alpha = 0.97f))
+                            }
+                            stops.add(topFeatherEndRatio to Color.Black)
+                            stops.add(bottomFeatherStartRatio to Color.Black)
+                            if (bottomSpan > 0.001f) {
+                                stops.add((bottomFeatherStartRatio + 0.08f * bottomSpan) to Color.Black.copy(alpha = 0.97f))
+                                stops.add((bottomFeatherStartRatio + 0.20f * bottomSpan) to Color.Black.copy(alpha = 0.89f))
+                                stops.add((bottomFeatherStartRatio + 0.36f * bottomSpan) to Color.Black.copy(alpha = 0.70f))
+                                stops.add((bottomFeatherStartRatio + 0.54f * bottomSpan) to Color.Black.copy(alpha = 0.44f))
+                                stops.add((bottomFeatherStartRatio + 0.72f * bottomSpan) to Color.Black.copy(alpha = 0.18f))
+                                stops.add((bottomFeatherStartRatio + 0.88f * bottomSpan) to Color.Black.copy(alpha = 0.04f))
+                            }
+                            if (bottomCutoffRatio < 0.999f) {
+                                stops.add(bottomCutoffRatio to Color.Transparent)
+                            }
+                            stops.add(1.0f to Color.Transparent)
+
+                            drawRect(
+                                brush = Brush.verticalGradient(*stops.toTypedArray()),
+                                blendMode = BlendMode.DstIn
+                            )
+                        }
+                    },
                 fontSize = effectiveLyricTextSize,
                 alignment = fullScreenLyricAlignment,
                 secondaryMode = fullScreenLyricSecondaryMode,
@@ -349,39 +432,150 @@ fun FullScreenLyricsView(
                 }
             )
 
+            // 2. 顶部栏：悬浮在屏幕顶部，包含状态栏和标题栏；底层配有覆盖状态栏及标题栏的实色遮罩与下方非线性渐变羽化
             AnimatedVisibility(
                 visible = areControlsVisible,
-                enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 3 },
-                exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 3 },
-                modifier = Modifier.pointerInput(fullScreenLyricAutoHideControls) {
-                    if (fullScreenLyricAutoHideControls) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                                scheduleAutoHide()
+                enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
+                exit = fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { size ->
+                            if (size.height > 0) topContainerHeightPx = size.height.toFloat()
+                        }
+                ) {
+                    // 底层遮罩：文字及状态栏背后实色全覆盖，文字下方羽化过渡渐隐至透明
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(topStart = topCornerRadius, topEnd = topCornerRadius))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(scrimColor)
+                                .statusBarsPadding()
+                                .height(headerContentHeightDp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(featherDp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.00f to scrimColor,
+                                        0.12f to scrimColor.copy(alpha = 0.96f),
+                                        0.28f to scrimColor.copy(alpha = 0.84f),
+                                        0.46f to scrimColor.copy(alpha = 0.65f),
+                                        0.64f to scrimColor.copy(alpha = 0.42f),
+                                        0.80f to scrimColor.copy(alpha = 0.20f),
+                                        0.92f to scrimColor.copy(alpha = 0.06f),
+                                        1.00f to Color.Transparent
+                                    )
+                                )
+                        )
+                    }
+
+                    // 顶层标题栏内容：状态栏内边距 + 56dp 标题栏
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .height(headerContentHeightDp)
+                    ) {
+                        FullScreenLyricsHeader(
+                            title = title,
+                            artist = artist,
+                            onClose = onClose,
+                            onMoreClick = onMoreClick,
+                            onDragDelta = { delta -> dragState.onHeaderDrag(delta) },
+                            onDragStart = { dragState.onHeaderDragStart() },
+                            onDragRelease = { velocity -> dragState.handleDragRelease(velocity = velocity) }
+                        )
+                    }
+                }
+            }
+
+            // 3. 底部播放控制条：悬浮于歌词区底部，底层配有上方非线性渐变羽化+控件区实色遮罩
+            AnimatedVisibility(
+                visible = areControlsVisible,
+                enter = fadeIn(tween(240)) + slideInVertically(tween(240)) { it },
+                exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .pointerInput(fullScreenLyricAutoHideControls) {
+                        if (fullScreenLyricAutoHideControls) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent()
+                                    scheduleAutoHide()
+                                }
                             }
                         }
                     }
-                }
             ) {
-                FullScreenControls(
-                    isPlaying = isPlaying,
-                    currentPositionProvider = currentPositionProvider,
-                    duration = duration,
-                    onSeek = handleSeek,
-                    onTogglePlay = onTogglePlay,
-                    onPlayNext = onPlayNext,
-                    onPlayPrevious = onPlayPrevious,
-                    playMode = playMode,
-                    onToggleShuffle = onToggleShuffle,
-                    onToggleRepeat = onToggleRepeat,
-                    secondaryMode = fullScreenLyricSecondaryMode,
-                    hasTranslation = hasTranslation,
-                    hasRoma = hasRoma,
-                    onToggleSecondaryMode = handleToggleSecondaryMode,
-                    onShareLyrics = handleShareLyrics,
-                    onLyricsSettingsClick = { showSettingsSheet = true }
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { size ->
+                            if (size.height > 0) controlsContainerHeightPx = size.height.toFloat()
+                        }
+                ) {
+                    // 底层遮罩背景：顶部非线性羽化渐变，下方控件区域实色全覆盖杜绝透字
+                    Column(modifier = Modifier.matchParentSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(featherDp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.00f to Color.Transparent,
+                                        0.08f to scrimColor.copy(alpha = 0.06f),
+                                        0.20f to scrimColor.copy(alpha = 0.20f),
+                                        0.36f to scrimColor.copy(alpha = 0.42f),
+                                        0.54f to scrimColor.copy(alpha = 0.65f),
+                                        0.72f to scrimColor.copy(alpha = 0.84f),
+                                        0.88f to scrimColor.copy(alpha = 0.96f),
+                                        1.00f to scrimColor
+                                    )
+                                )
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .background(scrimColor)
+                        )
+                    }
+
+                    // 顶层播放控制控件：预留顶部 featherDp 与遮罩羽化过渡区贴合
+                    FullScreenControls(
+                        isPlaying = isPlaying,
+                        currentPositionProvider = currentPositionProvider,
+                        duration = duration,
+                        onSeek = handleSeek,
+                        onTogglePlay = onTogglePlay,
+                        onPlayNext = onPlayNext,
+                        onPlayPrevious = onPlayPrevious,
+                        playMode = playMode,
+                        onToggleShuffle = onToggleShuffle,
+                        onToggleRepeat = onToggleRepeat,
+                        secondaryMode = fullScreenLyricSecondaryMode,
+                        hasTranslation = hasTranslation,
+                        hasRoma = hasRoma,
+                        onToggleSecondaryMode = handleToggleSecondaryMode,
+                        onShareLyrics = handleShareLyrics,
+                        onLyricsSettingsClick = { showSettingsSheet = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = featherDp)
+                    )
+                }
             }
         }
 
