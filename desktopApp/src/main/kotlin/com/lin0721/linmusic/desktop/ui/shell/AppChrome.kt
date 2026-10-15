@@ -99,11 +99,13 @@ internal fun AppPlayerBar(
     val controller = deps.playbackController
     val lyricsView = state.lyricsView
     val volume = controller.volume.collectAsState().value.takeIf { audioOutput != null }
+    val lastAudibleVolume by controller.lastAudibleVolume.collectAsState()
     val showDesktopLyric by deps.settingsPreferences.showDesktopLrc.collectAsState(initial = false)
     PlayerBar(
         controller = controller,
         playerViewModel = deps.playerViewModel,
         volume = volume,
+        lastAudibleVolume = lastAudibleVolume,
         onVolumeChange = controller::setVolume,
         nowPlayingOpen = state.dockOpen && state.dockOverlay == null,
         onToggleNowPlaying = state::toggleNowPlaying,

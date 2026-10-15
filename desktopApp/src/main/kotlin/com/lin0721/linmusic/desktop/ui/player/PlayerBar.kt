@@ -37,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,6 +87,7 @@ fun PlayerBar(
     controller: PlaybackController,
     playerViewModel: PlayerViewModel,
     volume: Int?,
+    lastAudibleVolume: Int,
     onVolumeChange: (Int) -> Unit,
     nowPlayingOpen: Boolean,
     onToggleNowPlaying: () -> Unit,
@@ -257,7 +257,7 @@ fun PlayerBar(
                 onClick = onToggleDevices
             )
             // 占位播放器没有音量能力时不显示
-            if (volume != null) VolumeControl(volume, onVolumeChange)
+            if (volume != null) VolumeControl(volume, lastAudibleVolume, onVolumeChange)
             BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = notSupported)
             BarIconButton(
                 if (isFullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
@@ -271,16 +271,8 @@ fun PlayerBar(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun VolumeControl(volume: Int, onVolumeChange: (Int) -> Unit) {
-    // 静音前的音量，再点一次恢复
-    var lastAudible by remember { mutableStateOf(if (volume > 0) volume else 100) }
+private fun VolumeControl(volume: Int, lastAudible: Int, onVolumeChange: (Int) -> Unit) {
     var scrollDeltaAccumulator by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(volume) {
-        if (volume > 0) {
-            lastAudible = volume
-        }
-    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -319,7 +311,6 @@ private fun VolumeControl(volume: Int, onVolumeChange: (Int) -> Unit) {
             size = SideButtonSize, iconSize = SideIconSize,
             onClick = {
                 if (volume > 0) {
-                    lastAudible = volume
                     onVolumeChange(0)
                 } else {
                     onVolumeChange(lastAudible)
