@@ -13,6 +13,7 @@ import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -127,10 +128,14 @@ class DesktopSettingsViewModel(
 
     fun clearCaches() {
         viewModelScope.launch {
-            withContext(ioDispatcher) {
+            val freed = withContext(ioDispatcher) {
+                val before = cacheManager.usage().total
                 cacheManager.clear()
-                _cacheUsage.value = cacheManager.usage()
+                val after = cacheManager.usage()
+                _cacheUsage.value = after
+                before - after.total
             }
+            _messages.tryEmit(if (freed > 0) "已清除缓存，释放 ${formatFileSize(freed)}" else "没有可清除的缓存")
         }
     }
 

@@ -123,6 +123,7 @@ fun SettingsPage(
     val logBytes by desktop.logBytes.collectAsState()
     val cacheMaxSize by common.audioCacheMaxSize.collectAsState()
     val cacheUsage by desktop.cacheUsage.collectAsState()
+    var confirmClearCache by remember { mutableStateOf(false) }
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
@@ -224,10 +225,19 @@ fun SettingsPage(
                     subtitle = "${formatFileSize(cacheUsage.total)}（歌曲 ${formatFileSize(cacheUsage.audio)} · 图片 ${formatFileSize(cacheUsage.image)} · " +
                         "歌词 ${formatFileSize(cacheUsage.lyrics)} · 离线数据 ${formatFileSize(cacheUsage.metadata)}）"
                 ) {
-                    TextButton(onClick = desktop::clearCaches) {
+                    TextButton(onClick = { confirmClearCache = true }) {
                         Text("清除缓存", color = DesktopColors.Accent)
                     }
                 }
+            }
+            if (confirmClearCache) {
+                ClearCacheDialog(
+                    onConfirm = {
+                        confirmClearCache = false
+                        desktop.clearCaches()
+                    },
+                    onDismiss = { confirmClearCache = false }
+                )
             }
 
             SettingsCard("下载") {
@@ -449,6 +459,25 @@ private fun openDirectory(dir: File): Boolean = try {
     }
 } catch (_: Exception) {
     false
+}
+
+@Composable
+private fun ClearCacheDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    DesktopDialog(
+        title = "清除缓存",
+        onDismiss = onDismiss,
+        width = 340.dp,
+        actions = {
+            DialogButton("取消", onDismiss)
+            DialogButton("清除", onConfirm, danger = true)
+        }
+    ) {
+        Text(
+            "将清除已缓存的歌曲、图片和歌词，离线数据会保留。已缓存的歌曲在离线时将无法播放。",
+            color = DesktopColors.TextGray,
+            fontSize = 13.sp
+        )
+    }
 }
 
 private fun cacheLimitLabel(bytes: Long): String =

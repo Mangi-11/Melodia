@@ -11,6 +11,7 @@ import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -174,6 +175,32 @@ class DesktopSettingsViewModelTest {
         assertEquals(0L, vm.cacheUsage.value.audio)
         assertEquals(0L, vm.cacheUsage.value.image)
         assertEquals(0L, vm.logBytes.value)
+    }
+
+    @Test
+    fun clearCachesReportsFreedSpace() = runBlocking {
+        cacheFile(1, 100, 1_000_000L)
+        val vm = viewModel()
+        val messages = mutableListOf<String>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.messages.collect { messages += it } }
+
+        vm.clearCaches()
+
+        assertEquals(listOf("已清除缓存，释放 ${formatFileSize(400L)}"), messages)
+        job.cancel()
+    }
+
+    @Test
+    fun clearCachesWithNothingToClearSaysSo() = runBlocking {
+        imageBytes = 0L
+        val vm = viewModel()
+        val messages = mutableListOf<String>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.messages.collect { messages += it } }
+
+        vm.clearCaches()
+
+        assertEquals(listOf("没有可清除的缓存"), messages)
+        job.cancel()
     }
 
     @Test
