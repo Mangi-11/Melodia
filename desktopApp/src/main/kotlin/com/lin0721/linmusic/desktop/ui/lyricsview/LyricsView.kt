@@ -121,6 +121,7 @@ fun LyricsViewOverlay(
     settingsPreferences: SettingsPreferences,
     desktopPreferences: DesktopPreferences,
     isFullscreen: Boolean,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -159,7 +160,7 @@ fun LyricsViewOverlay(
             artists = artists,
             onSeek = playerViewModel::seekToTime,
             onToggleFullscreen = state::toggleFullscreen,
-            onClose = state::close
+            onClose = onClose
         )
     }
 }

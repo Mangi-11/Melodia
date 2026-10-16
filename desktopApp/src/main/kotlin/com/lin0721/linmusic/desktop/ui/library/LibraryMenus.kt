@@ -136,6 +136,7 @@ internal fun LibrarySortViewMenu(
     viewModel: LibraryViewModel,
     viewMode: LibraryViewMode,
     onViewModeChange: (LibraryViewMode) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
     showSortLabel: Boolean
 ) {
     val sortOrder by viewModel.sortOrder.collectAsState()
@@ -166,7 +167,7 @@ internal fun LibrarySortViewMenu(
             MenuHeader("排序方式")
             LibrarySortOrder.entries.forEach { order ->
                 SortOption(order, selected = order == sortOrder) {
-                    viewModel.updateSortOrder(order)
+                    onSortOrderChange(order)
                     expanded = false
                 }
             }

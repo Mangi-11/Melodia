@@ -49,7 +49,7 @@ internal fun RouteContent(
             selectedTab = state.homeTab,
             onTabSelected = state::selectHomeTab,
             newWorksSelected = state.showNewWorks,
-            onNewWorksSelectedChange = { state.showNewWorks = it },
+            onNewWorksSelectedChange = state::selectNewWorks,
             onPlaylistClick = { id, title -> state.navigate(DesktopRoute.Playlist(id, title)) },
             onStyleClick = { id, name -> state.navigate(DesktopRoute.Style(id, name)) }
         )

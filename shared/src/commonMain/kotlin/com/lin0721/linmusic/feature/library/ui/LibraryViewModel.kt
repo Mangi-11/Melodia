@@ -556,6 +556,14 @@ class LibraryViewModel(
         applyFilterAndSort()
     }
 
+    // 直接设定主筛选，供桌面端前进/后退还原；同样重置歌单二级筛选
+    fun selectFilter(filter: LibraryFilter?) {
+        if (_selectedFilter.value == filter) return
+        _selectedFilter.value = filter
+        _selectedPlaylistOwnerFilter.value = null
+        applyFilterAndSort()
+    }
+
     fun clearFilter() {
         _selectedFilter.value = null
         _selectedPlaylistOwnerFilter.value = null

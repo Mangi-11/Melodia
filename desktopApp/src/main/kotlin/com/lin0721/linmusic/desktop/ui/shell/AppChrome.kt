@@ -119,6 +119,6 @@ internal fun AppPlayerBar(
         lyricVisible = showDesktopLyric,
         onToggleLyric = { scope.launch { deps.settingsPreferences.saveShowDesktopLrc(!showDesktopLyric) } },
         lyricsViewOpen = lyricsView.isOpen,
-        onToggleLyricsView = { if (lyricsView.isOpen) lyricsView.close() else lyricsView.open() }
+        onToggleLyricsView = state::toggleLyricsView
     )
 }

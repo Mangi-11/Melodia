@@ -23,7 +23,9 @@ import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.shell.fixedWidthAtStart
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
+import com.lin0721.linmusic.feature.library.ui.LibraryFilter
 import com.lin0721.linmusic.feature.library.ui.LibraryItem
+import com.lin0721.linmusic.feature.library.ui.LibrarySortOrder
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 
 private const val MODE_SWITCH_MS = 150
@@ -41,7 +43,9 @@ fun LibraryPane(
     onItemClick: (LibraryItem) -> Unit,
     onModeChange: (LibraryMode) -> Unit,
     viewMode: LibraryViewMode,
-    onViewModeChange: (LibraryViewMode) -> Unit
+    onViewModeChange: (LibraryViewMode) -> Unit,
+    onFilterToggle: (LibraryFilter) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit
 ) {
     Box(
         Modifier.width(width).fillMaxHeight()
@@ -67,10 +71,12 @@ fun LibraryPane(
                 when (current) {
                     LibraryMode.RAIL -> LibraryRail(viewModel, isLoggedIn, onItemClick, onModeChange)
                     LibraryMode.DEFAULT -> LibrarySidebar(
-                        viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange
+                        viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange,
+                        onFilterToggle, onSortOrderChange
                     )
                     LibraryMode.EXPANDED -> LibraryExpanded(
-                        viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange
+                        viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange,
+                        onFilterToggle, onSortOrderChange
                     )
                 }
             }
