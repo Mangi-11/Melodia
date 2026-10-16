@@ -78,6 +78,8 @@ fun FullScreenLyricsList(
     onViewportHeightChange: (Float) -> Unit,
     gestureModifier: Modifier,
     modifier: Modifier = Modifier.fillMaxSize(),
+    centerFirstLine: Boolean = false,
+    topInsetPx: Float = 0f,
     fontSize: Int = 22,
     alignment: String = "left",
     secondaryMode: String = "translation",
@@ -98,13 +100,45 @@ fun FullScreenLyricsList(
     val defaultHalfViewportDp = remember(configuration.screenHeightDp) { (configuration.screenHeightDp / 2).dp }
     val halfViewportPadding = if (viewportHeightPx > 0f) with(density) { (viewportHeightPx / 2f).toDp() } else defaultHalfViewportDp
 
-    LaunchedEffect(currentIndex, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing) {
-        if (!isUserScrolling && currentIndex in lyrics.indices && viewportHeightPx > 0f) {
+    LaunchedEffect(currentIndex, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
+        if (isUserScrolling || currentIndex !in lyrics.indices || viewportHeightPx <= 0f) return@LaunchedEffect
+
+        if (centerFirstLine) {
             lazyListState.springScrollToCentre(
                 targetIndex = currentIndex,
                 viewportHeightPx = viewportHeightPx
             )
+            return@LaunchedEffect
         }
+
+        // 估算值以默认间距（行距 24dp、副文本距 6dp）为基准，按设置的差值修正
+        val itemStridePx = with(density) { (66 + lineSpacing - 24).coerceAtLeast(1).dp.toPx() }
+        val linesAboveCentre = (viewportHeightPx / 2 / itemStridePx).toInt()
+
+        if (currentIndex < linesAboveCentre) {
+            lazyListState.springScrollToCentreClassic(
+                targetIndex = 0,
+                desiredOffsetPx = 0,
+                fallbackScrollOffsetPx = 0
+            )
+            return@LaunchedEffect
+        }
+
+        val current = lyrics[currentIndex]
+        val hasSecondary = current.backgroundLine != null || when (secondaryMode) {
+            "translation" -> current.translation != null
+            "roma" -> current.roma != null
+            else -> false
+        }
+        val itemHeightPx = with(density) {
+            (if (hasSecondary) 96 + secondarySpacing - 6 else 54).coerceAtLeast(1).dp.toPx()
+        }
+        val desiredOffsetPx = ((viewportHeightPx - itemHeightPx) / 2f - topInsetPx).toInt()
+        lazyListState.springScrollToCentreClassic(
+            targetIndex = currentIndex,
+            desiredOffsetPx = desiredOffsetPx,
+            fallbackScrollOffsetPx = -desiredOffsetPx
+        )
     }
 
     val centerLineIndex by remember {
@@ -168,8 +202,8 @@ fun FullScreenLyricsList(
                     .onSizeChanged { onViewportHeightChange(it.height.toFloat()) },
                 verticalArrangement = Arrangement.spacedBy(lineSpacing.coerceAtLeast(0).dp),
                 contentPadding = PaddingValues(
-                    top = halfViewportPadding,
-                    bottom = halfViewportPadding
+                    top = if (centerFirstLine) halfViewportPadding else with(density) { topInsetPx.toDp() },
+                    bottom = if (centerFirstLine) halfViewportPadding else with(density) { (viewportHeightPx / 2f).toDp() }
                 ),
                 horizontalAlignment = when (alignment) {
                     "center" -> Alignment.CenterHorizontally
@@ -334,4 +368,43 @@ private suspend fun LazyListState.springScrollToCentre(
             }
         }
     }
+}
+
+// 原样式：物理弹簧阻尼居中平滑滚动，首行吸顶
+private suspend fun LazyListState.springScrollToCentreClassic(
+    targetIndex: Int,
+    desiredOffsetPx: Int,
+    fallbackScrollOffsetPx: Int,
+    dampingRatio: Float = 0.82f,
+    stiffness: Float = 360f
+) {
+    val layoutInfo = this.layoutInfo
+    val visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
+
+    if (visibleItem != null) {
+        val currentOffset = visibleItem.offset
+        val deltaToScroll = (currentOffset - desiredOffsetPx).toFloat()
+
+        if (kotlin.math.abs(deltaToScroll) > 1f) {
+            var previousValue = 0f
+            val anim = Animatable(0f)
+            val springSpec = spring<Float>(
+                dampingRatio = dampingRatio,
+                stiffness = stiffness
+            )
+            this.scroll {
+                anim.animateTo(
+                    targetValue = deltaToScroll,
+                    animationSpec = springSpec
+                ) {
+                    val delta = this.value - previousValue
+                    scrollBy(delta)
+                    previousValue = this.value
+                }
+            }
+            return
+        }
+    }
+
+    this.animateScrollToItem(index = targetIndex, scrollOffset = fallbackScrollOffsetPx)
 }
