@@ -9,8 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.ui.platform.LocalConfiguration
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +41,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -298,29 +298,15 @@ private suspend fun LazyListState.springScrollToCentre(
 
     var visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
 
-    // 如果目标项不在当前可见区域内（例如大跨度进度跳转/切歌），先平滑预对齐至中央附近
+    // 目标行不在可见区时先瞬移到附近，再等一帧布局后精确居中
     if (visibleItem == null) {
         val visibleItems = layoutInfo.visibleItemsInfo
-        if (visibleItems.isNotEmpty()) {
-            val firstVisible = visibleItems.first().index
-            val lastVisible = visibleItems.last().index
-            val approxVisibleCount = (lastVisible - firstVisible + 1).coerceAtLeast(1)
-            val approxCenterLead = approxVisibleCount / 2
-            val snapIndex = (targetIndex - approxCenterLead).coerceIn(0, layoutInfo.totalItemsCount - 1)
-            this.scrollToItem(index = snapIndex, scrollOffset = 0)
-        } else {
-            this.scrollToItem(index = targetIndex, scrollOffset = 0)
-        }
+        val lead = if (visibleItems.isNotEmpty()) {
+            (visibleItems.last().index - visibleItems.first().index + 1).coerceAtLeast(1) / 2
+        } else 0
+        scrollToItem(index = (targetIndex - lead).coerceIn(0, layoutInfo.totalItemsCount - 1), scrollOffset = 0)
+        withFrameNanos { }
         visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
-        if (visibleItem == null) {
-            delay(16L)
-            visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
-        }
-        if (visibleItem == null) {
-            this.scrollToItem(index = targetIndex, scrollOffset = 0)
-            delay(32L)
-            visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
-        }
     }
 
     if (visibleItem != null) {
@@ -347,7 +333,5 @@ private suspend fun LazyListState.springScrollToCentre(
                 }
             }
         }
-    } else {
-        this.scrollToItem(index = targetIndex, scrollOffset = 0)
     }
 }

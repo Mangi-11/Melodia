@@ -309,7 +309,7 @@ fun FullScreenLyricsView(
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // 1. 歌词列表直接铺满全屏，上下边缘根据控件显隐状态自适应羽化
+            // 歌词列表直接铺满全屏，上下边缘根据控件显隐状态自适应羽化
             val featherDp = 38.dp
             val featherPx = with(density) { featherDp.toPx() }
             val statusBarHeightPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
@@ -318,7 +318,8 @@ fun FullScreenLyricsView(
             val totalTopSolidHeightPx = statusBarHeightPx + headerContentHeightPx
             val defaultControlsContainerHeightPx = with(density) { 220.dp.toPx() }
 
-            val effectiveTopCutoffPx = totalTopSolidHeightPx
+            // 优先使用顶栏实测高度，未测得时回退到估算值
+            val effectiveTopCutoffPx = if (topContainerHeightPx > featherPx) topContainerHeightPx - featherPx else totalTopSolidHeightPx
             val effectiveControlsSolidHeightPx = if (controlsContainerHeightPx > featherPx) controlsContainerHeightPx - featherPx else defaultControlsContainerHeightPx
 
             val isControlsShowing = areControlsVisible
@@ -432,7 +433,7 @@ fun FullScreenLyricsView(
                 }
             )
 
-            // 2. 顶部栏：悬浮在屏幕顶部，包含状态栏和标题栏；底层配有覆盖状态栏及标题栏的实色遮罩与下方非线性渐变羽化
+            // 顶部栏：悬浮在屏幕顶部，包含状态栏和标题栏；底层配有覆盖状态栏及标题栏的实色遮罩与下方非线性渐变羽化
             AnimatedVisibility(
                 visible = areControlsVisible,
                 enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
@@ -500,7 +501,7 @@ fun FullScreenLyricsView(
                 }
             }
 
-            // 3. 底部播放控制条：悬浮于歌词区底部，底层配有上方非线性渐变羽化+控件区实色遮罩
+            // 底部播放控制条：悬浮于歌词区底部，底层配有上方非线性渐变羽化+控件区实色遮罩
             AnimatedVisibility(
                 visible = areControlsVisible,
                 enter = fadeIn(tween(240)) + slideInVertically(tween(240)) { it },
