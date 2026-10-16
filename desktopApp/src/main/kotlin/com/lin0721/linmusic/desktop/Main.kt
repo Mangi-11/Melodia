@@ -52,6 +52,7 @@ import com.lin0721.linmusic.desktop.di.platformModuleFor
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
@@ -59,6 +60,7 @@ import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
 import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
+import com.lin0721.linmusic.desktop.ui.shell.TaskbarThumbnailEffect
 import com.lin0721.linmusic.desktop.ui.shell.WindowChromeEffect
 import com.lin0721.linmusic.desktop.ui.shell.rememberFullscreenState
 import com.lin0721.linmusic.desktop.ui.theme.MelodiaDesktopTheme
@@ -136,6 +138,7 @@ fun main() {
     val hotkeys = koin.get<GlobalHotkeyService>()
     val mediaSession = koin.get<MediaSessionService>()
     val windowEffects = koin.get<WindowEffects>()
+    val taskbarThumbnail = koin.get<TaskbarThumbnailService>()
     val searchFocusRequests = Channel<Unit>(Channel.CONFLATED)
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
@@ -342,6 +345,7 @@ fun main() {
             // 全屏与最大化一样不要圆角和边框线
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
             CanvasClearColorEffect()
+            TaskbarThumbnailEffect(taskbarThumbnail, controller)
             MelodiaDesktopTheme(uiScale = uiScaleFactor) {
                 MelodiaDesktopApp(
                     deps = appDependencies,
