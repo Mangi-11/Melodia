@@ -124,8 +124,8 @@ fun FullScreenLyricsToolbar(
             }
         }
 
-        // 右侧操作项：分享与歌词快捷设置
         Row(
+            modifier = Modifier.offset(x = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(MelodiaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
