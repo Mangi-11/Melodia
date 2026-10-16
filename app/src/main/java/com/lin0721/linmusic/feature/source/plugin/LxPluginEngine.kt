@@ -24,6 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "LxPluginEngine"
 
+// 沙盒代理请求的响应体上限，超限视为请求失败
+private const val MAX_PROXY_BODY_BYTES = 4L * 1024 * 1024
+
 // LX Music JS 插件沙盒引擎（多沙盒隔离与生命周期管理）
 class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
@@ -308,9 +311,9 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
                 }
 
                 val respBody = if (method.equals("POST", ignoreCase = true)) {
-                    SourceHttpClient.post(url, body, headersMap)
+                    SourceHttpClient.post(url, body, headersMap, maxBodyBytes = MAX_PROXY_BODY_BYTES)
                 } else {
-                    SourceHttpClient.get(url, headersMap)
+                    SourceHttpClient.get(url, headersMap, maxBodyBytes = MAX_PROXY_BODY_BYTES)
                 }
 
                 val respJson = org.json.JSONObject().apply {
