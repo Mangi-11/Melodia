@@ -14,12 +14,16 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,6 +121,8 @@ fun FullScreenLyricsView(
     val fullScreenLyricAutoHideControls by settingsPreferences.fullScreenLyricAutoHideControls.collectAsStateWithLifecycle(initialValue = false)
     val fullScreenLyricCenterFirstLine by settingsPreferences.fullScreenLyricCenterFirstLine.collectAsStateWithLifecycle(initialValue = false)
     val fullScreenLyricEdgeFade by settingsPreferences.fullScreenLyricEdgeFade.collectAsStateWithLifecycle(initialValue = false)
+    // 状态栏随控件隐藏时仍需避开挖孔摄像头
+    val topSafeInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
     var areControlsVisible by remember { mutableStateOf(true) }
     var autoHideJob by remember { mutableStateOf<Job?>(null) }
 
@@ -317,7 +323,7 @@ fun FullScreenLyricsView(
                 // 歌词列表直接铺满全屏，上下边缘根据控件显隐状态自适应羽化
                 val featherDp = 38.dp
                 val featherPx = with(density) { featherDp.toPx() }
-                val statusBarHeightPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
+                val statusBarHeightPx = topSafeInsets.getTop(density).toFloat()
                 val headerContentHeightDp = 56.dp
                 val headerContentHeightPx = with(density) { headerContentHeightDp.toPx() }
                 val totalTopSolidHeightPx = statusBarHeightPx + headerContentHeightPx
@@ -328,7 +334,7 @@ fun FullScreenLyricsView(
                 val effectiveControlsSolidHeightPx = if (controlsContainerHeightPx > featherPx) controlsContainerHeightPx - featherPx else defaultControlsContainerHeightPx
 
                 val isControlsShowing = areControlsVisible
-                val targetTopCutoffPx = if (isControlsShowing) effectiveTopCutoffPx else 0f
+                val targetTopCutoffPx = if (isControlsShowing) effectiveTopCutoffPx else statusBarHeightPx
                 val targetTopFeatherPx = if (isControlsShowing) featherPx else with(density) { 60.dp.toPx() }
 
                 val targetBottomControlsHeightPx = if (areControlsVisible) effectiveControlsSolidHeightPx else 0f
@@ -591,7 +597,7 @@ fun FullScreenLyricsView(
                 modifier = Modifier
                     .fillMaxSize()
                     .hazeChild(state = hazeState, style = HazeStyle(blurRadius = 40.dp, noiseFactor = 0.02f))
-                    .statusBarsPadding()
+                    .windowInsetsPadding(topSafeInsets)
             ) {
                 AnimatedVisibility(
                     visible = areControlsVisible,
