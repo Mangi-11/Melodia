@@ -21,13 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,7 +62,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// 设置页「音源与换源」卡片内的社区源（LX）插件管理：启用开关、插件列表与导入入口
+private const val CollapsedPluginCount = 3
+
+// 设置页「音源与换源」分区内的社区源（LX）插件管理：启用开关、插件列表与导入入口
 @Composable
 internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
     val navigator = LocalDesktopNavigator.current
@@ -72,6 +76,7 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
     var showImportDialog by remember { mutableStateOf(false) }
     var pendingScripts by remember { mutableStateOf<List<ArchiveScript>>(emptyList()) }
     var fileReading by remember { mutableStateOf(false) }
+    var listExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) { viewModel.messages.collect { navigator.showMessage(it) } }
 
@@ -112,7 +117,9 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
         }
     }
 
-    plugins.forEachIndexed { index, plugin ->
+    val collapsible = plugins.size > CollapsedPluginCount
+    val shown = if (collapsible && !listExpanded) plugins.take(CollapsedPluginCount) else plugins
+    shown.forEachIndexed { index, plugin ->
         PluginRow(
             index = index,
             count = plugins.size,
@@ -123,10 +130,21 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
             onRemove = { viewModel.remove(plugin.id) }
         )
     }
+    if (collapsible) {
+        PluginExpandToggle(
+            expanded = listExpanded,
+            hiddenCount = plugins.size - CollapsedPluginCount,
+            onToggle = { listExpanded = !listExpanded }
+        )
+    }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        ImportButton("选取文件 (.js/.zip/.7z)", enabled = !fileReading && !importing, onClick = pickFile)
-        ImportButton("粘贴脚本或链接导入", enabled = !fileReading && !importing, onClick = { showImportDialog = true })
+    Row(
+        Modifier.padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SettingsActionButton("选取文件 (.js/.zip/.7z)", enabled = !fileReading && !importing, onClick = pickFile)
+        SettingsActionButton("粘贴脚本或链接导入", enabled = !fileReading && !importing, onClick = { showImportDialog = true })
         if (fileReading || importing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = DesktopColors.Accent)
     }
 
@@ -235,18 +253,6 @@ private fun ScriptPickerDialog(
 }
 
 @Composable
-private fun ImportButton(text: String, enabled: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = DesktopColors.TextPrimary)
-    ) {
-        Text(text, fontSize = 12.sp)
-    }
-}
-
-@Composable
 private fun ImportDialog(
     viewModel: LxPluginSettingsViewModel,
     onDismiss: () -> Unit,
@@ -320,7 +326,11 @@ private fun PluginRow(
 ) {
     val primary = if (plugin.isEnabled) DesktopColors.TextPrimary else DesktopColors.TextGray
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(DesktopColors.Surface).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(DesktopColors.CardSurface)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
@@ -350,6 +360,27 @@ private fun PluginRow(
         PluginIconButton(Icons.Rounded.ArrowUpward, "上移", enabled = index > 0, onClick = onMoveUp)
         PluginIconButton(Icons.Rounded.ArrowDownward, "下移", enabled = index < count - 1, onClick = onMoveDown)
         PluginIconButton(Icons.Rounded.Delete, "卸载", enabled = true, danger = true, onClick = onRemove)
+    }
+}
+
+@Composable
+private fun PluginExpandToggle(expanded: Boolean, hiddenCount: Int, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(onClick = onToggle)
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(if (expanded) "收起" else "展开其余 $hiddenCount 个插件", color = DesktopColors.TextGray, fontSize = 13.sp)
+        Icon(
+            if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+            null,
+            tint = DesktopColors.TextGray,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
