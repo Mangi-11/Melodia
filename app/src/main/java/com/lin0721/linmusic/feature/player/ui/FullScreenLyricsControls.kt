@@ -1,6 +1,17 @@
 package com.lin0721.linmusic.feature.player.ui
 
 import com.lin0721.linmusic.core.ui.components.PlayPauseIcon
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -32,14 +43,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -369,6 +383,10 @@ fun FullScreenLyricsSettingsSheet(
     onAmllLyricsEnabledChange: (Boolean) -> Unit = {},
     autoHideControls: Boolean = false,
     onAutoHideControlsChange: (Boolean) -> Unit = {},
+    centerFirstLine: Boolean = false,
+    onCenterFirstLineChange: (Boolean) -> Unit = {},
+    edgeFade: Boolean = false,
+    onEdgeFadeChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -437,132 +455,197 @@ fun FullScreenLyricsSettingsSheet(
                 }
             }
 
-            LyricSliderSetting(
-                label = "歌词字号大小",
-                valueText = "${displayFontSize} sp",
-                value = displayFontSize,
-                onValueChange = onFontSizeChange,
-                valueRange = fontSizeRange
-            )
-
-            LyricSliderSetting(
-                label = "歌词行间距",
-                valueText = "${lineSpacing} dp",
-                value = lineSpacing,
-                onValueChange = onLineSpacingChange,
-                valueRange = 8f..48f,
-                startLabel = "窄",
-                endLabel = "宽"
-            )
-
-            LyricSliderSetting(
-                label = "歌词与翻译/音译间距",
-                valueText = "${secondarySpacing} dp",
-                value = secondarySpacing,
-                onValueChange = onSecondarySpacingChange,
-                valueRange = 0f..24f,
-                startLabel = "窄",
-                endLabel = "宽"
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 歌词对齐方式分段选择器
-            Text(
-                text = "歌词对齐方式",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-            )
-            val alignments = listOf(
-                "left" to "左对齐",
-                "center" to "居中对齐",
-                "right" to "右对齐"
-            )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                alignments.forEachIndexed { index, (key, label) ->
-                    val isSelected = alignment == key
-                    SegmentedButton(
-                        selected = isSelected,
-                        onClick = { onAlignmentChange(key) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = alignments.size),
-                        colors = segmentedColors,
-                        icon = {}
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
+            var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+            val tabTitles = listOf("排版", "效果", "界面")
+            SecondaryTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                tabTitles.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                text = title,
+                                fontSize = 14.sp,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 歌词副文本分段选择器
-            Text(
-                text = "歌词副文本",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-            )
-            val secondaryOptions = listOf(
-                "translation" to ("翻译" to hasTranslation),
-                "roma" to ("罗马音" to hasRoma),
-                "none" to ("仅原词" to true)
-            )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                secondaryOptions.forEachIndexed { index, (key, pair) ->
-                    val (label, isAvailable) = pair
-                    val isSelected = secondaryMode == key
-                    SegmentedButton(
-                        selected = isSelected,
-                        onClick = { if (isAvailable) onSecondaryModeChange(key) },
-                        enabled = isAvailable,
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = secondaryOptions.size),
-                        colors = segmentedColors,
-                        icon = {}
-                    ) {
-                        Text(
-                            text = if (isAvailable) label else "$label(无)",
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            // 页签内容横向滑动淡入淡出，弹窗高度随内容平滑伸缩
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        val direction = if (targetState > initialState) 1 else -1
+                        (fadeIn(tween(220, delayMillis = 60)) +
+                            slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { it / 6 * direction }) togetherWith
+                            (fadeOut(tween(120)) +
+                                slideOutHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it / 6 * direction }) using
+                            SizeTransform(clip = true) { _, _ ->
+                                spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold)
+                            }
+                    },
+                    label = "lyric_settings_tab"
+                ) { tab ->
+                  Column(modifier = Modifier.fillMaxWidth()) {
+                    when (tab) {
+                        0 -> {
+                        LyricSliderSetting(
+                            label = "字号",
+                            valueText = "${displayFontSize} sp",
+                            value = displayFontSize,
+                            onValueChange = onFontSizeChange,
+                            valueRange = fontSizeRange
                         )
+
+                        LyricSliderSetting(
+                            label = "行间距",
+                            valueText = "${lineSpacing} dp",
+                            value = lineSpacing,
+                            onValueChange = onLineSpacingChange,
+                            valueRange = 8f..48f,
+                            startLabel = "窄",
+                            endLabel = "宽"
+                        )
+
+                        LyricSliderSetting(
+                            label = "翻译间距",
+                            valueText = "${secondarySpacing} dp",
+                            value = secondarySpacing,
+                            onValueChange = onSecondarySpacingChange,
+                            valueRange = 0f..24f,
+                            startLabel = "窄",
+                            endLabel = "宽"
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 歌词对齐方式分段选择器
+                        Text(
+                            text = "对齐方式",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                        )
+                        val alignments = listOf(
+                            "left" to "左对齐",
+                            "center" to "居中对齐",
+                            "right" to "右对齐"
+                        )
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            alignments.forEachIndexed { index, (key, label) ->
+                                val isSelected = alignment == key
+                                SegmentedButton(
+                                    selected = isSelected,
+                                    onClick = { onAlignmentChange(key) },
+                                    shape = SegmentedButtonDefaults.itemShape(index = index, count = alignments.size),
+                                    colors = segmentedColors,
+                                    icon = {}
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 歌词副文本分段选择器
+                        Text(
+                            text = "副文本",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                        )
+                        val secondaryOptions = listOf(
+                            "translation" to ("翻译" to hasTranslation),
+                            "roma" to ("罗马音" to hasRoma),
+                            "none" to ("仅原词" to true)
+                        )
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            secondaryOptions.forEachIndexed { index, (key, pair) ->
+                                val (label, isAvailable) = pair
+                                val isSelected = secondaryMode == key
+                                SegmentedButton(
+                                    selected = isSelected,
+                                    onClick = { if (isAvailable) onSecondaryModeChange(key) },
+                                    enabled = isAvailable,
+                                    shape = SegmentedButtonDefaults.itemShape(index = index, count = secondaryOptions.size),
+                                    colors = segmentedColors,
+                                    icon = {}
+                                ) {
+                                    Text(
+                                        text = if (isAvailable) label else "$label(无)",
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                        }
+                        1 -> {
+                            LyricCompactSwitchRow(
+                                title = "启用 AMLL 歌词源",
+                                subtitle = "支持对唱分边与背景和声",
+                                checked = amllLyricsEnabled,
+                                onCheckedChange = onAmllLyricsEnabledChange
+                            )
+
+                            LyricCompactSwitchRow(
+                                title = "逐字歌词流光动效",
+                                subtitle = "开启柔和渐变推进边缘",
+                                checked = advancedKaraokeEffect,
+                                onCheckedChange = onAdvancedKaraokeEffectChange
+                            )
+
+                            LyricCompactSwitchRow(
+                                title = "字词呼吸光晕动效",
+                                subtitle = "演唱字词叠加呼吸高亮微光",
+                                checked = karaokeGlowEffect,
+                                onCheckedChange = onKaraokeGlowEffectChange
+                            )
+                        }
+                        else -> {
+                            LyricCompactSwitchRow(
+                                title = "自动隐藏控制组件",
+                                subtitle = "无操作 5 秒后自动隐藏顶栏与播放控制，轻触屏幕重新呼出",
+                                checked = autoHideControls,
+                                onCheckedChange = onAutoHideControlsChange
+                            )
+
+                            LyricCompactSwitchRow(
+                                title = "歌词首行居中",
+                                subtitle = "首行下沉到屏幕中央，不再吸顶",
+                                checked = centerFirstLine,
+                                onCheckedChange = onCenterFirstLineChange
+                            )
+
+                            LyricCompactSwitchRow(
+                                title = "歌词边缘渐隐",
+                                subtitle = "上下边缘渐隐，顶栏与播控悬浮于歌词之上",
+                                checked = edgeFade,
+                                onCheckedChange = onEdgeFadeChange
+                            )
+                        }
                     }
+                  }
                 }
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // 开关项整合
-            LyricCompactSwitchRow(
-                title = "启用 AMLL 歌词源",
-                subtitle = "支持对唱分边与背景和声",
-                checked = amllLyricsEnabled,
-                onCheckedChange = onAmllLyricsEnabledChange
-            )
-
-            LyricCompactSwitchRow(
-                title = "逐字歌词流光动效",
-                subtitle = "开启柔和渐变推进边缘",
-                checked = advancedKaraokeEffect,
-                onCheckedChange = onAdvancedKaraokeEffectChange
-            )
-
-            LyricCompactSwitchRow(
-                title = "字词呼吸光晕动效",
-                subtitle = "演唱字词叠加呼吸高亮微光",
-                checked = karaokeGlowEffect,
-                onCheckedChange = onKaraokeGlowEffectChange
-            )
-
-            LyricCompactSwitchRow(
-                title = "自动隐藏控制组件",
-                subtitle = "无操作 5 秒后自动隐藏顶栏与播放控制，轻触屏幕重新呼出",
-                checked = autoHideControls,
-                onCheckedChange = onAutoHideControlsChange
-            )
         }
     }
 }
