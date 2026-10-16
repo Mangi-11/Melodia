@@ -68,6 +68,7 @@ import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
+import com.lin0721.linmusic.desktop.platform.chooseDirectory
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
@@ -85,7 +86,6 @@ import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.io.File
 import kotlin.math.roundToInt
-import javax.swing.JFileChooser
 import java.awt.event.KeyEvent as AwtKeyEvent
 
 private val CrossfadeDurationOptionsMs = listOf(1_000, 2_000, 3_000, 4_000, 6_000, 8_000, 10_000, 12_000)
@@ -252,7 +252,7 @@ fun SettingsPage(
                         TextButton(onClick = {
                             scope.launch {
                                 val initial = File(customFolder ?: desktop.defaultDownloadDir.absolutePath)
-                                chooseDirectory(initial)?.let { common.updateDownloadFolderUri(it.absolutePath) }
+                                chooseDirectory(initial, "选择下载目录")?.let { common.updateDownloadFolderUri(it.absolutePath) }
                             }
                         }) {
                             Text("更改", color = DesktopColors.Accent)
@@ -336,14 +336,6 @@ fun SettingsPage(
             }
         }
     }
-}
-
-private fun chooseDirectory(initial: File): File? {
-    val chooser = JFileChooser(initial.takeIf { it.isDirectory }).apply {
-        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-        dialogTitle = "选择下载目录"
-    }
-    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
 @Composable

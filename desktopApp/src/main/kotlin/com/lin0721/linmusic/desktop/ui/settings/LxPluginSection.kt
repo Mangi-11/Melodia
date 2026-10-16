@@ -49,6 +49,7 @@ import com.lin0721.linmusic.core.source.LxArchiveReader
 import com.lin0721.linmusic.core.source.LxPluginItem
 import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.core.source.MusicPlatform
+import com.lin0721.linmusic.desktop.platform.chooseFile
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
@@ -58,9 +59,6 @@ import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.awt.FileDialog
-import java.awt.Frame
-import java.io.File
 
 // 设置页「音源与换源」卡片内的社区源（LX）插件管理：启用开关、插件列表与导入入口
 @Composable
@@ -85,24 +83,22 @@ internal fun ColumnScope.LxPluginSection(viewModel: LxPluginSettingsViewModel) {
         }
     }
 
-    val pickFile = {
-        val file = chooseScriptFile("选择 LX 插件脚本或压缩包")
-        if (file != null) {
-            scope.launch {
-                fileReading = true
-                try {
-                    val read = withContext(Dispatchers.IO) { file.inputStream().use { LxArchiveReader.readScripts(file.name, it) } }
-                    val scripts = read.getOrNull()
-                    when {
-                        scripts == null -> navigator.showMessage("读取失败：${read.exceptionOrNull()?.message}")
-                        scripts.size == 1 -> handleResult(viewModel.importFrom(scripts[0].content))
-                        else -> pendingScripts = scripts
-                    }
-                } catch (e: Exception) {
-                    navigator.showMessage("读取文件失败：${e.message}")
-                } finally {
-                    fileReading = false
+    val pickFile: () -> Unit = {
+        scope.launch {
+            val file = chooseFile("选择 LX 插件脚本或压缩包", "*.js;*.zip;*.7z") ?: return@launch
+            fileReading = true
+            try {
+                val read = withContext(Dispatchers.IO) { file.inputStream().use { LxArchiveReader.readScripts(file.name, it) } }
+                val scripts = read.getOrNull()
+                when {
+                    scripts == null -> navigator.showMessage("读取失败：${read.exceptionOrNull()?.message}")
+                    scripts.size == 1 -> handleResult(viewModel.importFrom(scripts[0].content))
+                    else -> pendingScripts = scripts
                 }
+            } catch (e: Exception) {
+                navigator.showMessage("读取文件失败：${e.message}")
+            } finally {
+                fileReading = false
             }
         }
     }
@@ -379,13 +375,3 @@ private fun PluginIconButton(
     }
 }
 
-// 系统文件选择框，会阻塞到关闭；取消返回 null
-private fun chooseScriptFile(title: String): File? {
-    val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
-        // Windows 原生对话框把 file 当作过滤模式
-        file = "*.js;*.zip;*.7z"
-        isVisible = true
-    }
-    val name = dialog.file ?: return null
-    return File(dialog.directory.orEmpty(), name)
-}
