@@ -3,6 +3,7 @@ package com.lin0721.linmusic.desktop.ui.settings
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.data.LyricsCache
 import com.lin0721.linmusic.core.preferences.PreferencesStores
+import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
@@ -16,6 +17,7 @@ import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CopyOnWriteArrayList
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DesktopSettingsViewModelTest {
@@ -115,7 +118,15 @@ class DesktopSettingsViewModelTest {
             imageCacheSize = { imageBytes },
             clearImageCache = { imageBytes = 0L }
         ),
+        relocator = relocator(),
         storage = storage,
+        ioDispatcher = UnconfinedTestDispatcher()
+    )
+
+    private fun relocator() = CacheRelocator(
+        preferences,
+        effectiveRoot = File(dir, "cache_in_use"),
+        defaultRoot = File(dir, "cache_in_use"),
         ioDispatcher = UnconfinedTestDispatcher()
     )
 
@@ -125,6 +136,16 @@ class DesktopSettingsViewModelTest {
             writeBytes(ByteArray(size))
             setLastModified(modified)
         }
+    }
+
+    // 偏好读写在 DataStore 自己的线程完成，消息稍后才会到
+    private fun awaitNotEmpty(messages: List<String>) = awaitUntil { messages.isNotEmpty() }
+
+    private fun awaitUntil(condition: () -> Boolean) = runBlocking {
+        withTimeoutOrNull(5_000) {
+            while (!condition()) delay(20)
+        }
+        Unit
     }
 
     // 写入在 DataStore 自己的线程完成，等到读回期望值为止
@@ -175,6 +196,37 @@ class DesktopSettingsViewModelTest {
         assertEquals(0L, vm.cacheUsage.value.audio)
         assertEquals(0L, vm.cacheUsage.value.image)
         assertEquals(0L, vm.logBytes.value)
+    }
+
+    @Test
+    fun changeCacheDirReportsPendingRestart() = runBlocking {
+        val chosen = File(dir, "chosen").apply { mkdirs() }
+        val vm = viewModel()
+        val messages = CopyOnWriteArrayList<String>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.messages.collect { messages += it } }
+
+        vm.changeCacheDir(chosen)
+        awaitNotEmpty(messages)
+
+        assertEquals(listOf("缓存目录已更改，重启后生效"), messages.toList())
+        assertEquals(chosen.absolutePath, preferences.cacheRoot.first())
+        awaitUntil { vm.relocation.value == null }
+        assertNull(vm.relocation.value)
+        job.cancel()
+    }
+
+    @Test
+    fun changeCacheDirReportsFailureAndKeepsSetting() = runBlocking {
+        val vm = viewModel()
+        val messages = CopyOnWriteArrayList<String>()
+        val job = launch(UnconfinedTestDispatcher()) { vm.messages.collect { messages += it } }
+
+        vm.changeCacheDir(File(dir, "missing"))
+        awaitNotEmpty(messages)
+
+        assertEquals(listOf("更改缓存目录失败：所选目录不存在"), messages.toList())
+        assertNull(preferences.cacheRoot.first())
+        job.cancel()
     }
 
     @Test

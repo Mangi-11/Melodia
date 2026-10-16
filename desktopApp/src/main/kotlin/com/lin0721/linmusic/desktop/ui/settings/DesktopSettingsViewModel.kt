@@ -4,18 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.data.CacheDirState
+import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CacheUsage
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.RelocationProgress
+import com.lin0721.linmusic.desktop.data.RelocationResult
 import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +48,7 @@ class DesktopSettingsViewModel(
     mediaSession: MediaSessionService,
     private val autoStart: AutoStartService,
     private val cacheManager: DesktopCacheManager,
+    private val relocator: CacheRelocator,
     private val storage: LocalStorageOps = LocalStorageOps(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
@@ -68,6 +75,13 @@ class DesktopSettingsViewModel(
 
     private val _cacheUsage = MutableStateFlow(CacheUsage(0L, 0L, 0L, 0L))
     val cacheUsage: StateFlow<CacheUsage> = _cacheUsage.asStateFlow()
+
+    val cacheDir: StateFlow<CacheDirState> = relocator.state.asState(relocator.stateFor(null))
+
+    // 非空表示正在迁移缓存
+    private val _relocation = MutableStateFlow<RelocationProgress?>(null)
+    val relocation: StateFlow<RelocationProgress?> = _relocation.asStateFlow()
+    private var relocationJob: Job? = null
 
     private val _logBytes = MutableStateFlow(0L)
     val logBytes: StateFlow<Long> = _logBytes.asStateFlow()
@@ -124,6 +138,30 @@ class DesktopSettingsViewModel(
                 _cacheUsage.value = cacheManager.usage()
             }
         }
+    }
+
+    // selected 为 null 表示恢复默认位置；新目录重启后才生效
+    fun changeCacheDir(selected: File?) {
+        if (relocationJob?.isActive == true) return
+        relocationJob = viewModelScope.launch {
+            _relocation.value = RelocationProgress(0L, 0L)
+            try {
+                when (val result = relocator.switchTo(selected) { _relocation.value = it }) {
+                    RelocationResult.Unchanged -> _messages.tryEmit("缓存目录已是当前使用的位置")
+                    RelocationResult.Switched -> _messages.tryEmit("缓存目录已更改，重启后生效")
+                    is RelocationResult.Failed -> _messages.tryEmit("更改缓存目录失败：${result.reason}")
+                }
+            } catch (e: CancellationException) {
+                _messages.tryEmit("已取消迁移")
+                throw e
+            } finally {
+                _relocation.value = null
+            }
+        }
+    }
+
+    fun cancelRelocation() {
+        relocationJob?.cancel()
     }
 
     fun clearCaches() {

@@ -42,6 +42,8 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LIBRARY_WIDTH = floatPreferencesKey("library_width")
         private val KEY_NOW_PLAYING_WIDTH = floatPreferencesKey("now_playing_width")
         private val KEY_AUDIO_DEVICE = stringPreferencesKey("audio_device")
+        private val KEY_CACHE_ROOT = stringPreferencesKey("cache_root")
+        private val KEY_CACHE_CLEANUP = stringPreferencesKey("cache_cleanup")
         private val KEY_VOLUME = intPreferencesKey("volume")
         private val KEY_LAST_AUDIBLE_VOLUME = intPreferencesKey("last_audible_volume")
         private val KEY_LYRICS_VIEW_FONT_SIZE = intPreferencesKey("lyrics_view_font_size")
@@ -82,6 +84,23 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
     val lyricsViewFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRICS_VIEW_FONT_SIZE] ?: DEFAULT_LYRICS_VIEW_FONT_SIZE }.distinctUntilChanged()
 
     val audioDevice: Flow<String> = dataStore.data.map { it[KEY_AUDIO_DEVICE] ?: AUTO_AUDIO_DEVICE }.distinctUntilChanged()
+
+    // 所选的缓存目录，缺省为默认位置；下次启动才生效
+    val cacheRoot: Flow<String?> = dataStore.data.map { it[KEY_CACHE_ROOT]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    // 切换缓存目录后待删除的旧缓存根目录
+    val pendingCacheCleanup: Flow<String?> = dataStore.data.map { it[KEY_CACHE_CLEANUP]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    suspend fun saveCacheRelocation(selected: String?, cleanup: String?) {
+        dataStore.edit { prefs ->
+            if (selected != null) prefs[KEY_CACHE_ROOT] = selected else prefs.remove(KEY_CACHE_ROOT)
+            if (cleanup != null) prefs[KEY_CACHE_CLEANUP] = cleanup else prefs.remove(KEY_CACHE_CLEANUP)
+        }
+    }
+
+    suspend fun clearPendingCacheCleanup() {
+        dataStore.edit { it.remove(KEY_CACHE_CLEANUP) }
+    }
 
     // 0 表示静音
     val volume: Flow<Int> = dataStore.data.map { (it[KEY_VOLUME] ?: DEFAULT_VOLUME).coerceIn(0, 100) }.distinctUntilChanged()

@@ -31,9 +31,11 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
+import com.lin0721.linmusic.desktop.app.DesktopCacheRoot
 import com.lin0721.linmusic.desktop.app.DesktopLogging
 import com.lin0721.linmusic.desktop.app.DesktopPaths
 import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
@@ -41,6 +43,7 @@ import com.lin0721.linmusic.desktop.app.SingleInstance
 import com.lin0721.linmusic.desktop.app.WindowBounds
 import com.lin0721.linmusic.desktop.app.currentScreenBounds
 import com.lin0721.linmusic.desktop.data.CacheLimits
+import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopImageLoader
@@ -112,7 +115,8 @@ fun main() {
     if (!SingleInstance(DesktopPaths.dataDir).acquire { activationRequests.trySend(Unit) }) {
         exitProcess(0)
     }
-    // 须先于缓存对象创建
+    // 须先于任何缓存目录的读取与缓存对象创建
+    DesktopCacheRoot.configure(DesktopPreferences(PreferencesStores.get(DesktopPaths.preferencesFile(DesktopPreferences.STORE_NAME))))
     DesktopCacheMigration.migrateAll()
     val koin = startKoin {
         modules(
@@ -124,8 +128,9 @@ fun main() {
     // 进程内常驻记录播客收听进度
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     val settingsPreferences = koin.get<SettingsPreferences>()
-    // 旧缓存超出当前上限时，启动后在后台补一次淘汰
+    // 切换缓存目录后清掉旧目录；旧缓存超出当前上限时补一次淘汰
     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        koin.get<CacheRelocator>().cleanupPending()
         try {
             koin.get<DesktopCacheManager>().enforce(CacheLimits.normalize(settingsPreferences.audioCacheMaxSize.first()))
         } catch (e: Exception) {

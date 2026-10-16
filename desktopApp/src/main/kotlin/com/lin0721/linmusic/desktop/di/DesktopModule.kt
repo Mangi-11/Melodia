@@ -27,6 +27,7 @@ import com.lin0721.linmusic.core.source.LxPluginRuntime
 import com.lin0721.linmusic.core.source.PlatformSearchProvider
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopLibraryPreferences
 import com.lin0721.linmusic.desktop.data.DesktopOnlineStateProvider
@@ -137,6 +138,7 @@ val desktopPlatformModule = module {
             metadataDir = DesktopPaths.metadataCacheDir
         )
     }
+    single { CacheRelocator(get()) }
     single<CachedAudioIndex> {
         val downloadPreferences = get<DesktopDownloadPreferences>()
         val audioCache = get<AudioCache>()
@@ -215,5 +217,5 @@ val desktopViewModelModule = module {
     factoryOf(::ArtistViewModel)
     singleOf(::CommonSettingsViewModel)
     singleOf(::LxPluginSettingsViewModel)
-    single { DesktopSettingsViewModel(get(), get(), get(), get(), get()) }
+    single { DesktopSettingsViewModel(get(), get(), get(), get(), get(), get()) }
 }

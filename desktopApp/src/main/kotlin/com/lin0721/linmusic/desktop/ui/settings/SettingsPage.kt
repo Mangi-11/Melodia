@@ -29,6 +29,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -67,8 +68,8 @@ import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
-import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.platform.chooseDirectory
+import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
@@ -123,6 +124,8 @@ fun SettingsPage(
     val logBytes by desktop.logBytes.collectAsState()
     val cacheMaxSize by common.audioCacheMaxSize.collectAsState()
     val cacheUsage by desktop.cacheUsage.collectAsState()
+    val cacheDir by desktop.cacheDir.collectAsState()
+    val relocation by desktop.relocation.collectAsState()
     var confirmClearCache by remember { mutableStateOf(false) }
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
@@ -219,6 +222,41 @@ fun SettingsPage(
                         common.updateAudioCacheMaxSize(size)
                         desktop.enforceCacheLimit(size)
                     }
+                }
+                SettingRow(
+                    "缓存目录",
+                    subtitle = relocation?.let { "正在迁移缓存：${formatFileSize(it.copiedBytes)} / ${formatFileSize(it.totalBytes)}" }
+                        ?: (cacheDir.root.absolutePath + if (cacheDir.pendingRestart) "（重启后生效）" else "")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (relocation != null) {
+                            TextButton(onClick = desktop::cancelRelocation) {
+                                Text("取消迁移", color = DesktopColors.Accent)
+                            }
+                        } else {
+                            if (cacheDir.isCustom) {
+                                TextButton(onClick = { desktop.changeCacheDir(null) }) {
+                                    Text("恢复默认", color = DesktopColors.TextGray)
+                                }
+                            }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val initial = cacheDir.root.parentFile ?: cacheDir.root
+                                    chooseDirectory(initial, "选择缓存目录")?.let(desktop::changeCacheDir)
+                                }
+                            }) {
+                                Text("更改", color = DesktopColors.Accent)
+                            }
+                        }
+                    }
+                }
+                relocation?.let { progress ->
+                    LinearProgressIndicator(
+                        progress = { progress.fraction },
+                        modifier = Modifier.fillMaxWidth().height(3.dp),
+                        color = DesktopColors.Accent,
+                        trackColor = DesktopColors.SurfaceLight
+                    )
                 }
                 SettingRow(
                     "已用空间",
