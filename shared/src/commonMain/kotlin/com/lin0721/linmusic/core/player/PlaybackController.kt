@@ -66,6 +66,7 @@ interface PlaybackController {
         playContext: String? = null
     )
     fun addToPlayNext(items: List<QueueItem>)
+    fun appendToQueue(items: List<QueueItem>)
     fun playNext()
     fun playPrevious()
     fun skipToPrevious()

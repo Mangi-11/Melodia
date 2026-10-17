@@ -322,6 +322,16 @@ class MpvPlaybackController(
         saveQueueState()
     }
 
+    override fun appendToQueue(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        if (playbackQueue.isEmpty) {
+            playQueue(items, 0, null)
+            return
+        }
+        playbackQueue.append(items)
+        saveQueueState()
+    }
+
     override fun playNext() {
         consecutiveFailures = 0
         nextIndex(fromUser = true)?.let { playIndex(it) }

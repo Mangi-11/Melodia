@@ -110,6 +110,16 @@ class SilentPlaybackController : DesktopPlaybackController {
         refreshNeighbours()
     }
 
+    override fun appendToQueue(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        if (_queue.value.isEmpty()) {
+            playQueue(items, 0, null)
+            return
+        }
+        _queue.value = _queue.value + items
+        refreshNeighbours()
+    }
+
     override fun playNext() = step(1)
 
     override fun playPrevious() = step(-1)
