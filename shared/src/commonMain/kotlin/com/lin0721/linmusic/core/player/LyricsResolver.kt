@@ -19,10 +19,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.withTimeoutOrNull
 
-// 已匹配网易的歌优先网易歌词（逐字与翻译更全），拿不到再读本地。
+// 已匹配网易的歌曲优先 AMLL 与网易逐字，缺少逐字时尝试 QQ，最后回退本地。
 // 接入 AMLL 后：AMLL TTML 与网易并行拉取，AMLL 拿到逐字时序就直接采信（TTML 的逐字与背景和声
 // 比网易 YRC 更完整）；否则等双方到齐后一起比较，有逐字的胜出，都没逐字时取有内容的一方。
-enum class LyricsSource { AMLL, NETEASE, LOCAL }
+enum class LyricsSource { AMLL, NETEASE, LOCAL, QQ }
 
 data class ResolvedLyrics(val lines: List<LyricLine>, val source: LyricsSource)
 
@@ -34,7 +34,9 @@ class LyricsResolver(
     // 按 songId 读取 AMLL TTML 原文；平台未接入 AMLL 时保持默认实现返回 null
     private val readAmllLyrics: suspend (songId: Long) -> String? = { null },
     private val isAmllEnabled: suspend () -> Boolean = { true },
-    private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val readQqLyrics: suspend (songId: Long) -> List<LyricLine> = { emptyList() },
+    private val isQqEnabled: suspend () -> Boolean = { true }
 ) {
 
     private companion object {
@@ -42,6 +44,7 @@ class LyricsResolver(
         // 网易一侧刻意不加超时，保持上游"等到出结果为止"的行为。
         const val SELECTION_WINDOW_MS = 2500L
         const val AMLL_TIMEOUT_MS = 4000L
+        const val QQ_TIMEOUT_MS = 8000L
     }
 
     fun lyricsFor(songId: Long): Flow<Result<List<LyricLine>>> = lyricsWithSourceFor(songId)
@@ -67,7 +70,7 @@ class LyricsResolver(
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
         if (!isAmllEnabled()) {
-            emit(chooseWithSource(emptyList(), fetchNeteaseResult(songId)))
+            emit(withQqFallback(songId, chooseWithSource(emptyList(), fetchNeteaseResult(songId))))
             return@flow
         }
         coroutineScope {
@@ -83,12 +86,28 @@ class LyricsResolver(
                 val neteaseResult = netease.await()
                 // 网易已就绪，若此时 AMLL 已返回（包括窗口外刚好完成）则参与择优，否则视作未命中
                 val amllLines = if (amll.isCompleted) amll.getCompleted() else emptyList()
-                emit(chooseWithSource(amllLines, neteaseResult))
+                emit(withQqFallback(songId, chooseWithSource(amllLines, neteaseResult)))
             } finally {
                 amll.cancel()
                 netease.cancel()
             }
         }
+    }
+
+    // 仅缺少逐字歌词时查询 QQ；已有 AMLL 或网易逐字时不增加网络等待。
+    private suspend fun withQqFallback(songId: Long, current: Result<ResolvedLyrics>): Result<ResolvedLyrics> {
+        if (!isQqEnabled() || current.getOrNull()?.lines?.any { it.words.isNotEmpty() } == true) return current
+        val qq = try {
+            withTimeoutOrNull(QQ_TIMEOUT_MS) { readQqLyrics(songId) }.orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val lines = cleanLines(qq)
+        if (lines.isEmpty()) return current
+        if (lines.none { it.words.isNotEmpty() } && current.getOrNull()?.lines?.isNotEmpty() == true) return current
+        return Result.success(ResolvedLyrics(LyricTimeline.prepareLines(lines), LyricsSource.QQ))
     }
 
     /** AMLL 任何失败都降级为空列表；网易的失败要原样带回，上层需要区分"没有歌词"与"请求失败"。 */

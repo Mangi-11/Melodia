@@ -115,6 +115,7 @@ fun FullScreenLyricsView(
     val fullScreenLyricSecondaryMode by settingsPreferences.fullScreenLyricSecondaryMode.collectAsStateWithLifecycle(initialValue = "translation")
     val fullScreenKaraokeAdvancedEffect by settingsPreferences.fullScreenKaraokeAdvancedEffect.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenKaraokeGlowEffect by settingsPreferences.fullScreenKaraokeGlowEffect.collectAsStateWithLifecycle(initialValue = false)
+    val qqLyricsEnabled by settingsPreferences.qqLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val amllLyricsEnabled by settingsPreferences.amllLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenLyricLineSpacing by settingsPreferences.fullScreenLyricLineSpacing.collectAsStateWithLifecycle(initialValue = 24)
     val fullScreenLyricSecondarySpacing by settingsPreferences.fullScreenLyricSecondarySpacing.collectAsStateWithLifecycle(initialValue = 6)
@@ -731,6 +732,10 @@ fun FullScreenLyricsView(
                 karaokeGlowEffect = fullScreenKaraokeGlowEffect,
                 onKaraokeGlowEffectChange = { enabled ->
                     scope.launch { settingsPreferences.saveFullScreenKaraokeGlowEffect(enabled) }
+                },
+                qqLyricsEnabled = qqLyricsEnabled,
+                onQqLyricsEnabledChange = { enabled ->
+                    scope.launch { settingsPreferences.saveQqLyricsEnabled(enabled) }
                 },
                 amllLyricsEnabled = amllLyricsEnabled,
                 onAmllLyricsEnabledChange = { enabled ->

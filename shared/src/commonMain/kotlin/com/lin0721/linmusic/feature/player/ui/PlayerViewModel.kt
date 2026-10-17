@@ -410,7 +410,9 @@ class PlayerViewModel(
     }
 
     private suspend fun loadLyrics(songId: Long) {
-        settingsPreferences.amllLyricsEnabled.distinctUntilChanged().collectLatest {
+        combine(settingsPreferences.amllLyricsEnabled, settingsPreferences.qqLyricsEnabled) { amll, qq ->
+            amll to qq
+        }.distinctUntilChanged().collectLatest {
             reloadLyrics(songId)
         }
     }

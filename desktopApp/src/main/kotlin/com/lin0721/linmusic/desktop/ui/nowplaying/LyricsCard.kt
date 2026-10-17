@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,7 +88,8 @@ fun LyricsCard(
     onSeek: (Long) -> Unit,
     onOpenFullscreen: () -> Unit,
     onOpenLyricsView: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sourceLabel: String? = null
 ) {
     val transition = rememberInfiniteTransition(label = "lyricMesh")
     val darkCenterX by transition.animateFloat(
@@ -151,6 +153,9 @@ fun LyricsCard(
             null
         }
     ) {
+        sourceLabel?.let {
+            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+        }
         Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(viewportHeight)) {
             LyricList(
                 lines = lines,

@@ -208,6 +208,7 @@ private fun FullPlayerInfoCard(
             isLoading = false,
             base = colors.base,
             isAmll = songState.lyricsSource == LyricsSource.AMLL,
+            isQrc = songState.lyricsSource == LyricsSource.QQ && songState.lyrics.any { it.words.isNotEmpty() },
             onOpenFullScreen = onOpenFullScreenLyrics
         )
         FullPlayerCard.COMMENTS_PREVIEW -> CommentsPreviewCard(

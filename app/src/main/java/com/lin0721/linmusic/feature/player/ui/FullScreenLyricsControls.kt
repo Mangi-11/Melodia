@@ -379,6 +379,8 @@ fun FullScreenLyricsSettingsSheet(
     onAdvancedKaraokeEffectChange: (Boolean) -> Unit = {},
     karaokeGlowEffect: Boolean = false,
     onKaraokeGlowEffectChange: (Boolean) -> Unit = {},
+    qqLyricsEnabled: Boolean = true,
+    onQqLyricsEnabledChange: (Boolean) -> Unit = {},
     amllLyricsEnabled: Boolean = true,
     onAmllLyricsEnabledChange: (Boolean) -> Unit = {},
     autoHideControls: Boolean = false,
@@ -599,6 +601,13 @@ fun FullScreenLyricsSettingsSheet(
                         }
                         }
                         1 -> {
+                            LyricCompactSwitchRow(
+                                title = "启用QQ音乐歌词源",
+                                subtitle = "提供更多逐字歌词",
+                                checked = qqLyricsEnabled,
+                                onCheckedChange = onQqLyricsEnabledChange
+                            )
+
                             LyricCompactSwitchRow(
                                 title = "启用 AMLL 歌词源",
                                 subtitle = "支持对唱分边与背景和声",

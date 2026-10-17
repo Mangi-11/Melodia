@@ -58,6 +58,7 @@ fun LyricsCard(
     isLoading: Boolean,
     base: Color,
     isAmll: Boolean = false,
+    isQrc: Boolean = false,
     onOpenFullScreen: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "fluid_mesh")
@@ -143,9 +144,9 @@ fun LyricsCard(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-            if (isAmll) {
+            if (isAmll || isQrc) {
                 Text(
-                    "AMLL",
+                    if (isAmll) "AMLL" else "QRC",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )

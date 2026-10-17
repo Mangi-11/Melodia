@@ -110,7 +110,13 @@ fun NowPlayingPanel(
                                     base = base,
                                     onSeek = playerViewModel::seekToTime,
                                     onOpenFullscreen = onOpenLyricsFullscreen,
-                                    onOpenLyricsView = onOpenLyricsView
+                                    onOpenLyricsView = onOpenLyricsView,
+                                    sourceLabel = when (detailState.lyricsSource) {
+                                        com.lin0721.linmusic.core.player.LyricsSource.AMLL -> "AMLL"
+                                        com.lin0721.linmusic.core.player.LyricsSource.QQ ->
+                                            "QRC".takeIf { detailState.lyrics.any { it.words.isNotEmpty() } }
+                                        else -> null
+                                    }
                                 )
                                 FullPlayerCard.COMMENTS_PREVIEW -> CommentsPreviewCard(
                                     state = commentsState,
