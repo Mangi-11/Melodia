@@ -90,4 +90,11 @@ class ThumbnailImagesTest {
             assertTrue((p and 0xFF) <= alpha)
         }
     }
+
+    @Test
+    fun createEmptyDibCreatesValidPointer() {
+        val dib = GdiBitmaps.createEmptyDib()
+        assertTrue(dib != null)
+        dib?.let { GdiBitmaps.delete(it) }
+    }
 }
