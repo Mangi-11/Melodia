@@ -1,7 +1,9 @@
 package com.lin0721.linmusic
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import com.lin0721.linmusic.feature.recognition.service.ACTION_OPEN_RECOGNITION_RESULT
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import android.content.pm.ActivityInfo
@@ -13,19 +15,19 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.lin0721.linmusic.core.player.FloatingLyricService
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.ui.theme.MelodiaTheme
+import com.lin0721.linmusic.core.ui.theme.scaledBy
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
+import org.koin.core.context.GlobalContext
 
 class MainActivity : ComponentActivity() {
 
@@ -34,6 +36,25 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    // 本次创建时已应用的缩放百分比；偏好里的值与它不一致就重建界面
+    private var appliedUiScalePercent = UiScale.DEFAULT_PERCENT
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        // Activity 创建时 Koin 已由 Application 启动；读取失败按不缩放处理
+        appliedUiScalePercent = runCatching {
+            runBlocking { GlobalContext.get().get<SettingsPreferences>().uiScalePercent.first() }
+        }.getOrDefault(UiScale.DEFAULT_PERCENT)
+        val factor = UiScale.toFactor(appliedUiScalePercent)
+        if (factor != 1f) applyOverrideConfiguration(newBase.resources.configuration.scaledBy(factor))
+    }
+
+    // 覆盖配置里的 dp 尺寸是创建时的快照，旋转等配置变化后会过期，重建以按新配置重新换算
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (appliedUiScalePercent != UiScale.DEFAULT_PERCENT) recreate()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,14 +81,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 首帧即按已存缩放渲染，避免先以 100% 绘制再跳变
-        val initialUiScalePercent = runCatching {
-            runBlocking { settingsPreferences.uiScalePercent.first() }
-        }.getOrDefault(UiScale.DEFAULT_PERCENT)
+        // 设置页松手后写入新缩放，重建界面让它落到 Activity 配置上
+        lifecycleScope.launch {
+            settingsPreferences.uiScalePercent.collect { percent ->
+                if (percent != appliedUiScalePercent) recreate()
+            }
+        }
 
         setContent {
-            val uiScalePercent by settingsPreferences.uiScalePercent.collectAsState(initial = initialUiScalePercent)
-            MelodiaTheme(uiScale = UiScale.toFactor(uiScalePercent)) {
+            MelodiaTheme {
                 MelodiaApp()
             }
         }

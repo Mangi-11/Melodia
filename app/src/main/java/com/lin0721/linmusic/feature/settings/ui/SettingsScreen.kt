@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,7 +64,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
-    var activeSubMenu by remember { mutableStateOf<SettingsSubMenu?>(null) }
+    // 缩放变更会重建 Activity，当前打开的子菜单要随之保留
+    var activeSubMenu by rememberSaveable { mutableStateOf<SettingsSubMenu?>(null) }
 
     // 全局浮层开着时让位，避免抢先吞掉本该用来关浮层的返回事件
     BackHandler(enabled = activeSubMenu != null && !LocalGlobalOverlayOpen.current) {
