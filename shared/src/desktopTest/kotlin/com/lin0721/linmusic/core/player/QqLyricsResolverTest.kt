@@ -6,6 +6,7 @@ import com.lin0721.linmusic.core.player.domain.WordInfo
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,7 +29,7 @@ class QqLyricsResolverTest {
     @Test fun qqWordLyricsReplacePlainNeteaseAndCarrySource() = runTest {
         val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler), readQqLyrics = { word })
-        val resolved = resolver.lyricsWithSourceFor(1).first().getOrThrow()
+        val resolved = resolver.lyricsWithSourceFor(1).toList().last().getOrThrow()
         assertEquals(LyricsSource.QQ, resolved.source)
         assertEquals("逐字", resolved.lines.single().text)
     }
@@ -38,14 +39,14 @@ class QqLyricsResolverTest {
         val resolver = LyricsResolver(repo(Result.success(word)), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { qqReads++; emptyList() })
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertEquals(0, qqReads)
     }
 
     @Test fun qqRescuesNeteaseFailure() = runTest {
         val resolver = LyricsResolver(repo(Result.failure(IllegalStateException("offline"))), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler), readQqLyrics = { word })
-        assertEquals(LyricsSource.QQ, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.QQ, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
     }
 
     @Test fun disablingQqSkipsReaderAndReenablingReselectsTheSameSong() = runTest {
@@ -54,20 +55,20 @@ class QqLyricsResolverTest {
         val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { reads++; word }, isQqEnabled = { enabled })
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertEquals(0, reads)
         enabled = true
-        assertEquals(LyricsSource.QQ, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.QQ, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertEquals(1, reads)
         enabled = false
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertEquals(1, reads)
     }
 
     @Test fun qqPlainLyricsDoNotReplaceExistingPlainLyrics() = runTest {
         val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler), readQqLyrics = { plain })
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
     }
 
     @Test fun qqTimeoutPreservesOriginalErrorAndLocalFallback() = runTest {
@@ -75,7 +76,7 @@ class QqLyricsResolverTest {
         val resolver = LyricsResolver(repo(Result.failure(failure)), { "[00:01.00]本地" }, { if (it == 1L) "local" else null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { delay(9000); word })
-        assertEquals(LyricsSource.LOCAL, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.LOCAL, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertSame(failure, resolver.lyricsFor(2).first().exceptionOrNull())
         assertEquals(16000L, testScheduler.currentTime)
     }
@@ -85,7 +86,7 @@ class QqLyricsResolverTest {
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { throw CancellationException("cancel") })
         try {
-            resolver.lyricsFor(1).first()
+            resolver.lyricsFor(1).toList().last()
             fail("Cancellation should propagate")
         } catch (_: CancellationException) { }
     }

@@ -421,13 +421,13 @@ class PlayerViewModel(
         _songDetailState.update { it.copy(isLyricsLoading = true) }
         lyricsResolver.lyricsWithSourceFor(songId).collect { result ->
             result.onSuccess { resolved ->
-                _songDetailState.update { it.copy(lyrics = resolved.lines, lyricsSource = resolved.source) }
+                _songDetailState.update { it.copy(lyrics = resolved.lines, lyricsSource = resolved.source, isLyricsLoading = false) }
                 // 换了一套歌词，上一套累积的暂留行必须作废；并按当前位置立即对齐一次，
                 // 不等下一次进度回调，否则进入播放页时会短暂停留在上一首的残留行
                 resetLyricPlayback()
                 updateLyricPlayback(playerManager.currentPosition.value, isSeek = true)
             }.onFailure {
-                _songDetailState.update { it.copy(lyrics = emptyList(), lyricsSource = null) }
+                _songDetailState.update { it.copy(lyrics = emptyList(), lyricsSource = null, isLyricsLoading = false) }
                 resetLyricPlayback()
             }
         }
