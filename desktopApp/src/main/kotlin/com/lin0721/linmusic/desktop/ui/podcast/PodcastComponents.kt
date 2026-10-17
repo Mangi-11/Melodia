@@ -95,7 +95,7 @@ internal fun PodcastFilterBar(
     onSelect: (PodcastFilter) -> Unit
 ) {
     LazyRow(
-        modifier = Modifier.fillMaxWidth().background(DesktopColors.Pane).padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         contentPadding = PaddingValues(horizontal = PodcastEdgePadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {

@@ -242,7 +242,7 @@ private fun StyleTile(style: MusicStyle, onClick: () -> Unit) {
     }
 }
 
-// 选中为白底、未选中为描边的胶囊，曲风二级标签与播客分类共用
+// 选中为白底、未选中为白色半透明底色的胶囊，曲风二级标签与播客分类共用
 @Composable
 internal fun OutlineChip(text: String, selected: Boolean, onClick: () -> Unit) {
     FilterChip(
@@ -251,12 +251,12 @@ internal fun OutlineChip(text: String, selected: Boolean, onClick: () -> Unit) {
         label = { Text(text, fontSize = 13.sp) },
         shape = CircleShape,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = Color.Transparent,
-            labelColor = DesktopColors.TextGray,
+            containerColor = Color.White.copy(alpha = 0.1f),
+            labelColor = DesktopColors.TextPrimary,
             selectedContainerColor = DesktopColors.TextPrimary,
             selectedLabelColor = DesktopColors.Pane
         ),
-        border = if (selected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
+        border = null
     )
 }
 
