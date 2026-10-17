@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import com.lin0721.linmusic.core.log.AppLogger
 import kotlinx.coroutines.withTimeoutOrNull
 
-// 网易和 AMLL 并行查询，有内容就先显示；后续结果按逐字质量和来源优先级升级。
+// 先展示网易歌词，其他来源均确认结果后再统一择优，最多替换一次。
 enum class LyricsSource { AMLL, NETEASE, LOCAL, QQ }
 
 data class ResolvedLyrics(val lines: List<LyricLine>, val source: LyricsSource)
@@ -95,6 +95,12 @@ class LyricsResolver(
             var amll = emptyList<LyricLine>()
             var qq = emptyList<LyricLine>()
             var displayed: ResolvedLyrics? = null
+            suspend fun display(resolved: ResolvedLyrics) {
+                if (resolved == displayed) return
+                emit(Result.success(resolved))
+                displayed = resolved
+                AppLogger.d("LyricsResolver", "歌词更新 songId=$songId source=${resolved.source} lines=${resolved.lines.size}")
+            }
             try {
                 while (pending > 0) {
                     val update = updates.receive()
@@ -105,22 +111,25 @@ class LyricsResolver(
                         is SourceUpdate.Qq -> qq = update.lines
                         is SourceUpdate.Cancelled -> throw update.exception
                     }
-                    val candidate = chooseWithSource(amll, netease ?: Result.success(emptyList()), qq)
-                    val resolved = candidate.getOrNull()?.takeIf { it.lines.isNotEmpty() }
-                    if (resolved != null && resolved != displayed) {
-                        // 先展示现有结果，不让镜像或 QQ 查询阻塞界面；来源快照确保只按既定优先级升级。
-                        emit(candidate)
-                        displayed = resolved
-                        AppLogger.d("LyricsResolver", "歌词更新 songId=$songId source=${resolved.source} lines=${resolved.lines.size}")
+                    if (update is SourceUpdate.Netease) {
+                        // 首阶段只展示网易；即使备用源先返回，也留到最终阶段统一比较。
+                        chooseWithSource(emptyList(), update.result).getOrNull()
+                            ?.takeIf { it.lines.isNotEmpty() }?.let { display(it) }
+                        // 网易已有逐字、QQ 已关闭或 AMLL 已有逐字时，QQ 直接确认为无需查询。
+                        if (qqEnabled &&
+                            cleanLines(update.result.getOrNull().orEmpty()).none { it.words.isNotEmpty() } &&
+                            cleanLines(amll).none { it.words.isNotEmpty() }) {
+                            pending++
+                            jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
+                        }
                     }
-                    // 网易没有逐字时才并行补查 QQ，不等待 AMLL，也不重复请求网易。
-                    if (update is SourceUpdate.Netease && qqEnabled &&
-                        cleanLines(update.result.getOrNull().orEmpty()).none { it.words.isNotEmpty() } &&
-                        cleanLines(amll).none { it.words.isNotEmpty() }) {
-                        pending++
-                        jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
+                    // 成功、未命中、异常和超时都算完成；等待所有待查来源结束后最多更新一次。
+                    if (pending == 0) {
+                        val candidate = chooseWithSource(amll, netease ?: Result.success(emptyList()), qq)
+                        val resolved = candidate.getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                        if (resolved != null) display(resolved)
+                        else if (displayed == null) emit(candidate)
                     }
-                    if (pending == 0 && displayed == null) emit(candidate)
                 }
             } finally {
                 jobs.forEach { it.cancel() }

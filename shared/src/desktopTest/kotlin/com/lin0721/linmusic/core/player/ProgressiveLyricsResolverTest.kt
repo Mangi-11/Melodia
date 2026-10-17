@@ -40,16 +40,16 @@ class ProgressiveLyricsResolverTest {
         assertEquals(LyricsSource.AMLL, received.last().second.source)
     }
 
-    @Test fun slowNeteaseDoesNotBlockFastAmllOrDowngradeIt() = runTest {
+    @Test fun fastAmllWaitsForNeteaseBeforeFinalSelection() = runTest {
         val resolver = LyricsResolver(repo(Result.success(word), 3000), { null }, { null },
             readAmllLyrics = { delay(10); ttml }, processingDispatcher = StandardTestDispatcher(testScheduler))
         val received = mutableListOf<Pair<Long, ResolvedLyrics>>()
         launch { resolver.lyricsWithSourceFor(1).collect { received += testScheduler.currentTime to it.getOrThrow() } }
         advanceTimeBy(10); runCurrent()
-        assertEquals(10L, received.single().first)
-        assertEquals(LyricsSource.AMLL, received.single().second.source)
+        assertTrue(received.isEmpty())
         advanceUntilIdle()
-        assertEquals(1, received.size)
+        assertEquals(listOf(3000L, 3000L), received.map { it.first })
+        assertEquals(listOf(LyricsSource.NETEASE, LyricsSource.AMLL), received.map { it.second.source })
     }
 
     @Test fun amllFailureDoesNotClearOrRepeatNetease() = runTest {
@@ -116,22 +116,52 @@ class ProgressiveLyricsResolverTest {
         assertEquals(10L, testScheduler.currentTime)
     }
 
-    @Test fun neteaseThenQqThenAmllUpgradeWithoutWaitingForOtherSources() = runTest {
+    @Test fun neteaseAppearsFirstAndQqDoesNotAppearBeforeAmllFinishes() = runTest {
         val resolver = LyricsResolver(repo(Result.success(plain), 10), { null }, { null },
             readAmllLyrics = { delay(4000); ttml }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { delay(1000); word })
         val received = mutableListOf<Pair<Long, LyricsSource>>()
         launch { resolver.lyricsWithSourceFor(1).collect { received += testScheduler.currentTime to it.getOrThrow().source } }
+        advanceTimeBy(2000); runCurrent()
+        assertEquals(listOf(10L to LyricsSource.NETEASE), received)
         advanceUntilIdle()
-        assertEquals(listOf(10L to LyricsSource.NETEASE, 1010L to LyricsSource.QQ, 4000L to LyricsSource.AMLL), received)
+        assertEquals(listOf(10L to LyricsSource.NETEASE, 4000L to LyricsSource.AMLL), received)
     }
 
-    @Test fun lateQqDoesNotDowngradeAmll() = runTest {
+    @Test fun earlyAmllWaitsForPendingQqBeforeReplacingNetease() = runTest {
         val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
             readAmllLyrics = { delay(1000); ttml }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { delay(2000); word })
-        assertEquals(listOf(LyricsSource.NETEASE, LyricsSource.AMLL),
-            resolver.lyricsWithSourceFor(1).toList().map { it.getOrThrow().source })
+        val received = mutableListOf<Pair<Long, LyricsSource>>()
+        launch { resolver.lyricsWithSourceFor(1).collect { received += testScheduler.currentTime to it.getOrThrow().source } }
+        advanceTimeBy(1500); runCurrent()
+        assertEquals(listOf(0L to LyricsSource.NETEASE), received)
+        advanceUntilIdle()
+        assertEquals(listOf(0L to LyricsSource.NETEASE, 2000L to LyricsSource.AMLL), received)
+    }
+
+    @Test fun qqIsSelectedOnlyAfterAmllTimeoutConfirmsNoLyrics() = runTest {
+        val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
+            readAmllLyrics = { delay(20000); ttml }, processingDispatcher = StandardTestDispatcher(testScheduler),
+            readQqLyrics = { delay(1000); word })
+        val received = mutableListOf<Pair<Long, LyricsSource>>()
+        launch { resolver.lyricsWithSourceFor(1).collect { received += testScheduler.currentTime to it.getOrThrow().source } }
+        advanceTimeBy(11000); runCurrent()
+        assertEquals(listOf(0L to LyricsSource.NETEASE), received)
+        advanceUntilIdle()
+        assertEquals(listOf(0L to LyricsSource.NETEASE, 12000L to LyricsSource.QQ), received)
+    }
+
+    @Test fun amllIsSelectedAfterQqTimeout() = runTest {
+        val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
+            readAmllLyrics = { delay(1000); ttml }, processingDispatcher = StandardTestDispatcher(testScheduler),
+            readQqLyrics = { delay(20000); word })
+        val received = mutableListOf<Pair<Long, LyricsSource>>()
+        launch { resolver.lyricsWithSourceFor(1).collect { received += testScheduler.currentTime to it.getOrThrow().source } }
+        advanceTimeBy(7000); runCurrent()
+        assertEquals(listOf(0L to LyricsSource.NETEASE), received)
+        advanceUntilIdle()
+        assertEquals(listOf(0L to LyricsSource.NETEASE, 8000L to LyricsSource.AMLL), received)
     }
 
     @Test fun amllMayUpgradeAfterTheFormerFourSecondDeadline() = runTest {
