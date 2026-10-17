@@ -34,13 +34,13 @@ class QqLyricsResolverTest {
         assertEquals("逐字", resolved.lines.single().text)
     }
 
-    @Test fun neteaseWordTimingSkipsQqCompletely() = runTest {
+    @Test fun neteaseWordTimingWinsButDoesNotPreventParallelQqQuery() = runTest {
         var qqReads = 0
         val resolver = LyricsResolver(repo(Result.success(word)), { null }, { null },
             isAmllEnabled = { false }, processingDispatcher = StandardTestDispatcher(testScheduler),
             readQqLyrics = { qqReads++; emptyList() })
         assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
-        assertEquals(0, qqReads)
+        assertEquals(1, qqReads)
     }
 
     @Test fun qqRescuesNeteaseFailure() = runTest {
@@ -78,7 +78,7 @@ class QqLyricsResolverTest {
             readQqLyrics = { delay(9000); word })
         assertEquals(LyricsSource.LOCAL, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         assertSame(failure, resolver.lyricsFor(2).first().exceptionOrNull())
-        assertEquals(16000L, testScheduler.currentTime)
+        assertTrue(testScheduler.currentTime in 16000L..16500L)
     }
 
     @Test fun cancellationIsPropagated() = runTest {

@@ -17,10 +17,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import com.lin0721.linmusic.core.log.AppLogger
 import kotlinx.coroutines.withTimeoutOrNull
 
-// 先展示网易歌词，其他来源均确认结果后再统一择优，最多替换一次。
+// 启用的三源同时查询，每 250ms 按最新快照择优，保留最后一批结果。
 enum class LyricsSource { AMLL, NETEASE, LOCAL, QQ }
 
 data class ResolvedLyrics(val lines: List<LyricLine>, val source: LyricsSource)
@@ -41,6 +43,7 @@ class LyricsResolver(
     private companion object {
         const val AMLL_TIMEOUT_MS = 12000L
         const val QQ_TIMEOUT_MS = 8000L
+        const val UPDATE_INTERVAL_MS = 250L
     }
 
     fun lyricsFor(songId: Long): Flow<Result<List<LyricLine>>> = lyricsWithSourceFor(songId)
@@ -73,6 +76,7 @@ class LyricsResolver(
         data class Amll(val lines: List<LyricLine>) : SourceUpdate
         data class Qq(val lines: List<LyricLine>) : SourceUpdate
         data class Cancelled(val exception: CancellationException) : SourceUpdate
+        data object Tick : SourceUpdate
     }
 
     private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
@@ -88,9 +92,16 @@ class LyricsResolver(
             }
             val amllEnabled = isAmllEnabled()
             val qqEnabled = isQqEnabled()
-            var pending = if (amllEnabled) 2 else 1
+            var pending = 1 + (if (amllEnabled) 1 else 0) + (if (qqEnabled) 1 else 0)
             val jobs = mutableListOf(query { SourceUpdate.Netease(fetchNeteaseResult(songId)) })
             if (amllEnabled) jobs += query { SourceUpdate.Amll(fetchAmllLines(songId)) }
+            if (qqEnabled) jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
+            val ticker = launch {
+                while (isActive) {
+                    delay(UPDATE_INTERVAL_MS)
+                    updates.send(SourceUpdate.Tick)
+                }
+            }
             var netease: Result<List<LyricLine>>? = null
             var amll = emptyList<LyricLine>()
             var qq = emptyList<LyricLine>()
@@ -101,37 +112,27 @@ class LyricsResolver(
                 displayed = resolved
                 AppLogger.d("LyricsResolver", "歌词更新 songId=$songId source=${resolved.source} lines=${resolved.lines.size}")
             }
+            // 与 sample 类似按固定周期取最新值；查询结束后仍消费最后一次 Tick，避免丢失尾值。
+            var dirty = false
             try {
-                while (pending > 0) {
-                    val update = updates.receive()
-                    pending--
-                    when (update) {
-                        is SourceUpdate.Netease -> netease = update.result
-                        is SourceUpdate.Amll -> amll = update.lines
-                        is SourceUpdate.Qq -> qq = update.lines
+                while (pending > 0 || dirty) {
+                    when (val update = updates.receive()) {
+                        is SourceUpdate.Netease -> { netease = update.result; pending--; dirty = true }
+                        is SourceUpdate.Amll -> { amll = update.lines; pending--; dirty = true }
+                        is SourceUpdate.Qq -> { qq = update.lines; pending--; dirty = true }
                         is SourceUpdate.Cancelled -> throw update.exception
-                    }
-                    if (update is SourceUpdate.Netease) {
-                        // 首阶段只展示网易；即使备用源先返回，也留到最终阶段统一比较。
-                        chooseWithSource(emptyList(), update.result).getOrNull()
-                            ?.takeIf { it.lines.isNotEmpty() }?.let { display(it) }
-                        // 网易已有逐字、QQ 已关闭或 AMLL 已有逐字时，QQ 直接确认为无需查询。
-                        if (qqEnabled &&
-                            cleanLines(update.result.getOrNull().orEmpty()).none { it.words.isNotEmpty() } &&
-                            cleanLines(amll).none { it.words.isNotEmpty() }) {
-                            pending++
-                            jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
+                        SourceUpdate.Tick -> {
+                            if (!dirty) continue
+                            val candidate = chooseWithSource(amll, netease ?: Result.success(emptyList()), qq)
+                            val resolved = candidate.getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                            if (resolved != null) display(resolved)
+                            else if (pending == 0 && displayed == null) emit(candidate)
+                            dirty = false
                         }
-                    }
-                    // 成功、未命中、异常和超时都算完成；等待所有待查来源结束后最多更新一次。
-                    if (pending == 0) {
-                        val candidate = chooseWithSource(amll, netease ?: Result.success(emptyList()), qq)
-                        val resolved = candidate.getOrNull()?.takeIf { it.lines.isNotEmpty() }
-                        if (resolved != null) display(resolved)
-                        else if (displayed == null) emit(candidate)
                     }
                 }
             } finally {
+                ticker.cancel()
                 jobs.forEach { it.cancel() }
                 updates.cancel()
             }

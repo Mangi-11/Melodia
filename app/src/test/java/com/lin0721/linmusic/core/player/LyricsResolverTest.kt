@@ -76,17 +76,18 @@ class LyricsResolverTest {
     }
 
     @Test
-    fun `关闭AMLL不读取镜像或缓存并立即使用网易`() = runTest {
+    fun `关闭AMLL不读取镜像或缓存并按采样周期使用网易`() = runTest {
         val repo = FakePlaybackRepository(Result.success(onlineLines))
         var amllReads = 0
         val resolver = LyricsResolver(
             repo, readLocalLyrics = { null }, localUriOf = { null },
-            readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { false }
+            readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { false },
+            processingDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
         )
         assertEquals("网易歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         assertEquals(0, amllReads)
         assertEquals(1, repo.lyricRequests)
-        assertEquals(0L, testScheduler.currentTime)
+        assertEquals(250L, testScheduler.currentTime)
     }
 
     @Test
