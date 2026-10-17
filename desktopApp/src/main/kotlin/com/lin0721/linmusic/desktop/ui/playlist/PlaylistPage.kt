@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
@@ -126,6 +127,7 @@ import com.lin0721.linmusic.desktop.ui.track.ADDED_COLUMN_WIDTH
 import com.lin0721.linmusic.desktop.ui.track.ImportSubmenuContent
 import com.lin0721.linmusic.desktop.ui.track.TrackReorder
 import com.lin0721.linmusic.desktop.ui.track.TrackRowSelection
+import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.desktop.ui.track.TrackSelectionBar
 import com.lin0721.linmusic.desktop.ui.track.TrackRow
 import com.lin0721.linmusic.desktop.ui.track.rememberTrackActions
@@ -220,6 +222,13 @@ private fun PlaylistContent(
     val likedSongIds by viewModel.likedSongIds.collectAsState()
     val unplayableIds by viewModel.unplayableIds.collectAsState()
     val collectState by viewModel.collectState.collectAsState()
+    val playMode by controller.playMode.collectAsState()
+    val isShuffleActive = playMode == PlayMode.SHUFFLE
+    val isPlaying by controller.playWhenReady.collectAsState()
+    val playContext by controller.playContext.collectAsState()
+    val playSource by controller.playSource.collectAsState()
+    val isThisPlaylistContext = playSource?.id == playlist.id || (playlist.name.isNotBlank() && playContext == playlist.name)
+    val isCurrentlyPlayingThis = isThisPlaylistContext && isPlaying
 
     val uid = profile?.uid
     val isLikedView = uid != null && !isAlbum && isLikedSongsPlaylist(playlist.name, playlist.id, uid)
@@ -307,10 +316,19 @@ private fun PlaylistContent(
 
     val viewOf = { all: List<Track> -> sortTracks(filterTracks(all, query), order, addedAt) }
     val playFrom: (Track) -> Unit = { track ->
-        if (customView) {
+        if (customView && !isShuffleActive) {
             viewModel.playTrackInPlaylist(track)
         } else {
-            viewModel.ensureAllTracksLoaded { all -> viewModel.playSongInList(track, viewOf(all)) }
+            viewModel.ensureAllTracksLoaded { all ->
+                val list = viewOf(all)
+                val ordered = if (isShuffleActive) {
+                    val remaining = list.filter { it.id != track.id }.shuffled()
+                    listOf(track) + remaining
+                } else {
+                    list
+                }
+                viewModel.playSongInList(track, ordered)
+            }
         }
     }
     val playDisplayed: (Boolean) -> Unit = { shuffle ->
@@ -321,6 +339,13 @@ private fun PlaylistContent(
                 val ordered = viewOf(all).let { if (shuffle) it.shuffled() else it }
                 ordered.firstOrNull { it.id !in unplayableIds }?.let { viewModel.playSongInList(it, ordered) }
             }
+        }
+    }
+    val onPlayClick = {
+        if (isThisPlaylistContext) {
+            controller.togglePlayPause()
+        } else {
+            playDisplayed(isShuffleActive)
         }
     }
 
@@ -390,8 +415,10 @@ private fun PlaylistContent(
                             if (!commentsOpen) viewModel.loadPlaylistComments(playlist.id)
                             navigator.toggleCommentsPanel(commentsHost)
                         },
-                        onPlay = { playDisplayed(false) },
-                        onShuffle = { playDisplayed(true) },
+                        isPlaying = isCurrentlyPlayingThis,
+                        onPlay = onPlayClick,
+                        isShuffleActive = isShuffleActive,
+                        onToggleShuffle = controller::toggleShuffle,
                         onToggleSubscribe = {
                             if (navigator.isLoggedIn) viewModel.toggleSubscribePlaylist() else navigator.showMessage("请先登录账号")
                         },
@@ -548,7 +575,7 @@ private fun PlaylistContent(
                 enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
                 exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
             ) {
-                PlaylistStickyBar(playlist.name, heroColor, showPlayButton, listState) { playDisplayed(false) }
+                PlaylistStickyBar(playlist.name, heroColor, showPlayButton, isCurrentlyPlayingThis, listState, onPlayClick)
             }
         }
     }
@@ -693,6 +720,7 @@ private fun PlaylistStickyBar(
     name: String,
     color: Color,
     showPlay: Boolean,
+    isPlaying: Boolean,
     listState: LazyListState,
     onPlay: () -> Unit
 ) {
@@ -708,7 +736,7 @@ private fun PlaylistStickyBar(
             enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(tween(STICKY_BAR_ANIMATION_MS)),
             exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(tween(STICKY_BAR_ANIMATION_MS))
         ) {
-            PlayCircleButton(StickyPlayButtonSize, 28.dp, onPlay, Modifier.padding(end = 12.dp))
+            PlayCircleButton(StickyPlayButtonSize, 28.dp, isPlaying, onPlay, Modifier.padding(end = 12.dp))
         }
         Text(
             name,
@@ -722,14 +750,25 @@ private fun PlaylistStickyBar(
 }
 
 @Composable
-private fun PlayCircleButton(size: Dp, iconSize: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    DesktopTooltip("播放") {
+private fun PlayCircleButton(
+    size: Dp,
+    iconSize: Dp,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    DesktopTooltip(if (isPlaying) "暂停" else "播放全部") {
         Box(
             modifier.size(size).clip(CircleShape).background(DesktopColors.Accent)
                 .pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Rounded.PlayArrow, "播放全部", tint = DesktopColors.TextPrimary, modifier = Modifier.size(iconSize))
+            Icon(
+                if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                if (isPlaying) "暂停" else "播放全部",
+                tint = DesktopColors.TextPrimary,
+                modifier = Modifier.size(iconSize)
+            )
         }
     }
 }
@@ -747,8 +786,10 @@ private fun PlaylistActionBar(
     showComments: Boolean,
     commentsOpen: Boolean,
     onToggleComments: () -> Unit,
+    isPlaying: Boolean,
     onPlay: () -> Unit,
-    onShuffle: () -> Unit,
+    isShuffleActive: Boolean,
+    onToggleShuffle: () -> Unit,
     onToggleSubscribe: () -> Unit,
     onDownload: () -> Unit,
     onPlayNextAll: () -> Unit,
@@ -768,8 +809,13 @@ private fun PlaylistActionBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PlayCircleButton(PlayButtonSize, 32.dp, onPlay)
-        ActionIcon(Icons.Rounded.Shuffle, "随机播放", onClick = onShuffle)
+        PlayCircleButton(PlayButtonSize, 32.dp, isPlaying, onPlay)
+        ActionIcon(
+            Icons.Rounded.Shuffle,
+            if (isShuffleActive) "随机播放已开启" else "随机播放已关闭",
+            tint = if (isShuffleActive) DesktopColors.Accent else DesktopColors.TextGray,
+            onClick = onToggleShuffle
+        )
         if (canSubscribe) {
             ActionIcon(
                 if (isSubscribed) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
