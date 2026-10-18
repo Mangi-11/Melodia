@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -61,7 +62,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -147,6 +151,11 @@ private val SpotlightCoverSize = 96.dp
 private const val SPOTLIGHT_DARKEN_FRACTION = 0.35f
 private const val SPOTLIGHT_TRACK_PREVIEW_COUNT = 8
 
+// 顶部渐变参数：主色压暗比例、高度与渐变色彩过渡时间
+private const val HOME_GRADIENT_DARKEN_FRACTION = 0.35f
+private val HomeGradientHeight = 300.dp
+private const val HOME_GRADIENT_ANIM_MS = 350
+
 // 顶部固定「全部 / 音乐 / 播客」胶囊，下方按选中项切换内容；各 tab 的数据切过去才拉，
 // 滚动位置在首页内按 tab 各自保留
 @Composable
@@ -164,6 +173,7 @@ fun HomePage(
     modifier: Modifier = Modifier
 ) {
     val navigator = LocalDesktopNavigator.current
+    val homeUiState by viewModel.uiState.collectAsState()
     val musicState by musicViewModel.uiState.collectAsState()
     val podcastState by podcastViewModel.state.collectAsState()
     val newWorksState by newWorksViewModel.uiState.collectAsState()
@@ -174,6 +184,49 @@ fun HomePage(
     val musicListState = rememberLazyListState()
     val podcastListState = rememberLazyListState()
     val newWorksGridState = rememberLazyGridState()
+
+    val defaultCoverUrl = (homeUiState as? HomeUiState.Success)?.data?.recentPlaylists?.firstOrNull()?.coverUrl.orEmpty()
+    var hoveredCoverUrl by remember { mutableStateOf<String?>(null) }
+    val activeCoverUrl = hoveredCoverUrl ?: defaultCoverUrl
+
+    var heroBase by remember { mutableStateOf(FallbackCoverPalette.base) }
+    LaunchedEffect(activeCoverUrl) {
+        if (activeCoverUrl.isNotBlank()) {
+            heroBase = extractCoverPaletteFromUrl(activeCoverUrl).base
+        }
+    }
+    val gradientColor by animateColorAsState(
+        targetValue = if (activeCoverUrl.isNotBlank()) {
+            lerp(heroBase, Color.Black, HOME_GRADIENT_DARKEN_FRACTION)
+        } else {
+            DesktopColors.Pane
+        },
+        animationSpec = tween(HOME_GRADIENT_ANIM_MS),
+        label = "homeTopGradient"
+    )
+
+    val currentScrollOffset by remember(selectedTab, newWorksSelected) {
+        derivedStateOf {
+            when {
+                selectedTab == HOME_TAB_MUSIC && newWorksSelected -> {
+                    if (newWorksGridState.firstVisibleItemIndex == 0) newWorksGridState.firstVisibleItemScrollOffset.toFloat()
+                    else 10000f
+                }
+                selectedTab == HOME_TAB_MUSIC -> {
+                    if (musicListState.firstVisibleItemIndex == 0) musicListState.firstVisibleItemScrollOffset.toFloat()
+                    else 10000f
+                }
+                selectedTab == HOME_TAB_PODCAST -> {
+                    if (podcastListState.firstVisibleItemIndex == 0) podcastListState.firstVisibleItemScrollOffset.toFloat()
+                    else 10000f
+                }
+                else -> {
+                    if (allListState.firstVisibleItemIndex == 0) allListState.firstVisibleItemScrollOffset.toFloat()
+                    else 10000f
+                }
+            }
+        }
+    }
 
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
@@ -190,66 +243,85 @@ fun HomePage(
             selectedTab = selectedTab,
             onSelect = onTabSelected,
             newWorksSelected = newWorksSelected,
-            onNewWorksSelect = { onNewWorksSelectedChange(true) }
+            onNewWorksSelect = { onNewWorksSelectedChange(true) },
+            modifier = Modifier.fillMaxWidth().background(gradientColor)
         )
-        Box(Modifier.weight(1f)) {
-            when {
-                selectedTab == HOME_TAB_MUSIC && newWorksSelected -> NewWorksTab(
-                    uiState = newWorksState,
-                    gridState = newWorksGridState,
-                    collectState = newWorksCollectState,
-                    importState = newWorksImportState,
-                    status = newWorksStatus,
-                    actions = remember(newWorksViewModel, navigator) {
-                        NewWorksTabActions(
-                            onAlbumClick = navigator.openAlbum,
-                            onTogglePlay = newWorksViewModel::togglePlayRelease,
-                            onToggleLibrary = newWorksViewModel::toggleInLibrary,
-                            onAddToPlayNext = newWorksViewModel::addToPlayNext,
-                            onPrepareCollect = newWorksViewModel::prepareCollectDialog,
-                            onSaveCollection = newWorksViewModel::savePlaylistCollection,
-                            onSaveNewCollection = newWorksViewModel::createPlaylistAndAddSong,
-                            onPrepareImportTargets = newWorksViewModel::prepareImportTargets,
-                            onAddToPlaylist = newWorksViewModel::addToPlaylist,
-                            onCreatePlaylistAndAdd = newWorksViewModel::createPlaylistAndAdd,
-                            onRetry = newWorksViewModel::load,
-                            onLoadMore = newWorksViewModel::loadMore
-                        )
-                    }
-                )
-                selectedTab == HOME_TAB_MUSIC -> MusicTab(
-                    uiState = musicState,
-                    listState = musicListState,
-                    onStyleClick = onStyleClick,
-                    onRetry = musicViewModel::loadStyles
-                )
-                selectedTab == HOME_TAB_PODCAST -> PodcastTab(
-                    state = podcastState,
-                    listState = podcastListState,
-                    actions = remember(podcastViewModel, navigator) {
-                        PodcastTabActions(
-                            onFilterSelect = podcastViewModel::selectFilter,
-                            onResume = podcastViewModel::resume,
-                            onPickPlay = podcastViewModel::playPicks,
-                            onRadioClick = { navigator.openRadio(it.id) },
-                            onOpenSubscribed = navigator.openPodcastSubscribed,
-                            onOpenToplist = navigator.openPodcastToplist,
-                            onOpenCategory = navigator.openPodcastCategory,
-                            onLoginClick = navigator.openLogin,
-                            onRetryAll = podcastViewModel::refresh,
-                            onRetrySubscribed = podcastViewModel::retrySubscribed,
-                            onRetryPicks = podcastViewModel::retryPicks,
-                            onRetryCategoryGroups = podcastViewModel::retryCategoryGroups,
-                            onRetryToplist = podcastViewModel::retryToplistRadios,
-                            onRetryCategoryRadios = podcastViewModel::retryCategoryRadios
-                        )
-                    }
-                )
-                else -> HomeAllContent(viewModel, allListState, onPlaylistClick)
+        Box(Modifier.weight(1f).clipToBounds()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(HomeGradientHeight)
+                    .graphicsLayer { translationY = -currentScrollOffset }
+                    .background(Brush.verticalGradient(listOf(gradientColor, DesktopColors.Pane)))
+            )
+                when {
+                    selectedTab == HOME_TAB_MUSIC && newWorksSelected -> NewWorksTab(
+                        uiState = newWorksState,
+                        gridState = newWorksGridState,
+                        collectState = newWorksCollectState,
+                        importState = newWorksImportState,
+                        status = newWorksStatus,
+                        actions = remember(newWorksViewModel, navigator) {
+                            NewWorksTabActions(
+                                onAlbumClick = navigator.openAlbum,
+                                onTogglePlay = newWorksViewModel::togglePlayRelease,
+                                onToggleLibrary = newWorksViewModel::toggleInLibrary,
+                                onAddToPlayNext = newWorksViewModel::addToPlayNext,
+                                onPrepareCollect = newWorksViewModel::prepareCollectDialog,
+                                onSaveCollection = newWorksViewModel::savePlaylistCollection,
+                                onSaveNewCollection = newWorksViewModel::createPlaylistAndAddSong,
+                                onPrepareImportTargets = newWorksViewModel::prepareImportTargets,
+                                onAddToPlaylist = newWorksViewModel::addToPlaylist,
+                                onCreatePlaylistAndAdd = newWorksViewModel::createPlaylistAndAdd,
+                                onRetry = newWorksViewModel::load,
+                                onLoadMore = newWorksViewModel::loadMore
+                            )
+                        }
+                    )
+                    selectedTab == HOME_TAB_MUSIC -> MusicTab(
+                        uiState = musicState,
+                        listState = musicListState,
+                        onStyleClick = onStyleClick,
+                        onRetry = musicViewModel::loadStyles
+                    )
+                    selectedTab == HOME_TAB_PODCAST -> PodcastTab(
+                        state = podcastState,
+                        listState = podcastListState,
+                        actions = remember(podcastViewModel, navigator) {
+                            PodcastTabActions(
+                                onFilterSelect = podcastViewModel::selectFilter,
+                                onResume = podcastViewModel::resume,
+                                onPickPlay = podcastViewModel::playPicks,
+                                onRadioClick = { navigator.openRadio(it.id) },
+                                onOpenSubscribed = navigator.openPodcastSubscribed,
+                                onOpenToplist = navigator.openPodcastToplist,
+                                onOpenCategory = navigator.openPodcastCategory,
+                                onLoginClick = navigator.openLogin,
+                                onRetryAll = podcastViewModel::refresh,
+                                onRetrySubscribed = podcastViewModel::retrySubscribed,
+                                onRetryPicks = podcastViewModel::retryPicks,
+                                onRetryCategoryGroups = podcastViewModel::retryCategoryGroups,
+                                onRetryToplist = podcastViewModel::retryToplistRadios,
+                                onRetryCategoryRadios = podcastViewModel::retryCategoryRadios
+                            )
+                        }
+                    )
+                    else -> HomeAllContent(
+                        viewModel = viewModel,
+                        listState = allListState,
+                        onPlaylistClick = onPlaylistClick,
+                        onTileHover = { url, isHovered ->
+                            if (isHovered) {
+                                hoveredCoverUrl = url
+                            } else if (hoveredCoverUrl == url) {
+                                hoveredCoverUrl = null
+                            }
+                        }
+                    )
+                }
             }
         }
     }
-}
 
 @Composable
 internal fun HomeTabLoading(modifier: Modifier = Modifier.fillMaxSize()) {
@@ -271,12 +343,17 @@ internal fun HomeTabError(message: String, onRetry: () -> Unit, modifier: Modifi
 }
 
 @Composable
-private fun HomeAllContent(viewModel: HomeViewModel, listState: LazyListState, onPlaylistClick: (id: Long, title: String) -> Unit) {
+private fun HomeAllContent(
+    viewModel: HomeViewModel,
+    listState: LazyListState,
+    onPlaylistClick: (id: Long, title: String) -> Unit,
+    onTileHover: (coverUrl: String, isHovered: Boolean) -> Unit
+) {
     val uiState by viewModel.uiState.collectAsState()
     when (val state = uiState) {
         HomeUiState.Loading -> HomeTabLoading()
         is HomeUiState.Error -> HomeTabError(state.message, viewModel::refreshHomeData)
-        is HomeUiState.Success -> HomeFeed(state.data, viewModel, listState, onPlaylistClick, Modifier)
+        is HomeUiState.Success -> HomeFeed(state.data, viewModel, listState, onPlaylistClick, onTileHover, Modifier)
     }
 }
 
@@ -286,6 +363,7 @@ private fun HomeFeed(
     viewModel: HomeViewModel,
     listState: LazyListState,
     onPlaylistClick: (id: Long, title: String) -> Unit,
+    onTileHover: (coverUrl: String, isHovered: Boolean) -> Unit,
     modifier: Modifier
 ) {
     val shouldLoadMore by remember(data) {
@@ -308,7 +386,7 @@ private fun HomeFeed(
                     contentPadding = PaddingValues(vertical = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(32.dp)
                 ) {
-                    homeItems(data, viewModel, onPlaylistClick)
+                    homeItems(data, viewModel, onPlaylistClick, onTileHover)
                 }
             }
         }
@@ -323,7 +401,8 @@ private fun LazyItemScope.reflow(): Modifier =
 private fun LazyListScope.homeItems(
     data: HomeFeedData,
     viewModel: HomeViewModel,
-    onPlaylistClick: (id: Long, title: String) -> Unit
+    onPlaylistClick: (id: Long, title: String) -> Unit,
+    onTileHover: (coverUrl: String, isHovered: Boolean) -> Unit
 ) {
     if (data.recentPlaylists.isNotEmpty()) {
         item(key = "recent") {
@@ -332,7 +411,8 @@ private fun LazyListScope.homeItems(
                 viewModel = viewModel,
                 modifier = reflow(),
                 onClick = { id, title -> onPlaylistClick(id, title) },
-                onPlay = { id -> viewModel.playCollection(id, isAlbum = false) }
+                onPlay = { id -> viewModel.playCollection(id, isAlbum = false) },
+                onTileHover = onTileHover
             )
         }
     }
@@ -420,7 +500,8 @@ private fun RecentGrid(
     viewModel: HomeViewModel,
     modifier: Modifier,
     onClick: (Long, String) -> Unit,
-    onPlay: (Long) -> Unit
+    onPlay: (Long) -> Unit,
+    onTileHover: (coverUrl: String, isHovered: Boolean) -> Unit
 ) {
     BoxWithConstraints(modifier) {
         val available = maxWidth - RecentGridPadding * 2
@@ -453,7 +534,8 @@ private fun RecentGrid(
                             titleSize = titleSize,
                             modifier = Modifier.weight(1f),
                             onClick = { onClick(playlist.id, playlist.name) },
-                            onPlay = { onPlay(playlist.id) }
+                            onPlay = { onPlay(playlist.id) },
+                            onHover = { isHovered -> onTileHover(playlist.coverUrl, isHovered) }
                         )
                     }
                 }
@@ -473,18 +555,28 @@ private fun RecentTile(
     titleSize: TextUnit,
     modifier: Modifier,
     onClick: () -> Unit,
-    onPlay: () -> Unit
+    onPlay: () -> Unit,
+    onHover: (Boolean) -> Unit = {}
 ) {
     val navigator = LocalDesktopNavigator.current
     val subscribedPlaylistIds by viewModel.subscribedPlaylistIds.collectAsState()
     val isSubscribed = playlist.id in subscribedPlaylistIds
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+
+    LaunchedEffect(hovered) {
+        onHover(hovered)
+    }
+    DisposableEffect(playlist.coverUrl) {
+        onDispose {
+            onHover(false)
+        }
+    }
     val density = LocalDensity.current
     var tileHeightPx by remember { mutableIntStateOf(0) }
     var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
-        if (hovered || contextMenuOffset != null) DesktopColors.SurfaceLight else DesktopColors.Surface,
+        if (hovered || contextMenuOffset != null) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
         tween(HOVER_FADE_MS),
         label = "recentTileBg"
     )

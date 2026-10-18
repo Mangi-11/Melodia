@@ -48,6 +48,7 @@ internal interface User32 : Library {
         const val WM_COMMAND = 0x0111
         const val WM_SETTINGCHANGE = 0x001A
         const val WM_DWMSENDICONICTHUMBNAIL = 0x0323
+        const val WM_DWMSENDICONICLIVEPREVIEWBITMAP = 0x0326
 
         const val WS_CAPTION = 0x00C00000L
         const val WS_SYSMENU = 0x00080000L

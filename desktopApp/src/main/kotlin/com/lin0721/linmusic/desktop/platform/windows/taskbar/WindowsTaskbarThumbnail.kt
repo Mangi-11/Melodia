@@ -68,6 +68,7 @@ internal class WindowsTaskbarThumbnail(private val effects: WindowsWindowEffects
         post {
             // 悬停缩略图时不再弹出整窗放大预览
             setWindowFlag(handle, Dwmapi.DWMWA_DISALLOW_PEEK, true)
+            setWindowFlag(handle, Dwmapi.DWMWA_EXCLUDED_FROM_PEEK, true)
             Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_MULTITHREADED)
             taskbarList = TaskbarList3.create()
             syncThemeAndButtons()
@@ -107,6 +108,7 @@ internal class WindowsTaskbarThumbnail(private val effects: WindowsWindowEffects
         post {
             setIconic(handle, false)
             setWindowFlag(handle, Dwmapi.DWMWA_DISALLOW_PEEK, false)
+            setWindowFlag(handle, Dwmapi.DWMWA_EXCLUDED_FROM_PEEK, false)
             icons.values.forEach { GdiBitmaps.destroyIcon(it) }
             icons = emptyMap()
             taskbarList?.release()
@@ -123,6 +125,10 @@ internal class WindowsTaskbarThumbnail(private val effects: WindowsWindowEffects
         return when (msg) {
             User32.WM_DWMSENDICONICTHUMBNAIL -> {
                 respondThumbnail(hwnd, lParam)
+                0L
+            }
+            User32.WM_DWMSENDICONICLIVEPREVIEWBITMAP -> {
+                respondLivePreview(hwnd)
                 0L
             }
             User32.WM_COMMAND -> onCommand(wParam)
@@ -178,6 +184,16 @@ internal class WindowsTaskbarThumbnail(private val effects: WindowsWindowEffects
         }
     }
 
+    private fun respondLivePreview(hwnd: Pointer) {
+        val bitmap = GdiBitmaps.createEmptyDib() ?: return
+        try {
+            val hr = Dwmapi.INSTANCE.DwmSetIconicLivePreviewBitmap(hwnd, bitmap, null, 0)
+            if (hr != 0) AppLogger.d(TAG, "DwmSetIconicLivePreviewBitmap 未生效 hr=0x${Integer.toHexString(hr)}")
+        } finally {
+            GdiBitmaps.delete(bitmap)
+        }
+    }
+
     private fun applyState(state: PlaybackState) {
         playbackState = state
         hwnd?.let { setIconic(it, state.hasTrack) }
@@ -194,7 +210,11 @@ internal class WindowsTaskbarThumbnail(private val effects: WindowsWindowEffects
             listOf(Dwmapi.DWMWA_FORCE_ICONIC_REPRESENTATION, Dwmapi.DWMWA_HAS_ICONIC_BITMAP)
         }
         for (attribute in order) setWindowFlag(handle, attribute, on)
-        if (on) Dwmapi.INSTANCE.DwmInvalidateIconicBitmaps(handle)
+        if (on) {
+            setWindowFlag(handle, Dwmapi.DWMWA_DISALLOW_PEEK, true)
+            setWindowFlag(handle, Dwmapi.DWMWA_EXCLUDED_FROM_PEEK, true)
+            Dwmapi.INSTANCE.DwmInvalidateIconicBitmaps(handle)
+        }
     }
 
     private fun setWindowFlag(handle: Pointer, attribute: Int, on: Boolean) {

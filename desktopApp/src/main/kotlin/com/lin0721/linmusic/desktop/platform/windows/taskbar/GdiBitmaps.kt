@@ -20,6 +20,9 @@ private const val ICON_INFO_COLOR_OFFSET = 24L
 // 缩略图位图与工具栏图标所需的 GDI 对象
 internal object GdiBitmaps {
 
+    // 1x1 全透明位图，用于静默响应悬停整窗预览；调用方负责 delete
+    fun createEmptyDib(): Pointer? = createDib(1, 1, intArrayOf(0))
+
     // 自上而下的 32 位 DIB，像素按 ARGB 的 Int 写入（即内存中的 BGRA）；调用方负责 delete
     fun createDib(width: Int, height: Int, argb: IntArray): Pointer? {
         if (width <= 0 || height <= 0 || argb.size != width * height) return null
