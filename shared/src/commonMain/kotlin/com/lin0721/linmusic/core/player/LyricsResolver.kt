@@ -41,7 +41,7 @@ class LyricsResolver(
 ) {
 
     private companion object {
-        const val AMLL_TIMEOUT_MS = 12000L
+        const val AMLL_TIMEOUT_MS = 6000L
         const val QQ_TIMEOUT_MS = 8000L
         const val UPDATE_INTERVAL_MS = 250L
     }
@@ -82,19 +82,24 @@ class LyricsResolver(
     private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
         coroutineScope {
             val updates = Channel<SourceUpdate>(Channel.UNLIMITED)
-            fun query(block: suspend () -> SourceUpdate) = launch {
+            fun query(reportCancellation: () -> Boolean = { true }, block: suspend () -> SourceUpdate) = launch {
                 try {
                     updates.send(block())
                 } catch (e: CancellationException) {
                     // 子查询主动取消也要通知协调器，避免等待一条永远不会到达的结果。
-                    updates.trySend(SourceUpdate.Cancelled(e))
+                    if (reportCancellation()) updates.trySend(SourceUpdate.Cancelled(e))
                 }
             }
             val amllEnabled = isAmllEnabled()
             val qqEnabled = isQqEnabled()
             var pending = 1 + (if (amllEnabled) 1 else 0) + (if (qqEnabled) 1 else 0)
             val jobs = mutableListOf(query { SourceUpdate.Netease(fetchNeteaseResult(songId)) })
-            if (amllEnabled) jobs += query { SourceUpdate.Amll(fetchAmllLines(songId)) }
+            var amllStopped = false
+            var amllPending = amllEnabled
+            var qqFinished = false
+            val amllJob = if (amllEnabled) query(reportCancellation = { !amllStopped }) {
+                SourceUpdate.Amll(fetchAmllLines(songId))
+            }.also { jobs += it } else null
             if (qqEnabled) jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
             val ticker = launch {
                 while (isActive) {
@@ -118,8 +123,10 @@ class LyricsResolver(
                 while (pending > 0 || dirty) {
                     when (val update = updates.receive()) {
                         is SourceUpdate.Netease -> { netease = update.result; pending--; dirty = true }
-                        is SourceUpdate.Amll -> { amll = update.lines; pending--; dirty = true }
-                        is SourceUpdate.Qq -> { qq = update.lines; pending--; dirty = true }
+                        is SourceUpdate.Amll -> if (amllPending) {
+                            amll = update.lines; amllPending = false; pending--; dirty = true
+                        }
+                        is SourceUpdate.Qq -> { qq = update.lines; qqFinished = true; pending--; dirty = true }
                         is SourceUpdate.Cancelled -> throw update.exception
                         SourceUpdate.Tick -> {
                             if (!dirty) continue
@@ -129,6 +136,15 @@ class LyricsResolver(
                             else if (pending == 0 && displayed == null) emit(candidate)
                             dirty = false
                         }
+                    }
+                    // 仅当网易和已启用的 QQ 都返回空结果时，提前结束仍在等待的 AMLL。
+                    if (amllPending && qqFinished && netease != null &&
+                        cleanLines(netease.getOrNull().orEmpty()).isEmpty() && cleanLines(qq).isEmpty()) {
+                        amllStopped = true
+                        amllPending = false
+                        pending--
+                        dirty = true
+                        amllJob?.cancel()
                     }
                 }
             } finally {

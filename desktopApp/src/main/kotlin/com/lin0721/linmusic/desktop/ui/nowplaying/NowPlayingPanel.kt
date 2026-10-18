@@ -112,7 +112,7 @@ fun NowPlayingPanel(
                                     onOpenFullscreen = onOpenLyricsFullscreen,
                                     onOpenLyricsView = onOpenLyricsView,
                                     sourceLabel = when (detailState.lyricsSource) {
-                                        com.lin0721.linmusic.core.player.LyricsSource.AMLL -> "AMLL"
+                                        com.lin0721.linmusic.core.player.LyricsSource.AMLL -> "TTML"
                                         com.lin0721.linmusic.core.player.LyricsSource.QQ ->
                                             "QRC".takeIf { detailState.lyrics.any { it.words.isNotEmpty() } }
                                         else -> null

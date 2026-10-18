@@ -146,7 +146,7 @@ fun LyricsCard(
             )
             if (isAmll || isQrc) {
                 Text(
-                    if (isAmll) "AMLL" else "QRC",
+                    if (isAmll) "TTML" else "QRC",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )

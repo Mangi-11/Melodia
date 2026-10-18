@@ -28,9 +28,9 @@ class AmllLyricsClient(private val cache: LyricsCache? = null) {
 
     internal val client = OkHttpClient.Builder()
         .cookieJar(CookieJar.NO_COOKIES)
-        .callTimeout(10, TimeUnit.SECONDS)
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
         .build()
 
     suspend fun fetch(songId: Long): String? {

@@ -10,11 +10,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AmllLyricsClientTest {
-    @Test fun primaryMayTakeFourSecondsWithoutBeingDiscarded() = runBlocking {
+    @Test fun primaryExceedingSixSecondsIsDiscarded() = runBlocking {
         MockWebServer().use { server ->
             val xml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="2s"><span begin="1s" end="2s">slow TLS or body</span></p></div></body></tt>"""
-            server.enqueue(MockResponse().setBody(xml).setBodyDelay(3200, TimeUnit.MILLISECONDS))
-            assertEquals(xml, AmllLyricsClient().fetchFrom(listOf(server.url("/primary").toString())))
+            server.enqueue(MockResponse().setBody(xml).setBodyDelay(6200, TimeUnit.MILLISECONDS))
+            assertNull(AmllLyricsClient().fetchFrom(listOf(server.url("/primary").toString())))
         }
     }
 
