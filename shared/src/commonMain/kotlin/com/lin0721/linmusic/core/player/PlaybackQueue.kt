@@ -160,6 +160,14 @@ class PlaybackQueue {
         _items.value = playItems
     }
 
+    // 追加到队列末尾；播放顺序与原始顺序都接在最后，不影响当前曲目
+    fun append(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        playItems = playItems + items
+        originalItems = originalItems + items
+        _items.value = playItems
+    }
+
     // 移除指定项，返回需要重新起播的下标，无需重播时返回 -1
     fun removeAt(index: Int): Int {
         if (index < 0 || index >= playItems.size || playItems.size <= 1) return -1

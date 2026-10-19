@@ -97,6 +97,12 @@ class FakePlaybackController : PlaybackController {
     override fun addToPlayNext(items: List<QueueItem>) {
         playNextCalls += items
     }
+
+    val appendCalls = mutableListOf<List<QueueItem>>()
+
+    override fun appendToQueue(items: List<QueueItem>) {
+        appendCalls += items
+    }
     override fun playNext() = Unit
     override fun playPrevious() = Unit
     override fun skipToPrevious() = Unit

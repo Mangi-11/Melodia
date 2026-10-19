@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.data
 
-import java.awt.FileDialog
-import java.awt.Frame
+import com.lin0721.linmusic.desktop.platform.chooseFile
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -62,13 +61,5 @@ object CoverImage {
     }
 }
 
-// 系统文件选择框，会阻塞到关闭；取消返回 null
-fun chooseImageFile(title: String): File? {
-    val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
-        // Windows 原生对话框把 file 当作过滤模式
-        file = "*.jpg;*.jpeg;*.png;*.bmp;*.gif"
-        isVisible = true
-    }
-    val name = dialog.file ?: return null
-    return File(dialog.directory.orEmpty(), name)
-}
+// 取消返回 null
+suspend fun chooseImageFile(title: String): File? = chooseFile(title, "*.jpg;*.jpeg;*.png;*.bmp;*.gif")

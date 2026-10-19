@@ -31,6 +31,7 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
     companion object {
         const val STORE_NAME = "desktop_prefs"
         const val DEFAULT_LYRICS_VIEW_FONT_SIZE = 40
+        const val DEFAULT_VOLUME = 100
 
         private val KEY_HOTKEYS = stringPreferencesKey("hotkeys")
         private val KEY_MEDIA_KEYS_ENABLED = booleanPreferencesKey("media_keys_enabled")
@@ -41,6 +42,10 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LIBRARY_WIDTH = floatPreferencesKey("library_width")
         private val KEY_NOW_PLAYING_WIDTH = floatPreferencesKey("now_playing_width")
         private val KEY_AUDIO_DEVICE = stringPreferencesKey("audio_device")
+        private val KEY_CACHE_ROOT = stringPreferencesKey("cache_root")
+        private val KEY_CACHE_CLEANUP = stringPreferencesKey("cache_cleanup")
+        private val KEY_VOLUME = intPreferencesKey("volume")
+        private val KEY_LAST_AUDIBLE_VOLUME = intPreferencesKey("last_audible_volume")
         private val KEY_LYRICS_VIEW_FONT_SIZE = intPreferencesKey("lyrics_view_font_size")
         private val KEY_WINDOW_BOUNDS = stringPreferencesKey("window_bounds")
         private val KEY_WINDOW_MAXIMIZED = booleanPreferencesKey("window_maximized")
@@ -79,6 +84,36 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
     val lyricsViewFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRICS_VIEW_FONT_SIZE] ?: DEFAULT_LYRICS_VIEW_FONT_SIZE }.distinctUntilChanged()
 
     val audioDevice: Flow<String> = dataStore.data.map { it[KEY_AUDIO_DEVICE] ?: AUTO_AUDIO_DEVICE }.distinctUntilChanged()
+
+    // 所选的缓存目录，缺省为默认位置；下次启动才生效
+    val cacheRoot: Flow<String?> = dataStore.data.map { it[KEY_CACHE_ROOT]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    // 切换缓存目录后待删除的旧缓存根目录
+    val pendingCacheCleanup: Flow<String?> = dataStore.data.map { it[KEY_CACHE_CLEANUP]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    suspend fun saveCacheRelocation(selected: String?, cleanup: String?) {
+        dataStore.edit { prefs ->
+            if (selected != null) prefs[KEY_CACHE_ROOT] = selected else prefs.remove(KEY_CACHE_ROOT)
+            if (cleanup != null) prefs[KEY_CACHE_CLEANUP] = cleanup else prefs.remove(KEY_CACHE_CLEANUP)
+        }
+    }
+
+    suspend fun clearPendingCacheCleanup() {
+        dataStore.edit { it.remove(KEY_CACHE_CLEANUP) }
+    }
+
+    // 0 表示静音
+    val volume: Flow<Int> = dataStore.data.map { (it[KEY_VOLUME] ?: DEFAULT_VOLUME).coerceIn(0, 100) }.distinctUntilChanged()
+
+    // 静音前的音量，取消静音时恢复到它
+    val lastAudibleVolume: Flow<Int> = dataStore.data.map { (it[KEY_LAST_AUDIBLE_VOLUME] ?: DEFAULT_VOLUME).coerceIn(1, 100) }.distinctUntilChanged()
+
+    suspend fun saveVolume(volume: Int, lastAudible: Int) {
+        dataStore.edit {
+            it[KEY_VOLUME] = volume.coerceIn(0, 100)
+            it[KEY_LAST_AUDIBLE_VOLUME] = lastAudible.coerceIn(1, 100)
+        }
+    }
 
     suspend fun saveHotkeys(hotkeys: Map<HotkeyAction, HotkeyCombo?>) {
         dataStore.edit { prefs ->

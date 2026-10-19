@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -49,6 +50,7 @@ import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 private val ChromeEnter = fadeIn(tween(CHROME_ANIM_MS)) + expandVertically(tween(CHROME_ANIM_MS))
@@ -75,7 +77,9 @@ fun WindowScope.MelodiaDesktopApp(
     val audioOutput: AudioOutputControl? = controller.takeIf { it.unavailableReason == null }
     val pane = rememberPaneLayoutState(deps.desktopPreferences, scope)
     val state = remember(lyricsView, pane) {
-        DesktopAppState(lyricsView, pane) { open -> scope.launch { deps.desktopPreferences.saveNowPlayingPanelOpen(open) } }
+        DesktopAppState(lyricsView, pane, deps.libraryViewModel.asViewControl()) { open ->
+            scope.launch { deps.desktopPreferences.saveNowPlayingPanelOpen(open) }
+        }
     }
 
     val userProfile by deps.homeViewModel.userProfile.collectAsState()
@@ -87,7 +91,14 @@ fun WindowScope.MelodiaDesktopApp(
 
     // 没有曲目时歌词界面无内容可看，自动收起
     LaunchedEffect(nowPlaying == null) { if (nowPlaying == null) lyricsView.close() }
-    LaunchedEffect(lyricsView.isOpen) { state.onLyricsOpenChanged(lyricsView.isOpen) }
+    // 不经记录入口的界面变化（Esc 收起歌词、拖拽改排序等）并入当前步骤，后退时不会被还原回去
+    LaunchedEffect(state) {
+        combine(
+            snapshotFlow { state.liveUi() },
+            deps.libraryViewModel.selectedFilter,
+            deps.libraryViewModel.sortOrder
+        ) { _, _, _ -> }.collect { state.absorbUiChange() }
+    }
     LaunchedEffect(state) { deps.desktopPreferences.nowPlayingPanelOpen.collect(state::syncSavedDockOpen) }
     // 登录失效时本地登录态已被清掉，这里提示并直接打开登录框
     LaunchedEffect(state) {

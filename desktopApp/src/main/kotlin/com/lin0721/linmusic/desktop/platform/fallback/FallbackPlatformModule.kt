@@ -7,6 +7,7 @@ import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,14 @@ val fallbackPlatformModule = module {
     single<GlobalHotkeyService> { NoopGlobalHotkeys() }
     single<AutoStartService> { UnsupportedAutoStart() }
     single<WindowEffects> { NoopWindowEffects() }
+    single<TaskbarThumbnailService> { NoopTaskbarThumbnail() }
     single<BrowserLocator> { BrowserLocator { null } }
+}
+
+internal class NoopTaskbarThumbnail : TaskbarThumbnailService {
+    override fun attach(window: Window) = Unit
+    override suspend fun bind(controller: PlaybackController) = Unit
+    override fun detach() = Unit
 }
 
 internal class NoopMediaSession : MediaSessionService {

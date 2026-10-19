@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
 import kotlin.math.sin
 
-// 无声输出的真实 libmpv 端到端验证边播边存：落缓存、命中缓存、联网失败时兜底
+// 无声输出的真实 libmpv 端到端验证歌曲缓存：落缓存、命中缓存、联网失败时兜底
 class MpvPlaybackControllerCacheTest {
 
     private lateinit var dir: File
@@ -137,7 +137,6 @@ class MpvPlaybackControllerCacheTest {
 
     @Test
     fun playedTrackIsCachedThenServedWithoutFetchingUrl() {
-        runBlocking { settings.saveStreamCacheEnabled(true) }
         val controller = newController()
         Thread.sleep(300)
         play(controller)
@@ -154,7 +153,6 @@ class MpvPlaybackControllerCacheTest {
 
     @Test
     fun cachedFileIsUsedWhenUrlFetchFails() {
-        runBlocking { settings.saveStreamCacheEnabled(true) }
         val controller = newController()
         Thread.sleep(300)
         play(controller)
@@ -168,19 +166,7 @@ class MpvPlaybackControllerCacheTest {
     }
 
     @Test
-    fun nothingIsCachedWhenSwitchedOff() {
-        val controller = newController()
-        Thread.sleep(300)
-        play(controller)
-
-        assertTrue(await(10_000) { controller.currentPosition.value > 2_500L })
-        Thread.sleep(1_500)
-        assertTrue(cache.playableIds(listOf(1)).isEmpty())
-    }
-
-    @Test
     fun externalTrackPlaysItsOwnUrlWithoutQueryingNeteaseOrCaching() {
-        runBlocking { settings.saveStreamCacheEnabled(true) }
         val controller = newController()
         Thread.sleep(300)
         val url = "http://127.0.0.1:${server.address.port}/song.wav"
@@ -189,6 +175,6 @@ class MpvPlaybackControllerCacheTest {
         assertTrue("应直接播放自带直链", await(10_000) { controller.currentPosition.value > 500L })
         assertEquals("外部歌曲不应向网易云取播放地址", 0, urlRequests.get())
         Thread.sleep(1_500)
-        assertTrue("外部歌曲不应写入边听边存缓存", cache.playableIds(listOf(-7)).isEmpty())
+        assertTrue("外部歌曲不应写入缓存", cache.playableIds(listOf(-7)).isEmpty())
     }
 }

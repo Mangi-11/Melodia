@@ -1,6 +1,5 @@
 package com.lin0721.linmusic.feature.newworks.ui
 
-import com.lin0721.linmusic.core.ui.components.StateIcon
 import com.lin0721.linmusic.core.ui.components.PlayPauseIcon
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -24,8 +23,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material3.CircularProgressIndicator
@@ -178,13 +176,12 @@ private fun NewWorksFeedList(
         items(state.releases, key = { "${it.isAlbum}_${it.id}" }) { release ->
             ReleaseFeedCard(
                 release = release,
-                inLibrary = status.isInLibrary(release),
                 playing = status.isReleasePlaying(release),
                 onClick = { if (release.isAlbum) actions.onAlbumClick(release.id) else actions.onTogglePlay(release) },
                 onPlay = { actions.onTogglePlay(release) },
                 onAdd = {
                     if (release.isAlbum) {
-                        actions.onToggleLibrary(release)
+                        actions.onPrepareImportTargets { importRelease = release }
                     } else {
                         actions.onPrepareCollect(release.id) { collectSongId = release.id }
                     }
@@ -254,7 +251,6 @@ private fun NewWorksFeedList(
 @Composable
 private fun ReleaseFeedCard(
     release: NewWorksRelease,
-    inLibrary: Boolean,
     playing: Boolean,
     onClick: () -> Unit,
     onPlay: () -> Unit,
@@ -325,14 +321,12 @@ private fun ReleaseFeedCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             MelodiaIconButton(onClick = onAdd) {
-                StateIcon(inLibrary) { added ->
-                    Icon(
-                        imageVector = if (added) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = if (added) "已添加" else "添加",
-                        tint = if (added) MaterialTheme.colorScheme.primary else Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Rounded.AddCircleOutline,
+                    contentDescription = "添加到歌单",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
             }
             Spacer(Modifier.width(MelodiaSpacing.xs))
             MelodiaIconButton(

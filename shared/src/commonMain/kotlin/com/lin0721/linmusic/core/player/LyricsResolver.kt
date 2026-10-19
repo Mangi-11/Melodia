@@ -8,21 +8,22 @@ import com.lin0721.linmusic.core.player.domain.TtmlLyricParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import com.lin0721.linmusic.core.log.AppLogger
 import kotlinx.coroutines.withTimeoutOrNull
 
-// 已匹配网易的歌优先网易歌词（逐字与翻译更全），拿不到再读本地。
-// 接入 AMLL 后：AMLL TTML 与网易并行拉取，AMLL 拿到逐字时序就直接采信（TTML 的逐字与背景和声
-// 比网易 YRC 更完整）；否则等双方到齐后一起比较，有逐字的胜出，都没逐字时取有内容的一方。
-enum class LyricsSource { AMLL, NETEASE, LOCAL }
+// 启用的三源同时查询，每 250ms 按最新快照择优，保留最后一批结果。
+enum class LyricsSource { AMLL, NETEASE, LOCAL, QQ }
 
 data class ResolvedLyrics(val lines: List<LyricLine>, val source: LyricsSource)
 
@@ -34,14 +35,15 @@ class LyricsResolver(
     // 按 songId 读取 AMLL TTML 原文；平台未接入 AMLL 时保持默认实现返回 null
     private val readAmllLyrics: suspend (songId: Long) -> String? = { null },
     private val isAmllEnabled: suspend () -> Boolean = { true },
-    private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val readQqLyrics: suspend (songId: Long) -> List<LyricLine> = { emptyList() },
+    private val isQqEnabled: suspend () -> Boolean = { true }
 ) {
 
     private companion object {
-        // 真机上 TLS 加 XML 解析偶发超过 1.2s，首次择优要留出窗口，否则慢镜像会把结果拖成网易歌词。
-        // 网易一侧刻意不加超时，保持上游"等到出结果为止"的行为。
-        const val SELECTION_WINDOW_MS = 2500L
-        const val AMLL_TIMEOUT_MS = 4000L
+        const val AMLL_TIMEOUT_MS = 6000L
+        const val QQ_TIMEOUT_MS = 8000L
+        const val UPDATE_INTERVAL_MS = 250L
     }
 
     fun lyricsFor(songId: Long): Flow<Result<List<LyricLine>>> = lyricsWithSourceFor(songId)
@@ -54,41 +56,111 @@ class LyricsResolver(
             return@flow
         }
         if (songId > 0) {
-            val online = onlineLyricsFor(songId).first()
-            if (online.getOrNull()?.lines.orEmpty().isNotEmpty()) {
-                emit(online)
-                return@flow
+            // 已关联网易的本地歌曲也持续收集，首份歌词显示后仍能升级为 AMLL。
+            onlineLyricsFor(songId).collect { online ->
+                if (online.getOrNull()?.lines.orEmpty().isNotEmpty()) emit(online)
+                else emit(Result.success(localLyrics(localUri)))
             }
-        }
-        val lines = readLocalLyrics(localUri)?.let(LyricParser::parseLocal).orEmpty()
-        emit(Result.success(ResolvedLyrics(LyricTimeline.prepareLines(lines), LyricsSource.LOCAL)))
-    }.flowOn(processingDispatcher)
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
-        if (!isAmllEnabled()) {
-            emit(chooseWithSource(emptyList(), fetchNeteaseResult(songId)))
             return@flow
         }
+        emit(Result.success(localLyrics(localUri)))
+    }.flowOn(processingDispatcher)
+
+    private suspend fun localLyrics(uri: String): ResolvedLyrics {
+        val lines = readLocalLyrics(uri)?.let(LyricParser::parseLocal).orEmpty()
+        return ResolvedLyrics(LyricTimeline.prepareLines(lines), LyricsSource.LOCAL)
+    }
+
+    private sealed interface SourceUpdate {
+        data class Netease(val result: Result<List<LyricLine>>) : SourceUpdate
+        data class Amll(val lines: List<LyricLine>) : SourceUpdate
+        data class Qq(val lines: List<LyricLine>) : SourceUpdate
+        data class Cancelled(val exception: CancellationException) : SourceUpdate
+        data object Tick : SourceUpdate
+    }
+
+    private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
         coroutineScope {
-            val amll = async { fetchAmllLines(songId) }
-            val netease = async { fetchNeteaseResult(songId) }
-            try {
-                // 窗口内优先等待 AMLL：若已带逐字时序直接定型，避免慢镜像在播放中途替换歌词
-                val amllWindowLines = withTimeoutOrNull(SELECTION_WINDOW_MS) { amll.await() }
-                if (amllWindowLines?.any { it.words.isNotEmpty() } == true) {
-                    emit(Result.success(ResolvedLyrics(amllWindowLines, LyricsSource.AMLL)))
-                    return@coroutineScope
+            val updates = Channel<SourceUpdate>(Channel.UNLIMITED)
+            fun query(reportCancellation: () -> Boolean = { true }, block: suspend () -> SourceUpdate) = launch {
+                try {
+                    updates.send(block())
+                } catch (e: CancellationException) {
+                    // 子查询主动取消也要通知协调器，避免等待一条永远不会到达的结果。
+                    if (reportCancellation()) updates.trySend(SourceUpdate.Cancelled(e))
                 }
-                val neteaseResult = netease.await()
-                // 网易已就绪，若此时 AMLL 已返回（包括窗口外刚好完成）则参与择优，否则视作未命中
-                val amllLines = if (amll.isCompleted) amll.getCompleted() else emptyList()
-                emit(chooseWithSource(amllLines, neteaseResult))
+            }
+            val amllEnabled = isAmllEnabled()
+            val qqEnabled = isQqEnabled()
+            var pending = 1 + (if (amllEnabled) 1 else 0) + (if (qqEnabled) 1 else 0)
+            val jobs = mutableListOf(query { SourceUpdate.Netease(fetchNeteaseResult(songId)) })
+            var amllStopped = false
+            var amllPending = amllEnabled
+            var qqFinished = false
+            val amllJob = if (amllEnabled) query(reportCancellation = { !amllStopped }) {
+                SourceUpdate.Amll(fetchAmllLines(songId))
+            }.also { jobs += it } else null
+            if (qqEnabled) jobs += query { SourceUpdate.Qq(fetchQqLines(songId)) }
+            val ticker = launch {
+                while (isActive) {
+                    delay(UPDATE_INTERVAL_MS)
+                    updates.send(SourceUpdate.Tick)
+                }
+            }
+            var netease: Result<List<LyricLine>>? = null
+            var amll = emptyList<LyricLine>()
+            var qq = emptyList<LyricLine>()
+            var displayed: ResolvedLyrics? = null
+            suspend fun display(resolved: ResolvedLyrics) {
+                if (resolved == displayed) return
+                emit(Result.success(resolved))
+                displayed = resolved
+                AppLogger.d("LyricsResolver", "歌词更新 songId=$songId source=${resolved.source} lines=${resolved.lines.size}")
+            }
+            // 与 sample 类似按固定周期取最新值；查询结束后仍消费最后一次 Tick，避免丢失尾值。
+            var dirty = false
+            try {
+                while (pending > 0 || dirty) {
+                    when (val update = updates.receive()) {
+                        is SourceUpdate.Netease -> { netease = update.result; pending--; dirty = true }
+                        is SourceUpdate.Amll -> if (amllPending) {
+                            amll = update.lines; amllPending = false; pending--; dirty = true
+                        }
+                        is SourceUpdate.Qq -> { qq = update.lines; qqFinished = true; pending--; dirty = true }
+                        is SourceUpdate.Cancelled -> throw update.exception
+                        SourceUpdate.Tick -> {
+                            if (!dirty) continue
+                            val candidate = chooseWithSource(amll, netease ?: Result.success(emptyList()), qq)
+                            val resolved = candidate.getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                            if (resolved != null) display(resolved)
+                            else if (pending == 0 && displayed == null) emit(candidate)
+                            dirty = false
+                        }
+                    }
+                    // 仅当网易和已启用的 QQ 都返回空结果时，提前结束仍在等待的 AMLL。
+                    if (amllPending && qqFinished && netease != null &&
+                        cleanLines(netease.getOrNull().orEmpty()).isEmpty() && cleanLines(qq).isEmpty()) {
+                        amllStopped = true
+                        amllPending = false
+                        pending--
+                        dirty = true
+                        amllJob?.cancel()
+                    }
+                }
             } finally {
-                amll.cancel()
-                netease.cancel()
+                ticker.cancel()
+                jobs.forEach { it.cancel() }
+                updates.cancel()
             }
         }
+    }
+
+    private suspend fun fetchQqLines(songId: Long): List<LyricLine> = try {
+        withTimeoutOrNull(QQ_TIMEOUT_MS) { readQqLyrics(songId) }.orEmpty()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        emptyList()
     }
 
     /** AMLL 任何失败都降级为空列表；网易的失败要原样带回，上层需要区分"没有歌词"与"请求失败"。 */
@@ -114,14 +186,17 @@ class LyricsResolver(
         return chooseWithSource(amll, netease).map { it.lines }
     }
 
-    internal fun chooseWithSource(amll: List<LyricLine>, netease: Result<List<LyricLine>>): Result<ResolvedLyrics> {
+    internal fun chooseWithSource(amll: List<LyricLine>, netease: Result<List<LyricLine>>, qq: List<LyricLine> = emptyList()): Result<ResolvedLyrics> {
         val a = cleanLines(amll)
         val n = cleanLines(netease.getOrNull().orEmpty())
+        val q = cleanLines(qq)
         val (lines, source) = when {
             a.any { it.words.isNotEmpty() } -> a to LyricsSource.AMLL
             n.any { it.words.isNotEmpty() } -> n to LyricsSource.NETEASE
+            q.any { it.words.isNotEmpty() } -> q to LyricsSource.QQ
             a.isNotEmpty() -> a to LyricsSource.AMLL
             n.isNotEmpty() -> n to LyricsSource.NETEASE
+            q.isNotEmpty() -> q to LyricsSource.QQ
             // 两边都没内容：保留网易原结果，是失败就继续向上抛
             else -> return netease.map { ResolvedLyrics(it, LyricsSource.NETEASE) }
         }

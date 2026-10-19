@@ -37,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -54,7 +56,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,8 +66,10 @@ import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.PlayPauseIcon
+import com.lin0721.linmusic.desktop.ui.components.TooltipLabel
 import com.lin0721.linmusic.desktop.ui.icons.PlayerBarIcons
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingArtists
+import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingSongTitle
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
@@ -81,6 +85,7 @@ private val SideButtonSize = 32.dp
 // 右侧与红心按钮的图标比切歌按钮的字形占格更满，缩小图标才能看起来一样大
 private val SideIconSize = 20.dp
 private val VolumeSliderWidth = 120.dp
+private val VolumeTooltipGap = 8.dp
 private const val NOT_SUPPORTED_MESSAGE = "暂未支持"
 
 @Composable
@@ -88,6 +93,7 @@ fun PlayerBar(
     controller: PlaybackController,
     playerViewModel: PlayerViewModel,
     volume: Int?,
+    lastAudibleVolume: Int,
     onVolumeChange: (Int) -> Unit,
     nowPlayingOpen: Boolean,
     onToggleNowPlaying: () -> Unit,
@@ -127,7 +133,7 @@ fun PlayerBar(
                     }
                 }
                 Column(Modifier.weight(1f, fill = false).padding(start = 12.dp)) {
-                    Text(track.title, color = DesktopColors.TextPrimary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    NowPlayingSongTitle(track, playerViewModel, fontSize = 14.sp)
                     NowPlayingArtists(track, playerViewModel, 12.sp)
                 }
                 if (podcast.isPodcast) {
@@ -257,7 +263,7 @@ fun PlayerBar(
                 onClick = onToggleDevices
             )
             // 占位播放器没有音量能力时不显示
-            if (volume != null) VolumeControl(volume, onVolumeChange)
+            if (volume != null) VolumeControl(volume, lastAudibleVolume, onVolumeChange)
             BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = notSupported)
             BarIconButton(
                 if (isFullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
@@ -271,67 +277,98 @@ fun PlayerBar(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun VolumeControl(volume: Int, onVolumeChange: (Int) -> Unit) {
-    // 静音前的音量，再点一次恢复
-    var lastAudible by remember { mutableStateOf(if (volume > 0) volume else 100) }
+private fun VolumeControl(volume: Int, lastAudible: Int, onVolumeChange: (Int) -> Unit) {
     var scrollDeltaAccumulator by remember { mutableStateOf(0f) }
+    var isScrollingVolume by remember { mutableStateOf(false) }
+    var lastScrollPosition by remember { mutableStateOf<Offset?>(null) }
+    var controlWidthPx by remember { mutableStateOf(0) }
 
-    LaunchedEffect(volume) {
-        if (volume > 0) {
-            lastAudible = volume
-        }
-    }
+    Box(
+        modifier = Modifier
+            .onSizeChanged { controlWidthPx = it.width }
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val deltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
+                if (deltaY == 0f) return@onPointerEvent
+                event.changes.forEach { it.consume() }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.onPointerEvent(PointerEventType.Scroll) { event ->
-            val deltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: return@onPointerEvent
-            if (deltaY == 0f) return@onPointerEvent
-            event.changes.forEach { it.consume() }
+                isScrollingVolume = true
+                lastScrollPosition = event.changes.firstOrNull()?.position
 
-            scrollDeltaAccumulator += deltaY
-            val steps = scrollDeltaAccumulator.toInt()
-            if (steps != 0) {
-                scrollDeltaAccumulator -= steps
-                val newVolume = if (steps < 0) {
-                    if (volume == 0) {
-                        val base = if (lastAudible > 0) lastAudible else 0
-                        (base + (-steps - 1) * 5 + if (base == 0) 5 else 0).coerceIn(0, 100)
+                scrollDeltaAccumulator += deltaY
+                val steps = scrollDeltaAccumulator.toInt()
+                if (steps != 0) {
+                    scrollDeltaAccumulator -= steps
+                    val newVolume = if (steps < 0) {
+                        if (volume == 0) {
+                            val base = if (lastAudible > 0) lastAudible else 0
+                            (base + (-steps - 1) * 5 + if (base == 0) 5 else 0).coerceIn(0, 100)
+                        } else {
+                            (volume - steps * 5).coerceIn(0, 100)
+                        }
                     } else {
                         (volume - steps * 5).coerceIn(0, 100)
                     }
-                } else {
-                    (volume - steps * 5).coerceIn(0, 100)
+                    if (newVolume != volume) {
+                        onVolumeChange(newVolume)
+                    }
                 }
-                if (newVolume != volume) {
-                    onVolumeChange(newVolume)
+            }
+            .onPointerEvent(PointerEventType.Move) { event ->
+                val currentPos = event.changes.firstOrNull()?.position
+                val anchor = lastScrollPosition
+                if (anchor != null && currentPos != null && (currentPos - anchor).getDistance() > 3f) {
+                    isScrollingVolume = false
+                    lastScrollPosition = null
                 }
+            }
+            .onPointerEvent(PointerEventType.Exit) {
+                isScrollingVolume = false
+                lastScrollPosition = null
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BarIconButton(
+                icon = when {
+                    volume == 0 -> Icons.AutoMirrored.Rounded.VolumeOff
+                    volume < 50 -> Icons.AutoMirrored.Rounded.VolumeDown
+                    else -> Icons.AutoMirrored.Rounded.VolumeUp
+                },
+                description = if (volume == 0) "取消静音" else "静音",
+                size = SideButtonSize, iconSize = SideIconSize,
+                onClick = {
+                    if (volume > 0) {
+                        onVolumeChange(0)
+                    } else {
+                        onVolumeChange(lastAudible)
+                    }
+                }
+            )
+            PlayerSlider(
+                value = volume / 100f,
+                onValueChange = { onVolumeChange((it * 100).roundToInt()) },
+                modifier = Modifier.width(VolumeSliderWidth),
+                previewLabel = { "${(it * 100).roundToInt()}%" },
+                externalActive = isScrollingVolume
+            )
+        }
+
+        if (isScrollingVolume && controlWidthPx > 0) {
+            val scrollX = lastScrollPosition?.x ?: (controlWidthPx / 2f)
+            Box(
+                Modifier.align(Alignment.TopStart).layout { measurable, _ ->
+                    val placeable = measurable.measure(Constraints())
+                    val minX = 0
+                    val maxX = (controlWidthPx - placeable.width).coerceAtLeast(0)
+                    val left = (scrollX.roundToInt() - placeable.width / 2).coerceIn(minX, maxX)
+                    layout(0, 0) {
+                        placeable.place(left, -placeable.height - VolumeTooltipGap.roundToPx())
+                    }
+                }
+            ) {
+                TooltipLabel("$volume%")
             }
         }
-    ) {
-        BarIconButton(
-            icon = when {
-                volume == 0 -> Icons.AutoMirrored.Rounded.VolumeOff
-                volume < 50 -> Icons.AutoMirrored.Rounded.VolumeDown
-                else -> Icons.AutoMirrored.Rounded.VolumeUp
-            },
-            description = if (volume == 0) "取消静音" else "静音",
-            size = SideButtonSize, iconSize = SideIconSize,
-            onClick = {
-                if (volume > 0) {
-                    lastAudible = volume
-                    onVolumeChange(0)
-                } else {
-                    onVolumeChange(lastAudible)
-                }
-            }
-        )
-        PlayerSlider(
-            value = volume / 100f,
-            onValueChange = { onVolumeChange((it * 100).roundToInt()) },
-            modifier = Modifier.width(VolumeSliderWidth),
-            previewLabel = { "${(it * 100).roundToInt()}%" }
-        )
     }
 }
 
@@ -350,8 +387,7 @@ private fun ProgressRow(position: Long, duration: Long, enabled: Boolean, onSeek
                 dragValue = null
             },
             enabled = enabled,
-            // 轨道两端已内缩半个滑块，与时间之间的间距靠它，不再额外加
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             previewLabel = { formatDuration((it * duration).toLong()) }
         )
         TimeLabel(duration, TextAlign.Start)

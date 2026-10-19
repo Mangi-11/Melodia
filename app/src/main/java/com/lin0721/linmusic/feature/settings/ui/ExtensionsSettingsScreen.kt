@@ -136,7 +136,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
 
             item {
                 SettingsGroupCard(SettingsSubMenu.EXTENSIONS.sectionTitles[4]) {
-                    // 松手后才应用，避免拖动中界面缩放导致滑块在手指下移位
+                    // 松手后才应用（会重建界面）；拖动中不应用，避免滑块在手指下移位
                     var pendingPercent by remember { mutableStateOf<Int?>(null) }
                     LaunchedEffect(uiScalePercent) { pendingPercent = null }
                     val displayPercent = pendingPercent ?: uiScalePercent
@@ -159,7 +159,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                             )
                         }
                         Text(
-                            text = "整体放大界面，松手后生效",
+                            text = "整体缩放界面，松手后生效，界面会重新加载一次",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )

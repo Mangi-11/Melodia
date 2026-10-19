@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -409,7 +410,9 @@ class PlayerViewModel(
     }
 
     private suspend fun loadLyrics(songId: Long) {
-        settingsPreferences.amllLyricsEnabled.distinctUntilChanged().collectLatest {
+        combine(settingsPreferences.amllLyricsEnabled, settingsPreferences.qqLyricsEnabled) { amll, qq ->
+            amll to qq
+        }.distinctUntilChanged().collectLatest {
             reloadLyrics(songId)
         }
     }
@@ -418,17 +421,23 @@ class PlayerViewModel(
         _songDetailState.update { it.copy(isLyricsLoading = true) }
         lyricsResolver.lyricsWithSourceFor(songId).collect { result ->
             result.onSuccess { resolved ->
-                _songDetailState.update { it.copy(lyrics = resolved.lines, lyricsSource = resolved.source) }
+                _songDetailState.update { it.copy(lyrics = resolved.lines, lyricsSource = resolved.source, isLyricsLoading = false) }
                 // 换了一套歌词，上一套累积的暂留行必须作废；并按当前位置立即对齐一次，
                 // 不等下一次进度回调，否则进入播放页时会短暂停留在上一首的残留行
                 resetLyricPlayback()
                 updateLyricPlayback(playerManager.currentPosition.value, isSeek = true)
             }.onFailure {
-                _songDetailState.update { it.copy(lyrics = emptyList(), lyricsSource = null) }
+                _songDetailState.update { it.copy(lyrics = emptyList(), lyricsSource = null, isLyricsLoading = false) }
                 resetLyricPlayback()
             }
         }
         _songDetailState.update { it.copy(isLyricsLoading = false) }
+    }
+
+    // 已加载的详情直接用，否则现取一次；失败返回 null
+    suspend fun resolveSongDetail(songId: Long): Track? {
+        _songDetailState.value.songDetail?.takeIf { it.id == songId }?.let { return it }
+        return playerRepository.getSongDetail(songId).firstOrNull()?.getOrNull()
     }
 
     private suspend fun loadSongDetail(songId: Long) {

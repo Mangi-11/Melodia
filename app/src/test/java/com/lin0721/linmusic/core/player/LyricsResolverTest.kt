@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
@@ -33,14 +34,14 @@ class LyricsResolverTest {
             readLocalLyrics = { null }, localUriOf = { null },
             readAmllLyrics = { amllText }, isAmllEnabled = { enabled }
         )
-        val amll = resolver.lyricsWithSourceFor(1).first().getOrThrow()
+        val amll = resolver.lyricsWithSourceFor(1).toList().last().getOrThrow()
         assertEquals(LyricsSource.AMLL, amll.source)
         assertEquals("AMLL歌词", amll.lines.single().text)
         enabled = false
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
         enabled = true
         amllText = null
-        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).first().getOrThrow().source)
+        assertEquals(LyricsSource.NETEASE, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
     }
 
     @Test
@@ -50,7 +51,7 @@ class LyricsResolverTest {
             readLocalLyrics = { localLrc }, localUriOf = { "content://a" },
             isAmllEnabled = { false }
         )
-        val result = resolver.lyricsWithSourceFor(1).first().getOrThrow()
+        val result = resolver.lyricsWithSourceFor(1).toList().last().getOrThrow()
         assertEquals(LyricsSource.LOCAL, result.source)
         assertEquals("本地歌词", result.lines.single().text)
     }
@@ -67,7 +68,7 @@ class LyricsResolverTest {
                     readAmllLyrics = { readThread = Thread.currentThread(); amllTtml },
                     processingDispatcher = dispatcher
                 )
-                val result = resolver.lyricsFor(1).first().getOrThrow()
+                val result = resolver.lyricsFor(1).toList().last().getOrThrow()
                 assertEquals("AMLL歌词", result.single().text)
                 assertEquals("lyrics-worker", readThread?.name)
                 assertEquals(callerThread, Thread.currentThread())
@@ -75,17 +76,18 @@ class LyricsResolverTest {
     }
 
     @Test
-    fun `关闭AMLL不读取镜像或缓存并立即使用网易`() = runTest {
+    fun `关闭AMLL不读取镜像或缓存并按采样周期使用网易`() = runTest {
         val repo = FakePlaybackRepository(Result.success(onlineLines))
         var amllReads = 0
         val resolver = LyricsResolver(
             repo, readLocalLyrics = { null }, localUriOf = { null },
-            readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { false }
+            readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { false },
+            processingDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
         )
-        assertEquals("网易歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
+        assertEquals("网易歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         assertEquals(0, amllReads)
         assertEquals(1, repo.lyricRequests)
-        assertEquals(0L, testScheduler.currentTime)
+        assertEquals(250L, testScheduler.currentTime)
     }
 
     @Test
@@ -97,11 +99,11 @@ class LyricsResolverTest {
             readLocalLyrics = { null }, localUriOf = { null },
             readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { enabled }
         )
-        assertEquals("AMLL歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
+        assertEquals("AMLL歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         enabled = false
-        assertEquals("网易歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
+        assertEquals("网易歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         enabled = true
-        assertEquals("AMLL歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
+        assertEquals("AMLL歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         assertEquals(2, amllReads)
     }
 
@@ -113,7 +115,7 @@ class LyricsResolverTest {
             readLocalLyrics = { localLrc }, localUriOf = { if (it == 1L) "content://a" else null },
             readAmllLyrics = { error("AMLL disabled") }, isAmllEnabled = { false }
         )
-        assertEquals("本地歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
+        assertEquals("本地歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
         assertEquals(failure, resolver.lyricsFor(2).first().exceptionOrNull())
     }
 

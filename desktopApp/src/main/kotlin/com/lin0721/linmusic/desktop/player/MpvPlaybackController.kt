@@ -15,6 +15,8 @@ import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.SleepTimer
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.desktop.data.CacheLimits
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
 import com.lin0721.linmusic.desktop.player.mpv.MpvEngine
@@ -55,6 +57,8 @@ private const val PERIODIC_STATE_SAVE_INTERVAL_MS = 5_000L
 // 退出时同步落盘的最长等待
 private const val EXIT_SAVE_TIMEOUT_MS = 1_500L
 
+private const val VOLUME_SAVE_DELAY_MS = 400L
+
 private const val CROSSFADE_PREPARE_TIMEOUT_MS = 8_000L
 private const val CROSSFADE_PREPARE_POLL_MS = 100L
 
@@ -73,7 +77,8 @@ class MpvPlaybackController(
     private val scope: CoroutineScope,
     // 仅测试用
     engineOptions: Map<String, String> = emptyMap(),
-    private val audioCache: AudioCache? = null
+    private val audioCache: AudioCache? = null,
+    private val cacheManager: DesktopCacheManager? = null
 ) : DesktopPlaybackController, MpvEngine.Listener {
 
     private val playbackQueue = PlaybackQueue()
@@ -117,6 +122,13 @@ class MpvPlaybackController(
 
     private val _volume = MutableStateFlow(100)
     override val volume: StateFlow<Int> = _volume.asStateFlow()
+
+    private val _lastAudibleVolume = MutableStateFlow(DesktopPreferences.DEFAULT_VOLUME)
+    override val lastAudibleVolume: StateFlow<Int> = _lastAudibleVolume.asStateFlow()
+
+    // 已读到存档或已被用户调整过；之前不能把默认值写回存档
+    private var volumeReady = false
+    private var volumeSaveJob: Job? = null
 
     private val _audioDevices = MutableStateFlow<List<AudioDevice>>(emptyList())
     override val audioDevices: StateFlow<List<AudioDevice>> = _audioDevices.asStateFlow()
@@ -165,6 +177,7 @@ class MpvPlaybackController(
             }
         }
         scope.launch { restoreAudioDevice() }
+        scope.launch { restoreVolume() }
         scope.launch {
             settingsPreferences.crossfadeEnabled.collect { enabled ->
                 crossfadeEnabled = enabled
@@ -180,6 +193,17 @@ class MpvPlaybackController(
         _audioDevices.value = engine.audioDevices()
         if (saved == AUTO_AUDIO_DEVICE || _audioDevices.value.none { it.name == saved }) return
         if (engine.setAudioDevice(saved)) _audioDevice.value = saved
+    }
+
+    private suspend fun restoreVolume() {
+        val saved = desktopPreferences.volume.first()
+        val lastAudible = desktopPreferences.lastAudibleVolume.first()
+        // 读取期间用户已调过音量时不再覆盖
+        if (volumeReady) return
+        volumeReady = true
+        _lastAudibleVolume.value = lastAudible
+        _volume.value = saved
+        engine.setVolume(saved)
     }
 
     override fun refreshAudioDevices() {
@@ -295,6 +319,16 @@ class MpvPlaybackController(
             return
         }
         playbackQueue.insertNext(items)
+        saveQueueState()
+    }
+
+    override fun appendToQueue(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        if (playbackQueue.isEmpty) {
+            playQueue(items, 0, null)
+            return
+        }
+        playbackQueue.append(items)
         saveQueueState()
     }
 
@@ -430,8 +464,20 @@ class MpvPlaybackController(
 
     override fun setVolume(percent: Int) {
         val clamped = percent.coerceIn(0, 100)
+        volumeReady = true
         _volume.value = clamped
+        if (clamped > 0) _lastAudibleVolume.value = clamped
         engine.setVolume(clamped)
+        saveVolumeDebounced()
+    }
+
+    // 拖动滑块会连续触发，停手后才写盘
+    private fun saveVolumeDebounced() {
+        volumeSaveJob?.cancel()
+        volumeSaveJob = scope.launch {
+            delay(VOLUME_SAVE_DELAY_MS)
+            desktopPreferences.saveVolume(_volume.value, _lastAudibleVolume.value)
+        }
     }
 
     // 退出时同步落盘，异步写入来不及在进程结束前完成
@@ -439,8 +485,12 @@ class MpvPlaybackController(
         playJob?.cancel()
         sleepTimer.cancel()
         roaming.cancel()
+        volumeSaveJob?.cancel()
         finishReporting()
         val state = currentPlaybackState()
+        val saveVolume = volumeReady
+        val volumeNow = _volume.value
+        val lastAudibleNow = _lastAudibleVolume.value
         val items = playbackQueue.original
         val index = playbackQueue.currentIndexInOriginal()
         val context = playbackQueue.playContext.value
@@ -450,6 +500,7 @@ class MpvPlaybackController(
                 runCatching {
                     if (state != null) preferences.savePlaybackState(state)
                     preferences.saveQueueState(items, index, context, source)
+                    if (saveVolume) desktopPreferences.saveVolume(volumeNow, lastAudibleNow)
                 }.onFailure { AppLogger.w(TAG, "退出时保存播放状态失败", it) }
             }
         }
@@ -558,16 +609,14 @@ class MpvPlaybackController(
         return resolvePlayback(item.songId)
     }
 
-    // 已下载 > 缓存命中 > 联网；联网失败退回任意音质缓存
-    // 缓存命中不受开关影响，开关只管是否录制
+    // 已下载 > 缓存命中 > 联网（同时录制缓存）；联网失败退回任意音质缓存
     private suspend fun resolvePlayback(songId: Long): Result<Playback> {
         localAudioOf(songId)?.let { return Result.success(Playback(it, null)) }
         val level = settingsPreferences.wifiQuality.first()
         audioCache?.completeFile(songId, level)?.let { return Result.success(Playback(it.absolutePath, null)) }
         return repository.getSongUrl(songId).first().fold(
             onSuccess = { url ->
-                val record = audioCache?.takeIf { settingsPreferences.streamCacheEnabled.first() }
-                    ?.let { RecordRequest(songId, it.tempFile(songId, level).absolutePath) }
+                val record = audioCache?.let { RecordRequest(songId, it.tempFile(songId, level).absolutePath) }
                 Result.success(Playback(url, record))
             },
             onFailure = { error ->
@@ -581,8 +630,9 @@ class MpvPlaybackController(
     private fun commitRecording(songId: Long, path: String) {
         val cache = audioCache ?: return
         scope.launch(Dispatchers.IO) {
-            if (cache.commit(File(path), settingsPreferences.audioCacheMaxSize.first())) {
+            if (cache.commit(File(path))) {
                 AppLogger.i(TAG, "已缓存 songId=$songId")
+                cacheManager?.enforce(CacheLimits.normalize(settingsPreferences.audioCacheMaxSize.first()))
             }
         }
     }

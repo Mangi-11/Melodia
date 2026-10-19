@@ -51,20 +51,21 @@ fun PlayerSlider(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null,
-    previewLabel: ((fraction: Float) -> String)? = null
+    previewLabel: ((fraction: Float) -> String)? = null,
+    externalActive: Boolean = false
 ) {
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var dragging by remember { mutableStateOf(false) }
-    val active = enabled && (hovered || dragging)
+    val active = enabled && (hovered || dragging || externalActive)
 
     var widthPx by remember { mutableStateOf(0) }
     var hoverX by remember { mutableStateOf<Float?>(null) }
     val thumbPx = with(density) { ThumbSize.toPx() }
     val hoverFraction = hoverX?.takeIf { widthPx > thumbPx }
         ?.let { ((it - thumbPx / 2) / (widthPx - thumbPx)).coerceIn(0f, 1f) }
-    val previewing = previewLabel != null && enabled && hoverFraction != null
+    val previewing = !externalActive && previewLabel != null && enabled && hoverFraction != null
 
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
@@ -165,8 +166,11 @@ fun PlayerSlider(
             Box(
                 Modifier.align(Alignment.TopStart).layout { measurable, _ ->
                     val placeable = measurable.measure(Constraints())
+                    val minX = 0
+                    val maxX = (widthPx - placeable.width).coerceAtLeast(0)
+                    val left = (x.roundToInt() - placeable.width / 2).coerceIn(minX, maxX)
                     layout(0, 0) {
-                        placeable.place(x.roundToInt() - placeable.width / 2, -placeable.height - PreviewGap.roundToPx())
+                        placeable.place(left, -placeable.height - PreviewGap.roundToPx())
                     }
                 }
             ) {

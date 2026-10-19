@@ -119,6 +119,7 @@ import com.lin0721.linmusic.desktop.ui.track.DangerColor
 import com.lin0721.linmusic.feature.library.ui.LibraryFilter
 import com.lin0721.linmusic.feature.library.ui.LibraryItem
 import com.lin0721.linmusic.feature.library.ui.LibraryItemType
+import com.lin0721.linmusic.feature.library.ui.LibrarySortOrder
 import com.lin0721.linmusic.feature.library.ui.LibraryUiState
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 import java.awt.Toolkit
@@ -149,6 +150,8 @@ fun LibrarySidebar(
     onModeChange: (LibraryMode) -> Unit,
     viewMode: LibraryViewMode,
     onViewModeChange: (LibraryViewMode) -> Unit,
+    onFilterToggle: (LibraryFilter) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val paneHover = remember { MutableInteractionSource() }
@@ -177,6 +180,8 @@ fun LibrarySidebar(
             onItemClick = onItemClick,
             viewMode = viewMode,
             onViewModeChange = onViewModeChange,
+            onFilterToggle = onFilterToggle,
+            onSortOrderChange = onSortOrderChange,
             wideSearch = false,
             edgePadding = 16.dp,
             cardMinWidth = 128.dp,
@@ -195,6 +200,8 @@ fun LibraryExpanded(
     onModeChange: (LibraryMode) -> Unit,
     viewMode: LibraryViewMode,
     onViewModeChange: (LibraryViewMode) -> Unit,
+    onFilterToggle: (LibraryFilter) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier.fillMaxSize().padding(top = 16.dp)) {
@@ -226,6 +233,8 @@ fun LibraryExpanded(
             onItemClick = onItemClick,
             viewMode = viewMode,
             onViewModeChange = onViewModeChange,
+            onFilterToggle = onFilterToggle,
+            onSortOrderChange = onSortOrderChange,
             wideSearch = true,
             edgePadding = 24.dp,
             cardMinWidth = 190.dp,
@@ -242,6 +251,8 @@ private fun LibraryBody(
     onItemClick: (LibraryItem) -> Unit,
     viewMode: LibraryViewMode,
     onViewModeChange: (LibraryViewMode) -> Unit,
+    onFilterToggle: (LibraryFilter) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
     wideSearch: Boolean,
     edgePadding: Dp,
     cardMinWidth: Dp,
@@ -257,7 +268,7 @@ private fun LibraryBody(
             Modifier.fillMaxWidth().padding(start = edgePadding, end = edgePadding, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LibraryFilterChips(viewModel)
+            LibraryFilterChips(viewModel, onFilterToggle)
             Spacer(Modifier.weight(1f))
             val query by viewModel.searchQuery.collectAsState()
             Box(
@@ -272,11 +283,11 @@ private fun LibraryBody(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            LibrarySortViewMenu(viewModel, viewMode, onViewModeChange, showSortLabel = true)
+            LibrarySortViewMenu(viewModel, viewMode, onViewModeChange, onSortOrderChange, showSortLabel = true)
         }
     } else {
-        Box(Modifier.padding(start = edgePadding, end = edgePadding, top = 12.dp)) { LibraryFilterChips(viewModel) }
-        LibraryCompactToolbar(viewModel, edgePadding, viewMode, onViewModeChange)
+        Box(Modifier.padding(start = edgePadding, end = edgePadding, top = 12.dp)) { LibraryFilterChips(viewModel, onFilterToggle) }
+        LibraryCompactToolbar(viewModel, edgePadding, viewMode, onViewModeChange, onSortOrderChange)
     }
     LibraryItems(viewModel, onItemClick, edgePadding, cardMinWidth, smallTileMinWidth, viewMode)
 }
@@ -287,7 +298,8 @@ private fun LibraryCompactToolbar(
     viewModel: LibraryViewModel,
     edgePadding: Dp,
     viewMode: LibraryViewMode,
-    onViewModeChange: (LibraryViewMode) -> Unit
+    onViewModeChange: (LibraryViewMode) -> Unit,
+    onSortOrderChange: (LibrarySortOrder) -> Unit
 ) {
     val query by viewModel.searchQuery.collectAsState()
     var searching by remember { mutableStateOf(query.isNotBlank()) }
@@ -338,7 +350,7 @@ private fun LibraryCompactToolbar(
                 }
             }
             Spacer(Modifier.weight(1f))
-            LibrarySortViewMenu(viewModel, viewMode, onViewModeChange, showSortLabel = !searching)
+            LibrarySortViewMenu(viewModel, viewMode, onViewModeChange, onSortOrderChange, showSortLabel = !searching)
         }
     }
 }
@@ -395,13 +407,13 @@ internal fun LibrarySearchInput(
 }
 
 @Composable
-private fun LibraryFilterChips(viewModel: LibraryViewModel) {
+private fun LibraryFilterChips(viewModel: LibraryViewModel, onToggle: (LibraryFilter) -> Unit) {
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         LibraryFilters.forEach { (filter, label) ->
             FilterChip(
                 selected = selectedFilter == filter,
-                onClick = { viewModel.toggleFilter(filter) },
+                onClick = { onToggle(filter) },
                 label = { Text(label, fontSize = 13.sp) },
                 shape = RoundedCornerShape(16.dp),
                 colors = FilterChipDefaults.filterChipColors(

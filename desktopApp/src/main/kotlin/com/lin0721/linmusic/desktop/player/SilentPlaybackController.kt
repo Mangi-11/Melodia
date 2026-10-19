@@ -24,6 +24,7 @@ class SilentPlaybackController : DesktopPlaybackController {
     override val unavailableReason: String = UNAVAILABLE_MESSAGE
 
     override val volume: StateFlow<Int> = MutableStateFlow(100).asStateFlow()
+    override val lastAudibleVolume: StateFlow<Int> = MutableStateFlow(100).asStateFlow()
     override val audioDevices: StateFlow<List<AudioDevice>> = MutableStateFlow(emptyList<AudioDevice>()).asStateFlow()
     override val audioDevice: StateFlow<String> = MutableStateFlow(AUTO_AUDIO_DEVICE).asStateFlow()
 
@@ -106,6 +107,16 @@ class SilentPlaybackController : DesktopPlaybackController {
         }
         val insertAt = (_currentIndex.value + 1).coerceIn(0, current.size)
         _queue.value = current.take(insertAt) + items + current.drop(insertAt)
+        refreshNeighbours()
+    }
+
+    override fun appendToQueue(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        if (_queue.value.isEmpty()) {
+            playQueue(items, 0, null)
+            return
+        }
+        _queue.value = _queue.value + items
         refreshNeighbours()
     }
 

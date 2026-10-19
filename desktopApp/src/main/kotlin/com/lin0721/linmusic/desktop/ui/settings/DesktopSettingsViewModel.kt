@@ -4,17 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.data.CacheDirState
+import com.lin0721.linmusic.desktop.data.CacheRelocator
+import com.lin0721.linmusic.desktop.data.CacheUsage
 import com.lin0721.linmusic.desktop.data.CloseAction
-import com.lin0721.linmusic.desktop.data.DesktopImageLoader
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.RelocationProgress
+import com.lin0721.linmusic.desktop.data.RelocationResult
 import com.lin0721.linmusic.desktop.platform.AutoStartService
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
-import com.lin0721.linmusic.desktop.player.cache.AudioCache
+import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,10 +35,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-// 图片缓存与日志由全局对象管理，抽成参数便于测试替换
+// 日志由全局对象管理，抽成参数便于测试替换
 class LocalStorageOps(
-    val imageCacheSize: () -> Long = DesktopImageLoader::diskCacheSize,
-    val clearImageCache: () -> Unit = DesktopImageLoader::clear,
     val logsSize: () -> Long = AppLogger::getLogsSize,
     val clearLogs: () -> Unit = { AppLogger.clearLogs() }
 )
@@ -42,7 +47,8 @@ class DesktopSettingsViewModel(
     private val hotkeys: GlobalHotkeyService,
     mediaSession: MediaSessionService,
     private val autoStart: AutoStartService,
-    private val audioCache: AudioCache,
+    private val cacheManager: DesktopCacheManager,
+    private val relocator: CacheRelocator,
     private val storage: LocalStorageOps = LocalStorageOps(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
@@ -67,16 +73,19 @@ class DesktopSettingsViewModel(
     private val _autoStartEnabled = MutableStateFlow<Boolean?>(null)
     val autoStartEnabled: StateFlow<Boolean?> = _autoStartEnabled.asStateFlow()
 
-    private val _audioCacheBytes = MutableStateFlow(0L)
-    val audioCacheBytes: StateFlow<Long> = _audioCacheBytes.asStateFlow()
+    private val _cacheUsage = MutableStateFlow(CacheUsage(0L, 0L, 0L, 0L))
+    val cacheUsage: StateFlow<CacheUsage> = _cacheUsage.asStateFlow()
 
-    private val _imageCacheBytes = MutableStateFlow(0L)
-    val imageCacheBytes: StateFlow<Long> = _imageCacheBytes.asStateFlow()
+    val cacheDir: StateFlow<CacheDirState> = relocator.state.asState(relocator.stateFor(null))
+
+    // 非空表示正在迁移缓存
+    private val _relocation = MutableStateFlow<RelocationProgress?>(null)
+    val relocation: StateFlow<RelocationProgress?> = _relocation.asStateFlow()
+    private var relocationJob: Job? = null
 
     private val _logBytes = MutableStateFlow(0L)
     val logBytes: StateFlow<Long> = _logBytes.asStateFlow()
 
-    val imageCacheMaxBytes: Long = DesktopImageLoader.DISK_CACHE_MAX_BYTES
     val logDir: File = DesktopPaths.logDir
     val defaultDownloadDir: File = DesktopPaths.defaultDownloadDir
 
@@ -90,8 +99,7 @@ class DesktopSettingsViewModel(
         }
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                _audioCacheBytes.value = audioCache.totalSize()
-                _imageCacheBytes.value = storage.imageCacheSize()
+                _cacheUsage.value = cacheManager.usage()
                 _logBytes.value = storage.logsSize()
             }
         }
@@ -123,30 +131,49 @@ class DesktopSettingsViewModel(
     }
 
     // 容量上限调低后立即按新上限淘汰
-    fun trimAudioCache(maxBytes: Long) {
+    fun enforceCacheLimit(maxBytes: Long) {
         viewModelScope.launch {
             withContext(ioDispatcher) {
-                audioCache.evict(maxBytes)
-                _audioCacheBytes.value = audioCache.totalSize()
+                cacheManager.enforce(maxBytes)
+                _cacheUsage.value = cacheManager.usage()
             }
         }
     }
 
-    fun clearAudioCache() {
-        viewModelScope.launch {
-            withContext(ioDispatcher) {
-                audioCache.clear()
-                _audioCacheBytes.value = audioCache.totalSize()
+    // selected 为 null 表示恢复默认位置；新目录重启后才生效
+    fun changeCacheDir(selected: File?) {
+        if (relocationJob?.isActive == true) return
+        relocationJob = viewModelScope.launch {
+            _relocation.value = RelocationProgress(0L, 0L)
+            try {
+                when (val result = relocator.switchTo(selected) { _relocation.value = it }) {
+                    RelocationResult.Unchanged -> _messages.tryEmit("缓存目录已是当前使用的位置")
+                    RelocationResult.Switched -> _messages.tryEmit("缓存目录已更改，重启后生效")
+                    is RelocationResult.Failed -> _messages.tryEmit("更改缓存目录失败：${result.reason}")
+                }
+            } catch (e: CancellationException) {
+                _messages.tryEmit("已取消迁移")
+                throw e
+            } finally {
+                _relocation.value = null
             }
         }
     }
 
-    fun clearImageCache() {
+    fun cancelRelocation() {
+        relocationJob?.cancel()
+    }
+
+    fun clearCaches() {
         viewModelScope.launch {
-            withContext(ioDispatcher) {
-                storage.clearImageCache()
-                _imageCacheBytes.value = storage.imageCacheSize()
+            val freed = withContext(ioDispatcher) {
+                val before = cacheManager.usage().total
+                cacheManager.clear()
+                val after = cacheManager.usage()
+                _cacheUsage.value = after
+                before - after.total
             }
+            _messages.tryEmit(if (freed > 0) "已清除缓存，释放 ${formatFileSize(freed)}" else "没有可清除的缓存")
         }
     }
 

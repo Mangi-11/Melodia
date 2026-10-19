@@ -162,6 +162,7 @@ Repository 边界统一产出 Kotlin `Result<T>`，异常类型抽象为领域�
 - [api-enhanced](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced) - 增强接口与加密逻辑参考
 - [node-vibrant](https://github.com/Vibrant-Colors/node-vibrant) - 取色算法参考
 - [SPlayer](https://github.com/SPlayer-Dev/SPlayer) - 现代流媒体架构设计启发
+- [Mei](https://github.com/ljyh223/Mei) — QQ 音乐歌词解析参考
 - [AMLL 歌词库](https://github.com/amll-dev/amll-ttml-db) - TTML 逐字歌词、对唱与背景和声歌词来源
 - [Spotify](https://spotify.com) - 优秀的移动端流媒体交互范式与 UI/UX 体验灵感
 - [SuperLyric](https://github.com/HChenX/SuperLyric) - 系统级实时歌词协议与 AIDL 规范

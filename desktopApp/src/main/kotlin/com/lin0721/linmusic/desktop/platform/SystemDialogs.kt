@@ -1,0 +1,42 @@
+package com.lin0721.linmusic.desktop.platform
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.awt.FileDialog
+import java.awt.Frame
+import java.io.File
+import java.lang.reflect.InvocationTargetException
+import javax.swing.JFileChooser
+import javax.swing.SwingUtilities
+
+// 系统选择框会开启嵌套事件循环：在协程或点击回调里直接阻塞，会让正在执行的协程被重入而崩溃。
+// 先挂起到 IO 线程，再交给界面线程弹出，弹窗期间协程保持挂起。
+private suspend fun <T> onEventThread(block: () -> T): T = withContext(Dispatchers.IO) {
+    var result: Any? = null
+    try {
+        SwingUtilities.invokeAndWait { result = block() }
+    } catch (e: InvocationTargetException) {
+        throw e.cause ?: e
+    }
+    @Suppress("UNCHECKED_CAST")
+    result as T
+}
+
+// 取消返回 null
+suspend fun chooseDirectory(initial: File, title: String): File? = onEventThread {
+    val chooser = JFileChooser(initial.takeIf { it.isDirectory }).apply {
+        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        dialogTitle = title
+    }
+    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
+}
+
+// filter 形如 "*.js;*.zip"；取消返回 null
+suspend fun chooseFile(title: String, filter: String): File? = onEventThread {
+    val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
+        // Windows 原生对话框把 file 当作过滤模式
+        file = filter
+        isVisible = true
+    }
+    dialog.file?.let { File(dialog.directory.orEmpty(), it) }
+}

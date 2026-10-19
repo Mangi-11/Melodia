@@ -30,16 +30,22 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
+import com.lin0721.linmusic.desktop.app.DesktopCacheRoot
 import com.lin0721.linmusic.desktop.app.DesktopLogging
 import com.lin0721.linmusic.desktop.app.DesktopPaths
 import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
 import com.lin0721.linmusic.desktop.app.SingleInstance
 import com.lin0721.linmusic.desktop.app.WindowBounds
 import com.lin0721.linmusic.desktop.app.currentScreenBounds
+import com.lin0721.linmusic.desktop.data.CacheLimits
+import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CloseAction
+import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopImageLoader
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.di.desktopAppDependencies
@@ -49,12 +55,15 @@ import com.lin0721.linmusic.desktop.di.platformModuleFor
 import com.lin0721.linmusic.desktop.platform.GlobalHotkeyService
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
+import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
+import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
+import com.lin0721.linmusic.desktop.ui.shell.TaskbarThumbnailEffect
 import com.lin0721.linmusic.desktop.ui.shell.WindowChromeEffect
 import com.lin0721.linmusic.desktop.ui.shell.rememberFullscreenState
 import com.lin0721.linmusic.desktop.ui.theme.MelodiaDesktopTheme
@@ -106,7 +115,8 @@ fun main() {
     if (!SingleInstance(DesktopPaths.dataDir).acquire { activationRequests.trySend(Unit) }) {
         exitProcess(0)
     }
-    // 须先于缓存对象创建
+    // 须先于任何缓存目录的读取与缓存对象创建
+    DesktopCacheRoot.configure(DesktopPreferences(PreferencesStores.get(DesktopPaths.preferencesFile(DesktopPreferences.STORE_NAME))))
     DesktopCacheMigration.migrateAll()
     val koin = startKoin {
         modules(
@@ -118,12 +128,22 @@ fun main() {
     // 进程内常驻记录播客收听进度
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     val settingsPreferences = koin.get<SettingsPreferences>()
+    // 切换缓存目录后清掉旧目录；旧缓存超出当前上限时补一次淘汰
+    CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        koin.get<CacheRelocator>().cleanupPending()
+        try {
+            koin.get<DesktopCacheManager>().enforce(CacheLimits.normalize(settingsPreferences.audioCacheMaxSize.first()))
+        } catch (e: Exception) {
+            AppLogger.w("Main", "启动时淘汰缓存失败", e)
+        }
+    }
     val playerViewModel = koin.get<PlayerViewModel>()
     val appDependencies = koin.desktopAppDependencies()
     val desktopPreferences = koin.get<DesktopPreferences>()
     val hotkeys = koin.get<GlobalHotkeyService>()
     val mediaSession = koin.get<MediaSessionService>()
     val windowEffects = koin.get<WindowEffects>()
+    val taskbarThumbnail = koin.get<TaskbarThumbnailService>()
     val searchFocusRequests = Channel<Unit>(Channel.CONFLATED)
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
@@ -329,6 +349,8 @@ fun main() {
             }
             // 全屏与最大化一样不要圆角和边框线
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
+            CanvasClearColorEffect()
+            TaskbarThumbnailEffect(taskbarThumbnail, controller)
             MelodiaDesktopTheme(uiScale = uiScaleFactor) {
                 MelodiaDesktopApp(
                     deps = appDependencies,

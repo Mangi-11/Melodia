@@ -1,11 +1,14 @@
 package com.lin0721.linmusic.desktop.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,14 +120,22 @@ private fun HomePill(
     selectedContainerColor: Color = DesktopColors.TextPrimary,
     labelStartInset: Dp = 0.dp
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val containerColor by animateColorAsState(
+        if (hovered) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
+        tween(150),
+        label = "homePillBg"
+    )
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(text, fontSize = 13.sp, modifier = Modifier.padding(start = labelStartInset)) },
         modifier = modifier,
         shape = shape,
+        interactionSource = interaction,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = DesktopColors.Surface,
+            containerColor = containerColor,
             labelColor = DesktopColors.TextPrimary,
             selectedContainerColor = selectedContainerColor,
             selectedLabelColor = DesktopColors.Pane

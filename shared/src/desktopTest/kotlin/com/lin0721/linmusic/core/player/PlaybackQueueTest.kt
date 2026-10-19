@@ -182,6 +182,29 @@ class PlaybackQueueTest {
         assertEquals(listOf(1L, 2L), queue.ids())
     }
 
+    @Test
+    fun `追加到队列末尾且不改变当前项`() {
+        val queue = queueOf(1, 2, 3, startIndex = 1)
+        queue.append(listOf(item(8), item(9)))
+        assertEquals(listOf(1L, 2L, 3L, 8L, 9L), queue.ids())
+        assertEquals(1, queue.currentIndex.value)
+        assertEquals(2L, queue.currentItem()?.songId)
+    }
+
+    @Test
+    fun `追加同时写入原始队列`() {
+        val queue = queueOf(1, 2)
+        queue.append(listOf(item(9)))
+        assertEquals(listOf(1L, 2L, 9L), queue.original.map { it.songId })
+    }
+
+    @Test
+    fun `追加空列表不产生变化`() {
+        val queue = queueOf(1, 2)
+        queue.append(emptyList())
+        assertEquals(listOf(1L, 2L), queue.ids())
+    }
+
     // ======================= 播放模式切换 =======================
 
     @Test

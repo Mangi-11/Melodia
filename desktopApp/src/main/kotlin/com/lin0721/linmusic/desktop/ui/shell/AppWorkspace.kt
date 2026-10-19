@@ -65,14 +65,16 @@ internal fun Workspace(
                     onItemClick = state::openLibraryItem,
                     onModeChange = state::setLibraryMode,
                     viewMode = pane.libraryViewMode,
-                    onViewModeChange = pane::updateViewMode
+                    onViewModeChange = state::setLibraryViewMode,
+                    onFilterToggle = state::toggleLibraryFilter,
+                    onSortOrderChange = state::setLibrarySortOrder
                 )
                 // 缝隙即拖动条：拖窄过阈值吸附成窄条，拖宽只停在上限，不会变成展开态
                 PaneResizeHandle(
                     width = workspace.centerGap,
                     enabled = pane.libraryMode != LibraryMode.EXPANDED,
                     onDragStart = { pane.startLibraryDrag(workspace.libraryWidth) },
-                    onDrag = { delta -> pane.dragLibrary(delta, measure.libraryMax, state::setLibraryMode) },
+                    onDrag = { delta -> pane.dragLibrary(delta, measure.libraryMax, state::setLibraryModeByDrag) },
                     onDragEnd = pane::endLibraryDrag
                 )
                 Pane(Modifier.weight(1f)) {
@@ -94,14 +96,14 @@ internal fun Workspace(
                     onCloseOverlay = state::closeOverlay,
                     onOpenComments = { state.toggleOverlay(DockOverlay.Comments) },
                     playlistComments = state.playlistComments,
-                    onOpenLyricsView = lyricsView::open,
-                    onOpenLyricsFullscreen = lyricsView::openWithFullscreen,
+                    onOpenLyricsView = state::openLyricsView,
+                    onOpenLyricsFullscreen = state::openLyricsFullscreen,
                     onOpenChange = state::setDockOpen,
                     controller = deps.playbackController,
                     playerViewModel = deps.playerViewModel,
                     songActions = deps.songActions,
                     onResizeStart = { pane.startDockDrag(dockState.width) },
-                    onResize = { delta -> pane.dragDock(delta, measure.dockMax, dockOpen) { state.setDockOpen(false) } },
+                    onResize = { delta -> pane.dragDock(delta, measure.dockMax, dockOpen, state::closeDockByDrag) },
                     onResizeEnd = pane::endDockDrag
                 )
             }
@@ -113,7 +115,8 @@ internal fun Workspace(
             playerViewModel = deps.playerViewModel,
             settingsPreferences = deps.settingsPreferences,
             desktopPreferences = deps.desktopPreferences,
-            isFullscreen = isFullscreen
+            isFullscreen = isFullscreen,
+            onClose = state::closeLyricsView
         )
         // 全屏歌词盖住了右侧栏，队列、设备等面板在它之上浮出
         if (lyricsView.isOpen && dockOpen && dockOverlay != null) {

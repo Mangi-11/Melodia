@@ -8,6 +8,7 @@ import com.sun.jna.Pointer
 import com.sun.jna.ptr.IntByReference
 import java.awt.Window
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 private const val TAG = "WindowsWindowEffects"
 
@@ -18,10 +19,24 @@ private interface WndProc : Callback {
 
 private class Subclass(val previous: Pointer?, val proc: WndProc)
 
+// 在 AWT 工具线程上同步回调；返回非空即视为已处理并作为窗口过程的结果，返回 null 则继续交给后续处理
+internal fun interface WindowMessageHook {
+    fun onMessage(hwnd: Pointer, msg: Int, wParam: Long, lParam: Long): Long?
+}
+
 // 无边框窗口的系统圆角、边框色与最小化/还原/显示/隐藏动画；非 Windows 11 上调用无副作用
 internal class WindowsWindowEffects : WindowEffects {
 
     private val subclasses = ConcurrentHashMap<Long, Subclass>()
+    private val hooks = CopyOnWriteArrayList<WindowMessageHook>()
+
+    fun addMessageHook(hook: WindowMessageHook) {
+        hooks.addIfAbsent(hook)
+    }
+
+    fun removeMessageHook(hook: WindowMessageHook) {
+        hooks.remove(hook)
+    }
 
     override val supportsClickThrough: Boolean = true
 
@@ -38,6 +53,7 @@ internal class WindowsWindowEffects : WindowEffects {
                     trimMaximizedBounds(hwnd, lParam)
                     return 0
                 }
+                if (hwnd != null) dispatchToHooks(hwnd, msg, wParam, lParam)?.let { return it }
                 return user32.CallWindowProcW(previous, hwnd, msg, wParam, lParam)
             }
         }
@@ -63,6 +79,18 @@ internal class WindowsWindowEffects : WindowEffects {
     override fun uninstall(window: Window) = withHandle(window) { hwnd ->
         val entry = subclasses.remove(Pointer.nativeValue(hwnd)) ?: return@withHandle
         User32.INSTANCE.SetWindowLongPtrW(hwnd, User32.GWLP_WNDPROC, entry.previous)
+    }
+
+    // 钩子抛出的异常不能穿过原生回调，否则会让整个进程崩溃
+    private fun dispatchToHooks(hwnd: Pointer, msg: Int, wParam: Long, lParam: Long): Long? {
+        for (hook in hooks) {
+            try {
+                hook.onMessage(hwnd, msg, wParam, lParam)?.let { return it }
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "窗口消息钩子执行失败 msg=0x${Integer.toHexString(msg)}", e)
+            }
+        }
+        return null
     }
 
     // 最大化时窗口矩形会向四周溢出一圈缩放边框，客户区需要收回到工作区内

@@ -12,10 +12,32 @@ object QrcLyricParser {
     private val qrcWordRegex = Regex("""(.*?)\((\d+),(\d+)\)""")
     private val wordTagStripRegex = Regex("""\(\d+,\d+\)""")
 
-    fun parse(rawText: String): List<LyricLine> {
+    fun parse(rawText: String, translation: String? = null, roma: String? = null): List<LyricLine> {
         if (rawText.isBlank()) return emptyList()
         val content = extractLyricContent(rawText)
-        return content.lines().mapNotNull(::parseLine).sortedBy { it.timeMs }
+        val lines = content.lines().mapNotNull(::parseLine).sortedBy { it.timeMs }
+        return attach(attach(lines, translation, false), roma, true)
+    }
+
+    // 与 Mei 一致，按三秒内最近的起点配对；每条主歌词只接受一条译文或音译。
+    private fun attach(lines: List<LyricLine>, raw: String?, romanization: Boolean): List<LyricLine> {
+        if (raw.isNullOrBlank()) return lines
+        val content = extractLyricContent(raw)
+        val extra = content.lines().mapNotNull(::parseLine).sortedBy { it.timeMs }
+        val used = mutableSetOf<Int>()
+        val result = lines.toMutableList()
+        for (line in extra) {
+            if (line.text.startsWith("//") || listOf("著作权", "QQ音乐", "腾讯音乐", "未经许可", "不得转载", "Provided by", "字幕", "制作", "出品", "TME")
+                    .any { line.text.contains(it, ignoreCase = true) }) continue
+            val index = result.indices.filter { it !in used && (result[it].durationMs == 0L || result[it].durationMs >= 300) }
+                .filter { kotlin.math.abs(result[it].timeMs - line.timeMs) <= 3000 }
+                .minWithOrNull(compareBy<Int> { kotlin.math.abs(result[it].timeMs - line.timeMs) }.thenByDescending { result[it].text.length })
+                ?: continue
+            result[index] = if (romanization) result[index].copy(roma = line.text)
+                else result[index].copy(translation = line.text)
+            used += index
+        }
+        return result
     }
 
     private fun extractLyricContent(raw: String): String {
@@ -40,6 +62,8 @@ object QrcLyricParser {
 
         val wordsList = mutableListOf<WordInfo>()
         val fullTextBuilder = StringBuilder()
+        // 同一行统一判断时间基准，避免相对时间跨过行起点后被误当成绝对时间。
+        val absoluteTimes = (matches.first().groupValues[2].toLongOrNull() ?: 0L) >= lineStartTime
 
         for (match in matches) {
             val wordText = match.groupValues[1]
@@ -48,7 +72,7 @@ object QrcLyricParser {
 
             if (wordText.isEmpty() && duration == 0L) continue
 
-            val startOffset = if (absoluteStart >= lineStartTime) absoluteStart - lineStartTime else absoluteStart.coerceAtLeast(0L)
+            val startOffset = if (absoluteTimes) absoluteStart - lineStartTime else absoluteStart
             wordsList.add(WordInfo(wordText, startOffset, duration))
             fullTextBuilder.append(wordText)
         }
@@ -61,20 +85,21 @@ object QrcLyricParser {
             }
         }
 
-        val fullText = fullTextBuilder.toString().trim()
-        if (fullText.isEmpty()) return null
+        val fullText = fullTextBuilder.toString()
+        if (fullText.isBlank()) return null
 
-        val lineDuration = if (declaredDuration > 0) {
-            declaredDuration
-        } else {
-            wordsList.lastOrNull()?.let { it.startOffsetMs + it.durationMs } ?: 0L
-        }
+        val lineDuration = maxOf(declaredDuration, wordsList.maxOfOrNull { it.startOffsetMs + it.durationMs } ?: 0L)
+        val validWords = wordsList.takeIf { words ->
+            words.all { it.startOffsetMs >= 0 && it.durationMs >= 0 } &&
+                words.zipWithNext().all { (a, b) -> a.startOffsetMs <= b.startOffsetMs } &&
+                words.joinToString("") { it.text } == fullText
+        }.orEmpty()
 
         return LyricLine(
             timeMs = lineStartTime,
             durationMs = lineDuration,
             text = fullText,
-            words = wordsList
+            words = validWords
         )
     }
 

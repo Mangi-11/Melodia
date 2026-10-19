@@ -22,6 +22,18 @@ interface MediaSessionService {
     fun shutdown()
 }
 
+// 任务栏预览小窗：有曲目时显示封面，并嵌入上一首/播放暂停/下一首按钮
+interface TaskbarThumbnailService {
+
+    // 须在窗口可显示之后调用；失败时后续调用均无效果
+    fun attach(window: Window)
+
+    // 同步播放状态并响应缩略图按钮，随调用方协程取消而结束
+    suspend fun bind(controller: PlaybackController)
+
+    fun detach()
+}
+
 interface GlobalHotkeyService {
 
     val isSupported: Boolean

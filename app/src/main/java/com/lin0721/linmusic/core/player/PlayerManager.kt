@@ -362,6 +362,16 @@ class PlayerManager(
         saveQueueState()
     }
 
+    override fun appendToQueue(items: List<QueueItem>) {
+        if (items.isEmpty()) return
+        if (playbackQueue.isEmpty) {
+            playQueue(items, 0)
+            return
+        }
+        playbackQueue.append(items)
+        saveQueueState()
+    }
+
     // 插播到"下一首"并立即从指定位置播放，保留原队列
     fun playNextNow(item: QueueItem, startPosition: Long = 0L) {
         val targetIndex = if (playbackQueue.isEmpty) {

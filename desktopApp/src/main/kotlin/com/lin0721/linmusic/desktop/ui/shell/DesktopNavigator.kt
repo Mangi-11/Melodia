@@ -25,6 +25,8 @@ class DesktopNavigator(
     // 新建歌单对话框里隐私开关的初始值
     val defaultPlaylistPrivate: Boolean,
     val downloadTrack: (Track) -> Unit,
+    // 指定下载音质，供需要先选音质的入口使用
+    val downloadTrackAt: (Track, level: String) -> Unit,
     val showMessage: (String) -> Unit,
     val goBack: () -> Unit,
     // 在右侧栏打开（或关闭已打开的）歌单评论
