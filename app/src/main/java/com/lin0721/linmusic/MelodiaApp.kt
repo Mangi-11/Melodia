@@ -672,7 +672,7 @@ fun MelodiaApp() {
             currentTrack = currentTrack,
             screenHeightPx = playerSheet.screenHeightPx,
             isPlayerOpen = playerSheet.isOpen,
-            playerOffsetY = playerSheet.offsetY,
+            playerOffsetY = { playerSheet.offsetY },
             isPlaying = isPlaying,
             currentPositionProvider = currentPositionProvider,
             duration = duration,

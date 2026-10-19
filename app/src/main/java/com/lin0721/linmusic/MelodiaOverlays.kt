@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -323,7 +326,8 @@ fun MelodiaFullPlayerOverlay(
     currentTrack: MediaItem?,
     screenHeightPx: Float,
     isPlayerOpen: Boolean,
-    playerOffsetY: Float,
+    // 位移只在布局阶段读取，展开动画逐帧推进时不会让调用方整体重组
+    playerOffsetY: () -> Float,
     isPlaying: Boolean,
     currentPositionProvider: () -> Long,
     duration: Long,
@@ -341,14 +345,17 @@ fun MelodiaFullPlayerOverlay(
 ) {
     // 仅在播放器打开或动画进行中时渲染，避免关闭后 nestedScroll 拦截触摸事件
     if (currentTrack != null && screenHeightPx > 0f && isPlayerOpen) {
+        val offsetProvider by rememberUpdatedState(playerOffsetY)
+        // 圆角只在"是否贴顶"翻转时才触发重组，不随每帧位移重组
+        val hasTopCorners by remember { derivedStateOf { offsetProvider() > 0f } }
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .offset { IntOffset(0, playerOffsetY.toInt()) }
+                .offset { IntOffset(0, offsetProvider().toInt()) }
                 .clip(
                     RoundedCornerShape(
-                        topStart = if (playerOffsetY > 0f) 24.dp else 0.dp,
-                        topEnd = if (playerOffsetY > 0f) 24.dp else 0.dp
+                        topStart = if (hasTopCorners) 24.dp else 0.dp,
+                        topEnd = if (hasTopCorners) 24.dp else 0.dp
                     )
                 )
         ) {

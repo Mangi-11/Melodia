@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -44,8 +45,14 @@ class MelodiaPlayerSheetState(private val scope: CoroutineScope) {
     fun animateTo(open: Boolean, velocity: Float, initialOffset: Float = Float.NaN) {
         springJobRef[0]?.cancel()
         if (open) {
+            // 先让它在屏幕外完成首次组合，再起弹簧；上滑展开时 onDrag 已经挂载，无需等待
+            val needsMount = !isOpen
             isOpen = true
             springJobRef[0] = scope.launch {
+                if (needsMount) {
+                    withFrameNanos { }
+                    withFrameNanos { }
+                }
                 animate(
                     initialValue = offsetY,
                     targetValue = 0f,
