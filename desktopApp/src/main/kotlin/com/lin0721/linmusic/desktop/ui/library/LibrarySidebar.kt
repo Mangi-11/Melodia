@@ -1,10 +1,14 @@
 package com.lin0721.linmusic.desktop.ui.library
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -30,9 +34,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -59,6 +61,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -90,6 +93,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -107,6 +111,7 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
@@ -517,12 +522,24 @@ private fun LibraryItems(
             is LibraryUiState.Success -> if (state.filteredItems.isEmpty() && query.isNotBlank()) {
                 CenteredBox { Text("未找到与“$query”相关的内容", color = DesktopColors.TextGray, fontSize = 13.sp) }
             } else {
-                Crossfade(viewMode, animationSpec = uiTween(VIEW_SWITCH_MS), label = "libraryView") { mode ->
-                    when (mode) {
-                        LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = true)
-                        LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = false)
-                        LibraryViewMode.SMALL_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, smallTileMinWidth, small = true)
-                        LibraryViewMode.LARGE_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, cardMinWidth, small = false)
+                val coverTransition = LocalLibraryCoverTransition.current
+                val motion = LocalUiMotion.current
+                AnimatedContent(
+                    targetState = viewMode,
+                    transitionSpec = {
+                        motion.transform(
+                            fadeIn(tween(COVER_TRANSITION_MS)) togetherWith fadeOut(tween(COVER_TRANSITION_MS)) using null
+                        )
+                    },
+                    label = "libraryView"
+                ) { mode ->
+                    CompositionLocalProvider(LocalLibraryCoverTransition provides coverTransition?.nested(this)) {
+                        when (mode) {
+                            LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = true)
+                            LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = false)
+                            LibraryViewMode.SMALL_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, smallTileMinWidth, small = true)
+                            LibraryViewMode.LARGE_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, cardMinWidth, small = false)
+                        }
                     }
                 }
             }
@@ -557,7 +574,7 @@ private fun LibraryList(
     onDelete: (LibraryItem) -> Unit,
     compact: Boolean
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberAnchoredListState(items)
     val scrolled by remember { derivedStateOf { listState.isScrolled } }
     Box(Modifier.fillMaxSize()) {
         HoverScrollbarBox(listState) {
@@ -584,21 +601,31 @@ private fun LibraryGrid(
     cardMinWidth: Dp,
     small: Boolean
 ) {
-    val gridState = rememberLazyGridState()
+    val gridState = rememberAnchoredGridState(items)
     val scrolled by remember { derivedStateOf { gridState.isScrolled } }
     Box(Modifier.fillMaxSize()) {
         HoverScrollbarBox(gridState) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(cardMinWidth),
-                state = gridState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = edgePadding - if (small) SmallTileInset else LargeCardInset, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(items, key = { it.id }) { item ->
-                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
-                        if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+            LookaheadScope {
+                CompositionLocalProvider(LocalLibraryGridLookahead provides this) {
+                    val reflow = isGridReflowEnabled()
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(cardMinWidth),
+                        state = gridState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = edgePadding - if (small) SmallTileInset else LargeCardInset, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(items, key = { it.id }) { item ->
+                            // 位移挂在格子上、尺寸挂在内层：animateBounds 不跟随父级位移，滚动不会被当成重排
+                            Box(if (reflow) Modifier.animateItem(placementSpec = GridReflowPlacementSpec) else Modifier) {
+                                Box(Modifier.libraryGridReflow()) {
+                                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
+                                        if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -738,7 +765,7 @@ private fun LibraryRow(item: LibraryItem, onClick: () -> Unit) {
             .clickable(onClick = onClick).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Cover(item.coverUrl, 48.dp, shape = coverShape(item))
+        Cover(item.coverUrl, 48.dp, modifier = Modifier.libraryCoverElement(item.id), shape = coverShape(item))
         Column(Modifier.padding(start = 12.dp)) {
             Text(
                 item.title,
@@ -789,7 +816,10 @@ private fun LibraryCoverTile(item: LibraryItem, onClick: () -> Unit) {
         val shape = coverShape(item)
         Box(Modifier.padding(SmallTileInset).clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Cover(item.coverUrl, maxWidth, shape = shape, requestSize = GridCoverRequestSize)
+                Cover(
+                    item.coverUrl, maxWidth, modifier = Modifier.libraryCoverElement(item.id), shape = shape,
+                    requestSize = GridCoverRequestSize
+                )
             }
         }
     }
@@ -799,7 +829,10 @@ private fun LibraryCoverTile(item: LibraryItem, onClick: () -> Unit) {
 private fun LibraryCard(item: LibraryItem, onClick: () -> Unit) {
     Column(Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(LargeCardInset)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Cover(item.coverUrl, maxWidth, shape = coverShape(item), requestSize = GridCoverRequestSize)
+            Cover(
+                item.coverUrl, maxWidth, modifier = Modifier.libraryCoverElement(item.id), shape = coverShape(item),
+                requestSize = GridCoverRequestSize
+            )
         }
         Text(
             item.title,

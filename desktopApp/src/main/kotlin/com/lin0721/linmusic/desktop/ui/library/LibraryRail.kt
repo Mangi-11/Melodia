@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardDoubleArrowRight
@@ -138,7 +137,7 @@ fun LibraryRail(
         LibraryCreateButton(viewModel, pill = false)
         val state = uiState
         if (state is LibraryUiState.Success) {
-            val listState = rememberLazyListState()
+            val listState = rememberAnchoredListState(state.filteredItems)
             val scrolled by remember { derivedStateOf { listState.isScrolled } }
             Box(Modifier.fillMaxSize()) {
                 HoverScrollbarBox(listState) {
@@ -159,7 +158,7 @@ fun LibraryRail(
                                 DesktopTooltip(tooltipContent = { LibraryItemTooltipCard(item) }, side = TooltipSide.Right) {
                                     val shape = coverShape(item)
                                     Box(Modifier.clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable { onItemClick(item) }) {
-                                        Cover(item.coverUrl, RailCoverSize, shape = shape)
+                                        Cover(item.coverUrl, RailCoverSize, modifier = Modifier.libraryCoverElement(item.id), shape = shape)
                                     }
                                 }
                             }
