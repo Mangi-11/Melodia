@@ -11,6 +11,8 @@ object QrcLyricParser {
     private val lrcLineHeaderRegex = Regex("""^\[(\d{2,}):(\d{2})[.:](\d{2,3})](.*)$""")
     private val qrcWordRegex = Regex("""(.*?)\((\d+),(\d+)\)""")
     private val wordTagStripRegex = Regex("""\(\d+,\d+\)""")
+    private val strongNoticeMarkers = listOf("著作权", "未经许可", "不得转载", "Provided by", "TME享有")
+    private val headerNoticeMarkers = listOf("QQ音乐", "腾讯音乐", "字幕", "制作", "出品", "TME")
 
     fun parse(rawText: String, translation: String? = null, roma: String? = null): List<LyricLine> {
         if (rawText.isBlank()) return emptyList()
@@ -26,9 +28,9 @@ object QrcLyricParser {
         val extra = content.lines().mapNotNull(::parseLine).sortedBy { it.timeMs }
         val used = mutableSetOf<Int>()
         val result = lines.toMutableList()
+        val mainStartMs = lines.minOfOrNull { it.timeMs } ?: return lines
         for (line in extra) {
-            if (line.text.startsWith("//") || listOf("著作权", "QQ音乐", "腾讯音乐", "未经许可", "不得转载", "Provided by", "字幕", "制作", "出品", "TME")
-                    .any { line.text.contains(it, ignoreCase = true) }) continue
+            if (isNotice(line, mainStartMs)) continue
             val index = result.indices.filter { it !in used && (result[it].durationMs == 0L || result[it].durationMs >= 300) }
                 .filter { kotlin.math.abs(result[it].timeMs - line.timeMs) <= 3000 }
                 .minWithOrNull(compareBy<Int> { kotlin.math.abs(result[it].timeMs - line.timeMs) }.thenByDescending { result[it].text.length })
@@ -38,6 +40,13 @@ object QrcLyricParser {
             used += index
         }
         return result
+    }
+
+    // 强标记任意位置都是版权声明；弱标记词也常见于正常译文，只在早于首条正文的头部区才算声明。
+    private fun isNotice(line: LyricLine, mainStartMs: Long): Boolean {
+        if (line.text.startsWith("//")) return true
+        if (strongNoticeMarkers.any { line.text.contains(it, ignoreCase = true) }) return true
+        return line.timeMs < mainStartMs && headerNoticeMarkers.any { line.text.contains(it, ignoreCase = true) }
     }
 
     private fun extractLyricContent(raw: String): String {
@@ -91,8 +100,7 @@ object QrcLyricParser {
         val lineDuration = maxOf(declaredDuration, wordsList.maxOfOrNull { it.startOffsetMs + it.durationMs } ?: 0L)
         val validWords = wordsList.takeIf { words ->
             words.all { it.startOffsetMs >= 0 && it.durationMs >= 0 } &&
-                words.zipWithNext().all { (a, b) -> a.startOffsetMs <= b.startOffsetMs } &&
-                words.joinToString("") { it.text } == fullText
+                words.zipWithNext().all { (a, b) -> a.startOffsetMs <= b.startOffsetMs }
         }.orEmpty()
 
         return LyricLine(

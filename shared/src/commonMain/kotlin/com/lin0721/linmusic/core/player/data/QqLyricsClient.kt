@@ -35,6 +35,12 @@ class QqLyricsClient internal constructor(
         "https://c.y.qq.com/soso/fcgi-bin/search_for_qq_cp"
     )
 
+    private companion object {
+        const val POSITIVE_TTL_MS = 30 * 60_000L
+        const val NEGATIVE_TTL_MS = 5 * 60_000L
+        const val MAX_CACHE_ENTRIES = 32
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
     private data class Cached(val lines: List<LyricLine>, val expiresAt: Long)
     private val cache = LinkedHashMap<Track, Cached>()
@@ -61,19 +67,25 @@ class QqLyricsClient internal constructor(
                     lines = QrcLyricParser.parse(QqLyricDecoder.decodeLyric(lrc.string("lyric")), translation, roma)
                 }
                 if (lines.isNotEmpty()) {
-                    synchronized(cache) {
-                        cache[track] = Cached(lines, System.currentTimeMillis() + 30 * 60_000)
-                        while (cache.size > 32) cache.remove(cache.keys.first())
-                    }
+                    remember(track, lines, POSITIVE_TTL_MS)
                     return@withContext lines
                 }
             }
+            // QQ 正常响应但无匹配或无歌词：短期缓存，避免切歌、切开关时反复请求；异常不缓存
+            remember(track, emptyList(), NEGATIVE_TTL_MS)
             emptyList()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             // QQ 无结果或网络错误不影响网易与本地歌词。
             emptyList()
+        }
+    }
+
+    private fun remember(track: Track, lines: List<LyricLine>, ttlMs: Long) {
+        synchronized(cache) {
+            cache[track] = Cached(lines, System.currentTimeMillis() + ttlMs)
+            while (cache.size > MAX_CACHE_ENTRIES) cache.remove(cache.keys.first())
         }
     }
 

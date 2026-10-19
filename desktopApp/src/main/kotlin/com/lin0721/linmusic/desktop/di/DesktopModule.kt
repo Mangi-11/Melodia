@@ -19,6 +19,7 @@ import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.player.data.AmllLyricsClient
 import com.lin0721.linmusic.core.player.data.LyricsCache
 import com.lin0721.linmusic.core.player.data.QqLyricsClient
+import com.lin0721.linmusic.core.player.data.QqLyricsSource
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -163,12 +164,12 @@ val desktopPlatformModule = module {
     single<PlaybackController> { get<DesktopPlaybackController>() }
     single { AmllLyricsClient(get<LyricsCache>()) }
     single { QqLyricsClient() }
+    single { QqLyricsSource(get(), get()) }
     // 桌面第一版没有本地音乐，只取在线歌词
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()
-        val playbackRepository = get<PlaybackRepository>()
-        val qqLyricsClient = get<QqLyricsClient>()
+        val qqLyricsSource = get<QqLyricsSource>()
         LyricsResolver(
             playbackRepository = get(),
             readLocalLyrics = { null },
@@ -176,10 +177,7 @@ val desktopPlatformModule = module {
             readAmllLyrics = { songId -> amllLyricsClient.fetch(songId) },
             isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() },
             isQqEnabled = { settingsPreferences.qqLyricsEnabled.first() },
-            readQqLyrics = { songId ->
-                playbackRepository.getSongDetail(songId).first().getOrNull()
-                    ?.let { qqLyricsClient.fetch(it) }.orEmpty()
-            }
+            readQqLyrics = qqLyricsSource::fetch
         )
     }
 }

@@ -76,7 +76,7 @@ class LyricsResolverTest {
     }
 
     @Test
-    fun `关闭AMLL不读取镜像或缓存并按采样周期使用网易`() = runTest {
+    fun `关闭AMLL不读取镜像或缓存并立即使用网易`() = runTest {
         val repo = FakePlaybackRepository(Result.success(onlineLines))
         var amllReads = 0
         val resolver = LyricsResolver(
@@ -84,10 +84,10 @@ class LyricsResolverTest {
             readAmllLyrics = { amllReads++; amllTtml }, isAmllEnabled = { false },
             processingDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
         )
-        assertEquals("网易歌词", resolver.lyricsFor(1).toList().last().getOrThrow().single().text)
+        assertEquals("网易歌词", resolver.lyricsFor(1).first().getOrThrow().single().text)
         assertEquals(0, amllReads)
         assertEquals(1, repo.lyricRequests)
-        assertEquals(250L, testScheduler.currentTime)
+        assertEquals(0L, testScheduler.currentTime)
     }
 
     @Test
@@ -157,11 +157,11 @@ class LyricsResolverTest {
     }
 
     @Test
-    fun `已匹配的本地歌优先网易歌词`() = runTest {
+    fun `已匹配的本地歌先显示本地歌词再升级为网易歌词`() = runTest {
         val local = FakeLocalMusicApi(localLrc)
-        val lines = resolver(FakePlaybackRepository(Result.success(onlineLines)), local, "content://a").lyricsFor(7L).first().getOrThrow()
-        assertEquals("网易歌词", lines.single().text)
-        assertEquals(0, local.lyricReads)
+        val results = resolver(FakePlaybackRepository(Result.success(onlineLines)), local, "content://a").lyricsFor(7L).toList()
+        assertEquals(listOf("本地歌词", "网易歌词"), results.map { it.getOrThrow().single().text })
+        assertEquals(1, local.lyricReads)
     }
 
     @Test

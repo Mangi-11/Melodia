@@ -35,6 +35,19 @@ class QrcLyricParserTest {
         assertNull(lines[1].translation)
     }
 
+    @Test fun weakNoticeWordsAreOnlyFilteredBeforeFirstMainLine() {
+        val lines = QrcLyricParser.parse("[2000,1000]甲(2000,1000)",
+            "[00:00.50]制作人：某某\n[00:20.00]远处的译文")
+        assertNull(lines.single().translation)
+    }
+
+    @Test fun translationContainingWeakNoticeWordIsKeptInsideTheSong() {
+        val lines = QrcLyricParser.parse("[2000,1000]甲(2000,1000)\n[5000,1000]乙(5000,1000)",
+            "[00:02.00]译文一\n[00:05.00]我在制作一首歌")
+        assertEquals("译文一", lines[0].translation)
+        assertEquals("我在制作一首歌", lines[1].translation)
+    }
+
     @Test fun plainLrcWorksAndBackgroundMarkersAreIgnored() {
         val line = QrcLyricParser.parse("[ti:title]\n[bg:和声(1000,100)]\n[00:01.00]普通歌词").single()
         assertEquals("普通歌词", line.text)

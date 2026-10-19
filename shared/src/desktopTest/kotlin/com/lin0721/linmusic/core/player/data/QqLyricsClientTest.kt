@@ -89,6 +89,32 @@ class QqLyricsClientTest {
         }
     }
 
+    @Test fun noMatchIsCachedBriefly() = runTest {
+        MockWebServer().use { server ->
+            val emptySearch = """{"search":{"code":0,"data":{"body":{"item_song":[]}}}}"""
+            repeat(2) { server.enqueue(MockResponse().setBody(emptySearch)) }
+            val client = QqLyricsClient(OkHttpClient(), server.url("/").toString())
+            assertTrue(client.fetch(target).isEmpty())
+            assertEquals(2, server.requestCount)
+            assertTrue(client.fetch(target).isEmpty())
+            assertEquals(2, server.requestCount)
+        }
+    }
+
+    @Test fun requestFailureIsNotCached() = runTest {
+        MockWebServer().use { server ->
+            val client = QqLyricsClient(OkHttpClient(), server.url("/musicu").toString(), server.url("/public").toString())
+            repeat(2) {
+                server.enqueue(MockResponse().setBody("""{"code":0,"search":{"code":2001}}"""))
+                server.enqueue(MockResponse().setResponseCode(500))
+            }
+            assertTrue(client.fetch(target).isEmpty())
+            assertEquals(2, server.requestCount)
+            assertTrue(client.fetch(target).isEmpty())
+            assertEquals(4, server.requestCount)
+        }
+    }
+
     companion object {
         // 固定合成样本由 SPlayer/LDDC 的独立实现生成；QQ 的 DES 变体不能用标准 JCE 替代。
         private val samples = mapOf(
