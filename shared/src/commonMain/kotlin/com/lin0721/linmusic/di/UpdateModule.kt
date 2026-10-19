@@ -1,15 +1,14 @@
 package com.lin0721.linmusic.di
 
-import com.lin0721.linmusic.BuildConfig
-import com.lin0721.linmusic.core.update.UpdateManager
-import com.lin0721.linmusic.core.update.data.ApkDownloader
-import com.lin0721.linmusic.core.update.data.ApkInstaller
+import com.lin0721.linmusic.core.AppEnvironment
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.update.data.GithubReleaseApi
 import com.lin0721.linmusic.core.update.data.UpdateRepository
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import retrofit2.Retrofit
@@ -20,18 +19,17 @@ private const val GITHUB_BASE_URL = "https://api.github.com/"
 private const val GITHUB_CLIENT = "github"
 
 /**
- * 软件更新（GitHub Releases）依赖注入模块
+ * 软件更新检查（GitHub Releases）依赖注入模块
  *
- * GitHub API 与主业务网络完全隔离
+ * GitHub API 与网易业务网络隔离，不经过加密拦截器；currentVersionCode 为 null 表示开发构建
  */
-val updateModule = module {
+fun updateModule(currentVersionCode: Int?): Module = module {
 
-    //GitHub 专用的 OkHttpClient（不做请求体日志）
     single(named(GITHUB_CLIENT)) {
         OkHttpClient.Builder()
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
-                    level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
+                    level = if (AppEnvironment.isDebug) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
                 }
             )
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -42,28 +40,15 @@ val updateModule = module {
 
     single(named(GITHUB_CLIENT)) {
         val json: Json = get()
-        val contentType = "application/json".toMediaType()
         Retrofit.Builder()
             .baseUrl(GITHUB_BASE_URL)
             .client(get(named(GITHUB_CLIENT)))
-            .addConverterFactory(json.asConverterFactory(contentType))
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
     }
 
     single<GithubReleaseApi> { get<Retrofit>(named(GITHUB_CLIENT)).create(GithubReleaseApi::class.java) }
 
     single { UpdateRepository(get()) }
-    single { ApkDownloader(context = get(), downloadClient = get(named(GITHUB_CLIENT))) }
-    single { ApkInstaller(context = get()) }
-    single { com.lin0721.linmusic.core.update.data.UpdateNotificationHelper(context = get()) }
-    single {
-        UpdateManager(
-            context = get(),
-            updateRepository = get(),
-            apkDownloader = get(),
-            apkInstaller = get(),
-            settingsPreferences = get(),
-            notificationHelper = get()
-        )
-    }
+    single { UpdateChecker(updateRepository = get(), settingsPreferences = get(), currentVersionCode = currentVersionCode) }
 }
