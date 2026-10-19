@@ -5,6 +5,7 @@ import com.lin0721.linmusic.core.auth.LoginViewModel
 import com.lin0721.linmusic.core.auth.SessionMonitor
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.songlike.SongLikeRepository
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
 import com.lin0721.linmusic.desktop.platform.BrowserLocator
@@ -52,6 +53,7 @@ class DesktopAppDependencies(
     val settingsPreferences: SettingsPreferences,
     val sessionMonitor: SessionMonitor,
     val browserLocator: BrowserLocator,
+    val updateChecker: UpdateChecker,
     val songActions: SongActionSources,
     val pageViewModels: PageViewModelFactory
 )

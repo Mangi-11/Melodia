@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.core.update.UpdateChecker
+import com.lin0721.linmusic.core.update.data.UpdateRepository
+import com.lin0721.linmusic.desktop.app.AppInfo
 import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
@@ -40,6 +43,7 @@ import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
 import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.desktop.ui.update.openInBrowser
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
@@ -54,7 +58,8 @@ internal enum class SettingsCategory(val label: String) {
     Storage("存储与下载"),
     Interface("界面与歌词"),
     System("系统与窗口"),
-    Hotkeys("快捷键")
+    Hotkeys("快捷键"),
+    About("关于")
 }
 
 // 一个设置项：分类、搜索用的文本与实际渲染内容；group 非空时在分区内按连续的同名组分段
@@ -98,7 +103,8 @@ private val ActionSpacing = Arrangement.spacedBy(8.dp)
 internal fun settingsEntries(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
-    lxPlugins: LxPluginSettingsViewModel
+    lxPlugins: LxPluginSettingsViewModel,
+    updateChecker: UpdateChecker
 ): List<SettingsEntry> {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
@@ -130,6 +136,9 @@ internal fun settingsEntries(
     val hotkeyMap by desktop.hotkeyMap.collectAsState()
     val failedHotkeys by desktop.failedHotkeys.collectAsState()
     val mediaSessionAvailable by desktop.mediaSessionAvailable.collectAsState()
+    val autoCheckUpdate by common.autoCheckUpdateEnabled.collectAsState()
+    val allowPrerelease by common.allowPrereleaseChannel.collectAsState()
+    val availableUpdate by updateChecker.availableUpdate.collectAsState()
 
     val customDownloadFolder = downloadFolder?.takeIf { it.isNotBlank() }
     val cacheDirSubtitle = relocation?.let { "正在迁移缓存：${formatFileSize(it.copiedBytes)} / ${formatFileSize(it.totalBytes)}" }
@@ -494,7 +503,64 @@ internal fun settingsEntries(
                 }
             )
         }
+
+        add(
+            SettingsEntry(
+                key = "appVersion",
+                category = SettingsCategory.About,
+                title = "当前版本",
+                keywords = listOf("版本", "更新", "升级", "version")
+            ) {
+                val update = availableUpdate
+                SettingRow(
+                    title = "当前版本",
+                    subtitle = update?.let { "发现新版本 ${it.versionName}${if (it.isPrerelease) "（测试版）" else ""}" }
+                        ?: appVersionLabel(),
+                    subtitleColor = if (update != null) DesktopColors.Accent else DesktopColors.TextGray
+                ) {
+                    Row(horizontalArrangement = ActionSpacing, verticalAlignment = Alignment.CenterVertically) {
+                        if (update != null) SettingsActionButton("查看新版本", onClick = updateChecker::showDialog)
+                        SettingsActionButton("检查更新", onClick = { updateChecker.checkForUpdate(manual = true) })
+                    }
+                }
+            }
+        )
+        add(
+            rowEntry(
+                "autoCheckUpdate", SettingsCategory.About, "自动检查更新",
+                subtitle = "启动应用时后台检查一次更新",
+                keywords = listOf("更新", "升级", "自动")
+            ) {
+                SettingSwitch(autoCheckUpdate, onChange = common::updateAutoCheckUpdateEnabled)
+            }
+        )
+        add(
+            rowEntry(
+                "allowPrerelease", SettingsCategory.About, "接收测试版更新",
+                subtitle = "包含 beta/rc 预览版本，可能不稳定",
+                keywords = listOf("更新", "测试版", "预发布", "beta", "rc")
+            ) {
+                SettingSwitch(allowPrerelease, onChange = common::updateAllowPrereleaseChannel)
+            }
+        )
+        add(
+            rowEntry(
+                "projectHome", SettingsCategory.About, "项目主页",
+                subtitle = UpdateRepository.REPOSITORY_URL,
+                keywords = listOf("github", "主页", "反馈", "源码")
+            ) {
+                SettingsActionButton("打开", onClick = {
+                    if (!openInBrowser(UpdateRepository.REPOSITORY_URL)) navigator.showMessage("无法打开浏览器")
+                })
+            }
+        )
     }
+}
+
+private fun appVersionLabel(): String = when {
+    !AppInfo.isRelease -> "开发版本 ${AppInfo.version}"
+    AppInfo.isPrerelease -> "Version ${AppInfo.version}（测试版）"
+    else -> "Version ${AppInfo.version}"
 }
 
 private val HotkeyActionLabels = HotkeyAction.entries.map { it.label }

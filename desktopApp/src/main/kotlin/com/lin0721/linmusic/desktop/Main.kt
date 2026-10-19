@@ -30,10 +30,12 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.desktop.app.AppInfo
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
 import com.lin0721.linmusic.desktop.app.DesktopCacheRoot
 import com.lin0721.linmusic.desktop.app.DesktopLogging
@@ -73,6 +75,7 @@ import com.lin0721.linmusic.desktop.ui.tray.isTraySupported
 import com.lin0721.linmusic.di.networkModule
 import com.lin0721.linmusic.di.repositoryModule
 import com.lin0721.linmusic.di.sourceModule
+import com.lin0721.linmusic.di.updateModule
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import com.lin0721.linmusic.feature.podcast.data.PodcastProgressTracker
 import kotlinx.coroutines.CoroutineScope
@@ -121,12 +124,18 @@ fun main() {
     val koin = startKoin {
         modules(
             platformModuleFor(System.getProperty("os.name").orEmpty()),
-            desktopPlatformModule, networkModule, repositoryModule, sourceModule, desktopViewModelModule
+            desktopPlatformModule, networkModule, repositoryModule, sourceModule, desktopViewModelModule,
+            updateModule(AppInfo.versionCode)
         )
     }.koin
     val controller = koin.get<DesktopPlaybackController>()
     // 进程内常驻记录播客收听进度
     PodcastProgressTracker(controller, koin.get()).start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    // 延迟检查更新，避开启动关键路径；进程生命周期内只自动检查这一次
+    CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        delay(3000)
+        koin.get<UpdateChecker>().checkForUpdate(manual = false, showDialogOnAutoFound = true)
+    }
     val settingsPreferences = koin.get<SettingsPreferences>()
     // 切换缓存目录后清掉旧目录；旧缓存超出当前上限时补一次淘汰
     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

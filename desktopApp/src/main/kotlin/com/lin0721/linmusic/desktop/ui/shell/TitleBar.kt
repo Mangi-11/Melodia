@@ -149,6 +149,7 @@ fun WindowScope.TitleBar(
     onProfileClick: () -> Unit,
     onRecentClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    hasUpdate: Boolean,
     onLogoutClick: () -> Unit,
     onMinimize: () -> Unit,
     onToggleMaximize: () -> Unit,
@@ -199,7 +200,7 @@ fun WindowScope.TitleBar(
         }
         Row(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
             if (onDownloadsClick != null) DownloadsButton(downloadTasks, downloadsOpen, onDownloadsClick)
-            AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onSettingsClick, onLogoutClick)
+            AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onSettingsClick, hasUpdate, onLogoutClick)
             WindowButton(Icons.Rounded.Remove, "最小化", onClick = onMinimize)
             WindowButton(
                 if (isMaximized) Icons.Rounded.FilterNone else Icons.Rounded.CropSquare,
@@ -298,19 +299,25 @@ private fun DownloadsButton(tasks: List<DownloadTask>, open: Boolean, onClick: (
                 }
             }
             if (needsAttention && !showCheck) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp).size(8.dp)
-                        .border(1.dp, DesktopColors.WindowBackground, CircleShape)
-                        .padding(1.dp)
-                        .clip(CircleShape)
-                        .background(DesktopColors.Accent)
-                )
+                AttentionDot(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp))
             }
         }
     }
 }
 
-// 未登录时菜单提供登录入口，设置页始终可达
+// 红色提醒圆点，外圈描边与标题栏背景分隔
+@Composable
+private fun AttentionDot(modifier: Modifier = Modifier) {
+    Box(
+        modifier.size(8.dp)
+            .border(1.dp, DesktopColors.WindowBackground, CircleShape)
+            .padding(1.dp)
+            .clip(CircleShape)
+            .background(DesktopColors.Accent)
+    )
+}
+
+// 未登录时菜单提供登录入口，设置页始终可达；有新版本时头像与设置项亮红点
 @Composable
 private fun AvatarMenu(
     userProfile: UserProfile?,
@@ -318,6 +325,7 @@ private fun AvatarMenu(
     onProfileClick: () -> Unit,
     onRecentClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    hasUpdate: Boolean,
     onLogoutClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -332,6 +340,7 @@ private fun AvatarMenu(
                 Icon(Icons.Rounded.Person, "账户", tint = DesktopColors.TextGray, modifier = Modifier.size(20.dp))
             }
         }
+        if (hasUpdate) AttentionDot(Modifier.align(Alignment.TopEnd))
         DesktopMenu(expanded = expanded, onDismiss = { expanded = false }) {
             if (userProfile != null) {
                 Text(
@@ -359,10 +368,19 @@ private fun AvatarMenu(
                     onRecentClick()
                 }
             }
-            AvatarMenuItem(Icons.Rounded.Settings, "设置") {
-                expanded = false
-                onSettingsClick()
-            }
+            MenuItem(
+                "设置",
+                onClick = {
+                    expanded = false
+                    onSettingsClick()
+                },
+                icon = Icons.Rounded.Settings,
+                trailing = if (hasUpdate) {
+                    { Box(Modifier.size(6.dp).clip(CircleShape).background(DesktopColors.Accent)) }
+                } else {
+                    null
+                }
+            )
             if (userProfile != null) {
                 AvatarMenuItem(Icons.AutoMirrored.Rounded.Logout, "退出登录") {
                     expanded = false
