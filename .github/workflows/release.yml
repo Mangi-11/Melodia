@@ -2,6 +2,7 @@ name: Release
 
 # 推送 v1.2.3 或 v1.2.3-beta.1/-rc.1 形式的 tag 时触发：Android 与桌面端并行构建，
 # 两端都成功后才创建 GitHub Release，避免发出缺一端安装包的版本。
+# 预发布 tag 必须打在 dev 上，正式版 tag 必须打在 main 上，否则直接失败。
 # 手动运行为演练：按输入的版本号打两端安装包、作为 artifact 留存，不创建 Release
 on:
   push:
@@ -27,6 +28,11 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
+      # 校验 tag 所在分支需要完整历史与远端分支
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 从 tag 解析版本号
         id: version
         env:
@@ -80,6 +86,23 @@ jobs:
           echo "name=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      # 手动演练没有 tag，按所选分支构建，不做校验
+      - name: 校验 tag 所在分支
+        if: github.event_name == 'push'
+        env:
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = "true" ]; then
+            BRANCH=dev
+          else
+            BRANCH=main
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$BRANCH"; then
+            echo "tag $GITHUB_REF_NAME 指向的提交 $GITHUB_SHA 不在 $BRANCH 分支上，预发布需打在 dev、正式版需打在 main" >&2
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME 位于 $BRANCH 分支"
 
   android:
     needs: version
