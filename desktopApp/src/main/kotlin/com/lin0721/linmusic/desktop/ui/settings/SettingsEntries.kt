@@ -1,5 +1,10 @@
 package com.lin0721.linmusic.desktop.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,7 +13,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -24,10 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.update.data.UpdateRepository
@@ -40,6 +53,7 @@ import com.lin0721.linmusic.desktop.platform.chooseDirectory
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
 import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
@@ -99,6 +113,7 @@ private val QualityOptions = listOf(
 )
 
 private val ActionSpacing = Arrangement.spacedBy(8.dp)
+private const val CARD_LAYOUT_EXPAND_MS = 200
 
 @Composable
 internal fun settingsEntries(
@@ -401,12 +416,7 @@ internal fun settingsEntries(
                 subtitle = cardLayoutSubtitle,
                 keywords = SupportedInfoCards.map { it.title } + listOf("面板", "排序", "显示", "隐藏", "卡片")
             ) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Text("正在播放面板信息卡片", color = DesktopColors.TextPrimary, fontSize = 14.sp)
-                    Text(cardLayoutSubtitle, color = DesktopColors.TextGray, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    CardLayoutEditor(cardLayout, common::updateFullPlayerCardLayout)
-                }
+                CardLayoutSetting(cardLayout, cardLayoutSubtitle, common::updateFullPlayerCardLayout)
             }
         )
         add(
@@ -614,6 +624,52 @@ private fun UiScaleSetting(percent: Int, onCommit: (Int) -> Unit) {
             onValueChangeFinished = { pending?.let(onCommit) },
             modifier = Modifier.padding(top = 8.dp)
         )
+    }
+}
+
+// 卡片列表较长，默认收起只留标题行
+@Composable
+private fun CardLayoutSetting(
+    layout: List<FullPlayerCardSetting>,
+    expandedSubtitle: String,
+    onChange: (List<FullPlayerCardSetting>) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val supported = layout.filter { it.card in SupportedInfoCards }
+    val subtitle = if (expanded) {
+        expandedSubtitle
+    } else {
+        "已显示 ${supported.count { it.visible }}/${supported.size} 张，展开可调整顺序与显隐"
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .pointerHoverIcon(PointerIcon.Hand)
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("正在播放面板信息卡片", color = DesktopColors.TextPrimary, fontSize = 14.sp)
+                Text(subtitle, color = DesktopColors.TextGray, fontSize = 12.sp)
+            }
+            Icon(
+                if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "收起" else "展开",
+                tint = DesktopColors.TextGray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(uiTween(CARD_LAYOUT_EXPAND_MS)) + expandVertically(uiTween(CARD_LAYOUT_EXPAND_MS)),
+            exit = fadeOut(uiTween(CARD_LAYOUT_EXPAND_MS)) + shrinkVertically(uiTween(CARD_LAYOUT_EXPAND_MS))
+        ) {
+            Column {
+                Spacer(Modifier.height(8.dp))
+                CardLayoutEditor(layout, onChange)
+            }
+        }
     }
 }
 
