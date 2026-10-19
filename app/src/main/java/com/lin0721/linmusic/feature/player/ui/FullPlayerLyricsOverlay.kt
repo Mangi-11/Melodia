@@ -3,7 +3,6 @@ package com.lin0721.linmusic.feature.player.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.ui.theme.PlayerBackdropPalette
+import com.lin0721.linmusic.core.ui.theme.uiSpring
 import dev.chrisbanes.haze.HazeState
 
 // 全屏歌词覆盖层，从底部滑入滑出
@@ -56,7 +56,7 @@ fun FullPlayerLyricsOverlay(
         visible = visible,
         enter = slideInVertically(
             initialOffsetY = { it },
-            animationSpec = spring(
+            animationSpec = uiSpring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = Spring.StiffnessMediumLow
             )
@@ -66,7 +66,7 @@ fun FullPlayerLyricsOverlay(
         } else {
             slideOutVertically(
                 targetOffsetY = { it },
-                animationSpec = spring(
+                animationSpec = uiSpring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessMediumLow
                 )

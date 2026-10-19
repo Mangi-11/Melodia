@@ -51,6 +51,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaTextButton
 import com.lin0721.linmusic.core.ui.components.PlaceholderTextField
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
@@ -112,9 +113,10 @@ fun CloudMatchSheet(
             )
             Spacer(modifier = Modifier.height(MelodiaSpacing.sm))
 
+            val motion = LocalUiMotion.current
             AnimatedContent(
                 targetState = overlay.contentState(),
-                transitionSpec = { fadeIn(MatchContentFadeSpec) togetherWith fadeOut(MatchContentFadeSpec) },
+                transitionSpec = { motion.transform(fadeIn(MatchContentFadeSpec) togetherWith fadeOut(MatchContentFadeSpec)) },
                 label = "cloud_match_content"
             ) { state ->
                 when (state) {

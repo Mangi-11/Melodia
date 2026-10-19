@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.player
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -67,6 +66,7 @@ import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.PlayPauseIcon
 import com.lin0721.linmusic.desktop.ui.components.TooltipLabel
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.icons.PlayerBarIcons
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingArtists
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingSongTitle
@@ -409,7 +409,7 @@ private fun TimeLabel(ms: Long, align: TextAlign) {
 
 @Composable
 private fun hoverScale(hovered: Boolean) =
-    animateFloatAsState(if (hovered) HOVER_SCALE else 1f, tween(HOVER_SCALE_MS), label = "hoverScale")
+    animateFloatAsState(if (hovered) HOVER_SCALE else 1f, uiTween(HOVER_SCALE_MS), label = "hoverScale")
 
 // 底栏统一的图标按钮：悬停时变亮并放大；showDot 为真且处于激活态时，图标下方加指示点
 @Composable

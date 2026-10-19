@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,8 @@ import com.lin0721.linmusic.core.ui.components.rememberSelectionBottomPadding
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 import com.lin0721.linmusic.feature.playlist.ui.SearchBarItem
 import com.lin0721.linmusic.feature.playlist.ui.rememberSearchBarRevealState
 import com.lin0721.linmusic.core.model.ArtistAlbum
@@ -189,8 +192,8 @@ fun ArtistContent(
                     Box(modifier = Modifier.heightIn(min = CollapsedHeaderMinHeight)) {
                         AnimatedVisibility(
                             visible = !searchOpen,
-                            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                            enter = uiEnter(fadeIn() + expandVertically(expandFrom = Alignment.Top)),
+                            exit = uiExit(fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top))
                         ) {
                             ArtistNameSection(artist = artist, progress = progress, tintColor = dominantColor)
                         }
@@ -200,8 +203,8 @@ fun ArtistContent(
                 item(key = "action_bar") {
                     AnimatedVisibility(
                         visible = !searchOpen,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        enter = uiEnter(fadeIn() + expandVertically(expandFrom = Alignment.Top)),
+                        exit = uiExit(fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top))
                     ) {
                         ArtistActionBar(
                             artist = artist,
@@ -219,8 +222,8 @@ fun ArtistContent(
                 item(key = "tab_bar") {
                     AnimatedVisibility(
                         visible = !searchOpen,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        enter = uiEnter(fadeIn() + expandVertically(expandFrom = Alignment.Top)),
+                        exit = uiExit(fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top))
                     ) {
                         ArtistTabBar(
                             selectedTab = selectedTab,

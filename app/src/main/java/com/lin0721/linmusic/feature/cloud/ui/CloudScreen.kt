@@ -6,7 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -67,6 +66,7 @@ import com.lin0721.linmusic.core.ui.interaction.pressScale
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.cloud.upload.UploadStatus
 import org.koin.androidx.compose.koinViewModel
 
@@ -115,7 +115,7 @@ fun CloudScreen(
                 MelodiaIconButton(onClick = { viewModel.toggleSearch() }) {
                     Crossfade(
                         targetState = success.isSearchActive,
-                        animationSpec = tween(durationMillis = 200),
+                        animationSpec = uiTween(durationMillis = 200),
                         label = "cloud_search_icon"
                     ) { isSearching ->
                         Icon(
@@ -160,16 +160,16 @@ fun CloudScreen(
                         AnimatedVisibility(
                             visible = state.isSearchActive,
                             enter = expandVertically(
-                                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                                animationSpec = uiTween(durationMillis = 260, easing = FastOutSlowInEasing),
                                 expandFrom = Alignment.Top
                             ) + fadeIn(
-                                animationSpec = tween(durationMillis = 200)
+                                animationSpec = uiTween(durationMillis = 200)
                             ),
                             exit = shrinkVertically(
-                                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                                animationSpec = uiTween(durationMillis = 220, easing = FastOutSlowInEasing),
                                 shrinkTowards = Alignment.Top
                             ) + fadeOut(
-                                animationSpec = tween(durationMillis = 150)
+                                animationSpec = uiTween(durationMillis = 150)
                             )
                         ) {
                             CloudSearchField(
@@ -367,8 +367,8 @@ private fun CloudSearchField(
 
         AnimatedVisibility(
             visible = isFetchingAll,
-            enter = fadeIn(tween(150)),
-            exit = fadeOut(tween(150))
+            enter = fadeIn(uiTween(150)),
+            exit = fadeOut(uiTween(150))
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.width(MelodiaSpacing.xs))
@@ -382,8 +382,8 @@ private fun CloudSearchField(
 
         AnimatedVisibility(
             visible = !isFetchingAll && query.isNotEmpty(),
-            enter = fadeIn(tween(150)),
-            exit = fadeOut(tween(150))
+            enter = fadeIn(uiTween(150)),
+            exit = fadeOut(uiTween(150))
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.width(MelodiaSpacing.xs))

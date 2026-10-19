@@ -3,7 +3,6 @@ package com.lin0721.linmusic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -68,9 +67,11 @@ import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.ProfileSidebar
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.ui.components.MiniPlayerCard
 import com.lin0721.linmusic.core.ui.components.MiniPlayerLikeMode
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import com.lin0721.linmusic.feature.recognition.ui.RecognitionScreen
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
@@ -127,6 +128,7 @@ private class PanelRevealShape(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MelodiaApp() {
+    val motion = LocalUiMotion.current
     val viewModel: HomeViewModel = koinViewModel()
     val libraryViewModel: LibraryViewModel = koinViewModel()
     val settingsPreferences: SettingsPreferences = koinInject()
@@ -247,11 +249,11 @@ fun MelodiaApp() {
             panelRise.snapTo(0f)
             panelFullscreen.snapTo(0f)
         } else if (isPanelVisible) {
-            panelRise.animateTo(1f, PanelRiseSpec)
+            panelRise.animateTo(1f, motion.spec(PanelRiseSpec))
             isPanelDocked = true
         } else {
             isPanelDocked = false
-            panelRise.animateTo(0f, PanelRiseSpec)
+            panelRise.animateTo(0f, motion.spec(PanelRiseSpec))
         }
     }
     // 切到侧栏模式（设置变更或旋转）时收起已打开的底部全屏播放页
@@ -268,7 +270,7 @@ fun MelodiaApp() {
         if (isPanelFullscreen && panelRise.value == 0f) {
             panelFullscreen.snapTo(1f)
         } else {
-            panelFullscreen.animateTo(if (isPanelFullscreen) 1f else 0f, PanelFullscreenSpec)
+            panelFullscreen.animateTo(if (isPanelFullscreen) 1f else 0f, motion.spec(PanelFullscreenSpec))
         }
     }
     val panelWidth = rememberMelodiaPlayerPanelWidth()
@@ -721,8 +723,8 @@ fun MelodiaApp() {
         // 放在 Toast 之前，识别页上仍能看到提示
         AnimatedVisibility(
             visible = showRecognition,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             RecognitionScreen(
                 onClose = { showRecognition = false },

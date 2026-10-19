@@ -78,6 +78,7 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.OverlayPanelHeader
@@ -247,7 +248,7 @@ fun PlayQueuePanel(
                             },
                             actions = actions,
                             onRemove = { controller.removeFromQueue(index) },
-                            modifier = Modifier.animateItem()
+                            modifier = if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier
                         )
                     }
                 }

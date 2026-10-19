@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.data.LibraryViewMode
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.shell.fixedWidthAtStart
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
@@ -47,6 +48,7 @@ fun LibraryPane(
     onFilterToggle: (LibraryFilter) -> Unit,
     onSortOrderChange: (LibrarySortOrder) -> Unit
 ) {
+    val motion = LocalUiMotion.current
     Box(
         Modifier.width(width).fillMaxHeight()
             .clip(RoundedCornerShape(DesktopDimens.PaneRadius))
@@ -56,8 +58,10 @@ fun LibraryPane(
             targetState = mode,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                fadeIn(tween(MODE_SWITCH_MS)) togetherWith fadeOut(tween(MODE_SWITCH_MS)) using
-                    SizeTransform(clip = false) { _, _ -> snap() }
+                motion.transform(
+                    fadeIn(tween(MODE_SWITCH_MS)) togetherWith fadeOut(tween(MODE_SWITCH_MS)) using
+                        SizeTransform(clip = false) { _, _ -> snap() }
+                )
             },
             contentAlignment = Alignment.TopStart,
             label = "libraryMode"

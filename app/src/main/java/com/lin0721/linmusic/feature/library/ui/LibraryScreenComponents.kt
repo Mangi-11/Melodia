@@ -3,8 +3,6 @@ package com.lin0721.linmusic.feature.library.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -60,6 +58,8 @@ import com.lin0721.linmusic.core.ui.theme.LibraryBlueGreenGradient
 import com.lin0721.linmusic.core.ui.theme.DownloadedGreen
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // ────────────────────────────────────────────────────────────────────────────
 // 分类筛选胶囊行：默认（未筛选）展示全部胶囊；选中某个胶囊后仅保留该胶囊，
@@ -95,12 +95,12 @@ fun LibraryFilterPillsRow(
     )
 
     // 增删胶囊时的位移动画：略带回弹但不过冲
-    val placementSpec = spring<androidx.compose.ui.unit.IntOffset>(
+    val placementSpec = uiSpring<androidx.compose.ui.unit.IntOffset>(
         dampingRatio = Spring.DampingRatioLowBouncy,
         stiffness = Spring.StiffnessMediumLow
     )
-    val fadeInSpec = spring<Float>(stiffness = Spring.StiffnessMedium)
-    val fadeOutSpec = spring<Float>(stiffness = Spring.StiffnessMedium)
+    val fadeInSpec = uiSpring<Float>(stiffness = Spring.StiffnessMedium)
+    val fadeOutSpec = uiSpring<Float>(stiffness = Spring.StiffnessMedium)
 
     LazyRow(
         modifier = modifier.padding(top = MelodiaSpacing.sm, bottom = 10.dp),
@@ -132,12 +132,12 @@ fun LibraryFilterPillsRow(
             val isSelected = filter == selectedFilter
             val bgColor by animateColorAsState(
                 targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-                animationSpec = tween(220),
+                animationSpec = uiTween(220),
                 label = "pill_bg"
             )
             val contentColor by animateColorAsState(
                 targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.LightGray,
-                animationSpec = tween(220),
+                animationSpec = uiTween(220),
                 label = "pill_content"
             )
             Box(
@@ -147,7 +147,7 @@ fun LibraryFilterPillsRow(
                     .pressable(MelodiaPress.Pill) { onSelect(filter) }
                     .clip(RoundedCornerShape(PillRadius))
                     .background(bgColor)
-                    .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
+                    .animateContentSize(uiSpring(stiffness = Spring.StiffnessMedium))
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -164,12 +164,12 @@ fun LibraryFilterPillsRow(
                 val isSelected = ownerFilter == selectedPlaylistOwnerFilter
                 val bgColor by animateColorAsState(
                     targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-                    animationSpec = tween(220),
+                    animationSpec = uiTween(220),
                     label = "owner_pill_bg"
                 )
                 val contentColor by animateColorAsState(
                     targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.LightGray,
-                    animationSpec = tween(220),
+                    animationSpec = uiTween(220),
                     label = "owner_pill_content"
                 )
                 Box(
@@ -518,7 +518,7 @@ fun DraggablePlaylistRow(
     onDragEnd: () -> Unit,
     enabled: Boolean = true
 ) {
-    val liftSpec = remember { spring<Dp>(stiffness = Spring.StiffnessMediumLow) }
+    val liftSpec = uiSpring<Dp>(stiffness = Spring.StiffnessMediumLow)
     val elevation by animateDpAsState(
         targetValue = if (isDragging) 8.dp else 0.dp,
         animationSpec = liftSpec,
@@ -527,6 +527,7 @@ fun DraggablePlaylistRow(
     val isLifted = isDragging || dragOffsetY != 0f
     val bgColor by animateColorAsState(
         targetValue = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background,
+        animationSpec = uiSpring(),
         label = "playlist_row_bg"
     )
 

@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,12 +57,14 @@ import com.lin0721.linmusic.Screen
 import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.PaletteMemoryCache
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.gestures.Orientation
@@ -108,6 +109,7 @@ fun MiniPlayerCard(
     likeMode: MiniPlayerLikeMode = MiniPlayerLikeMode.Collect,
     expanded: Boolean = false
 ) {
+    val motion = LocalUiMotion.current
     if (currentTrack == null) return
 
     val context = LocalContext.current
@@ -135,7 +137,7 @@ fun MiniPlayerCard(
     // 平板宽屏下悬浮在深色页面背景上，压暗幅度收窄一档，避免浅色封面取色后和背景融在一起
     val animatedBase by animateColorAsState(
         targetValue = colorPalette.base,
-        animationSpec = tween(800),
+        animationSpec = uiTween(800),
         label = "mini_player_base"
     )
     val fillColor = remember(animatedBase, expanded) { animatedBase.darken(if (expanded) 0.20f else 0.45f) }
@@ -169,7 +171,7 @@ fun MiniPlayerCard(
     }
     LaunchedEffect(pendingSlideInKey) {
         if (pendingSlideInKey != null) {
-            animate(swipeState.offsetX, 0f, 0f, SwipeCoverSpringSpec) { value, _ ->
+            animate(swipeState.offsetX, 0f, 0f, motion.spec(SwipeCoverSpringSpec)) { value, _ ->
                 swipeState.offsetX = value
             }
         }

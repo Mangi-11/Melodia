@@ -2,10 +2,13 @@ package com.lin0721.linmusic.desktop.ui.lyricsview
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -78,6 +81,9 @@ import com.lin0721.linmusic.core.player.domain.lyricLineKey
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
+import com.lin0721.linmusic.desktop.ui.components.uiEnter
+import com.lin0721.linmusic.desktop.ui.components.uiExit
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.rememberCoverBase
 import com.lin0721.linmusic.desktop.ui.nowplaying.verticalEdgeFade
 import com.lin0721.linmusic.desktop.ui.palette.darken
@@ -94,6 +100,8 @@ import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.delay
 
 private const val FADE_MS = 150
+private const val OPEN_MS = 220
+private const val OPEN_SCALE = 0.98f
 private const val RESUME_FOLLOW_MS = 3_000L
 private const val AUTO_HIDE_MS = 5_000L
 private const val HEADER_FADE_MS = 200
@@ -127,8 +135,8 @@ fun LyricsViewOverlay(
     AnimatedVisibility(
         visible = state.isOpen,
         modifier = modifier,
-        enter = fadeIn(tween(FADE_MS)),
-        exit = fadeOut(tween(FADE_MS))
+        enter = uiEnter(fadeIn(tween(OPEN_MS)) + scaleIn(tween(OPEN_MS, easing = FastOutSlowInEasing), initialScale = OPEN_SCALE)),
+        exit = uiExit(fadeOut(tween(FADE_MS)) + scaleOut(tween(FADE_MS), targetScale = OPEN_SCALE))
     ) {
         val nowPlaying by controller.nowPlaying.collectAsState()
         val track = nowPlaying ?: return@AnimatedVisibility
@@ -213,8 +221,8 @@ private fun LyricsViewContent(
         }
     }
     // 沉浸态没有标题栏与播放栏的间隙，上下补一圈与左右一致的边
-    val verticalGap by animateDpAsState(if (controlsHidden) DesktopDimens.PaneGap else 0.dp, tween(CHROME_ANIM_MS), label = "lyricsVerticalGap")
-    val headerInset by animateDpAsState(if (controlsHidden) 0.dp else HeaderTitleRowBottom, tween(CHROME_ANIM_MS), label = "lyricsHeaderInset")
+    val verticalGap by animateDpAsState(if (controlsHidden) DesktopDimens.PaneGap else 0.dp, uiTween(CHROME_ANIM_MS), label = "lyricsVerticalGap")
+    val headerInset by animateDpAsState(if (controlsHidden) 0.dp else HeaderTitleRowBottom, uiTween(CHROME_ANIM_MS), label = "lyricsHeaderInset")
     // 布局变化会合成同位置的移动事件，按窗口坐标过滤掉没有真实位移的移动
     var boxOrigin by remember { mutableStateOf(Offset.Zero) }
     var lastPointer by remember { mutableStateOf(Offset.Unspecified) }
@@ -259,8 +267,8 @@ private fun LyricsViewContent(
         AnimatedVisibility(
             visible = !controlsHidden,
             modifier = Modifier.align(Alignment.TopCenter),
-            enter = fadeIn(tween(HEADER_FADE_MS)),
-            exit = fadeOut(tween(HEADER_FADE_MS))
+            enter = fadeIn(uiTween(HEADER_FADE_MS)),
+            exit = fadeOut(uiTween(HEADER_FADE_MS))
         ) {
             Header(
                 track = track,

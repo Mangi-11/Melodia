@@ -19,7 +19,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,8 +65,12 @@ import com.lin0721.linmusic.core.ui.components.AdaptiveContentWidth
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.ContentSwitchDurationMs
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.TextGray
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.recognition.domain.RecognitionMode
 import org.koin.androidx.compose.koinViewModel
 
@@ -85,6 +88,7 @@ fun RecognitionScreen(
     backHandlerEnabled: Boolean = true,
     viewModel: RecognitionViewModel = koinViewModel()
 ) {
+    val motion = LocalUiMotion.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val nowPlaying by viewModel.nowPlaying.collectAsStateWithLifecycle()
@@ -220,7 +224,7 @@ fun RecognitionScreen(
                             targetState = uiState,
                             contentKey = { it::class },
                             transitionSpec = {
-                                fadeIn(tween(ContentSwitchDurationMs)) togetherWith fadeOut(tween(ContentSwitchDurationMs))
+                                fadeIn(motion.tween(ContentSwitchDurationMs)) togetherWith fadeOut(motion.tween(ContentSwitchDurationMs))
                             },
                             label = "recognition_state"
                         ) { state ->
@@ -270,8 +274,8 @@ fun RecognitionScreen(
                 // 外层 Column 的作用域会劫持重载解析，这里显式调用非作用域版本
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showHistory,
-                    enter = slideInHorizontally(tween(ContentSwitchDurationMs)) { it } + fadeIn(tween(ContentSwitchDurationMs)),
-                    exit = slideOutHorizontally(tween(ContentSwitchDurationMs)) { it } + fadeOut(tween(ContentSwitchDurationMs))
+                    enter = slideInHorizontally(uiTween(ContentSwitchDurationMs)) { it } + fadeIn(uiTween(ContentSwitchDurationMs)),
+                    exit = slideOutHorizontally(uiTween(ContentSwitchDurationMs)) { it } + fadeOut(uiTween(ContentSwitchDurationMs))
                 ) {
                     RecognitionHistoryPage(
                         history = history,
@@ -286,8 +290,8 @@ fun RecognitionScreen(
 
             AnimatedVisibility(
                 visible = showMiniPlayer,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                enter = uiEnter(slideInVertically(initialOffsetY = { it }) + fadeIn()),
+                exit = uiExit(slideOutVertically(targetOffsetY = { it }) + fadeOut())
             ) {
                 // 平板上与内容列同宽居中，手机上 680dp 上限不生效
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

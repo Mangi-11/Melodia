@@ -2,7 +2,6 @@ package com.lin0721.linmusic.desktop.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlinx.coroutines.delay
 
@@ -89,10 +89,10 @@ fun HomeTabPills(
                 // 平移与裁剪宽度同步，胶囊保持完整尺寸从主胶囊背后推出
                 AnimatedVisibility(
                     visible = secondaryVisible,
-                    enter = slideInHorizontally(tween(SECONDARY_ANIM_MS)) { -it } +
-                        expandHorizontally(tween(SECONDARY_ANIM_MS), expandFrom = Alignment.Start),
-                    exit = slideOutHorizontally(tween(SECONDARY_ANIM_MS)) { -it } +
-                        shrinkHorizontally(tween(SECONDARY_ANIM_MS), shrinkTowards = Alignment.Start),
+                    enter = slideInHorizontally(uiTween(SECONDARY_ANIM_MS)) { -it } +
+                        expandHorizontally(uiTween(SECONDARY_ANIM_MS), expandFrom = Alignment.Start),
+                    exit = slideOutHorizontally(uiTween(SECONDARY_ANIM_MS)) { -it } +
+                        shrinkHorizontally(uiTween(SECONDARY_ANIM_MS), shrinkTowards = Alignment.Start),
                     modifier = Modifier.overlapStart(PillRadius)
                 ) {
                     HomePill(
@@ -124,7 +124,7 @@ private fun HomePill(
     val hovered by interaction.collectIsHoveredAsState()
     val containerColor by animateColorAsState(
         if (hovered) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
-        tween(150),
+        uiTween(150),
         label = "homePillBg"
     )
     FilterChip(

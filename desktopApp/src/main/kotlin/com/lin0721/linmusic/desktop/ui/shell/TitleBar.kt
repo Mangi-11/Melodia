@@ -3,7 +3,6 @@ package com.lin0721.linmusic.desktop.ui.shell
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -101,6 +100,7 @@ import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.MenuScope
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
 import com.lin0721.linmusic.desktop.ui.components.trackTextInputFocus
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.download.DownloadRoundTracker
 import com.lin0721.linmusic.desktop.ui.icons.DownloadIcons
 import com.lin0721.linmusic.desktop.ui.navigation.BackStack
@@ -220,8 +220,8 @@ private fun HomeButton(
     val hoverSource = remember { MutableInteractionSource() }
     val isHovered by hoverSource.collectIsHoveredAsState()
 
-    val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, tween(150))
-    val bgColor by animateColorAsState(if (isHovered) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), tween(150))
+    val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, uiTween(150))
+    val bgColor by animateColorAsState(if (isHovered) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), uiTween(150))
 
     Box(
         Modifier
@@ -265,12 +265,12 @@ private fun DownloadsButton(tasks: List<DownloadTask>, open: Boolean, onClick: (
             showCheck = false
         }
     }
-    val fill by animateFloatAsState(progress ?: 0f, tween(FILL_ANIMATION_MS), label = "downloadFill")
+    val fill by animateFloatAsState(progress ?: 0f, uiTween(FILL_ANIMATION_MS), label = "downloadFill")
     val needsAttention = tasks.any { it.status == DownloadTaskStatus.PAUSED || it.status == DownloadTaskStatus.FAILED }
 
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (hovered) DOWNLOAD_HOVER_SCALE else 1f, tween(FILL_ANIMATION_MS), label = "downloadHover")
+    val scale by animateFloatAsState(if (hovered) DOWNLOAD_HOVER_SCALE else 1f, uiTween(FILL_ANIMATION_MS), label = "downloadHover")
     val tint = if (hovered || open) DesktopColors.TextPrimary else DesktopColors.TextGray
     val tooltip = progress?.let { "下载中 ${(it * 100).roundToInt()}%" } ?: "下载管理"
     DesktopTooltip(tooltip, side = TooltipSide.Bottom, modifier = Modifier.padding(end = 8.dp)) {
@@ -280,7 +280,7 @@ private fun DownloadsButton(tasks: List<DownloadTask>, open: Boolean, onClick: (
                 interactionSource = hoverSource,
                 modifier = Modifier.size(DOWNLOAD_BUTTON_SIZE).graphicsLayer { scaleX = scale; scaleY = scale }
             ) {
-                Crossfade(showCheck, animationSpec = tween(FILL_ANIMATION_MS), label = "downloadIcon") { check ->
+                Crossfade(showCheck, animationSpec = uiTween(FILL_ANIMATION_MS), label = "downloadIcon") { check ->
                     Box(Modifier.size(DOWNLOAD_ICON_SIZE)) {
                         val icon = if (check) DownloadIcons.Check else DownloadIcons.Download
                         Icon(icon, "下载管理", tint = if (check) DesktopColors.TextPrimary else tint, modifier = Modifier.fillMaxSize())
@@ -406,18 +406,18 @@ private fun SearchBox(
         isFocused || isHovered -> Color(0xFF2A2A2A)
         else -> Color(0xFF1F1F1F)
     }
-    val animatedBg by animateColorAsState(targetBg, tween(180))
+    val animatedBg by animateColorAsState(targetBg, uiTween(180))
 
     val borderColor = when {
         isFocused -> Color.White
         isHovered -> Color.White.copy(alpha = 0.55f)
         else -> Color.Transparent
     }
-    val animatedBorderColor by animateColorAsState(borderColor, tween(180))
+    val animatedBorderColor by animateColorAsState(borderColor, uiTween(180))
 
     val scale by animateFloatAsState(
         targetValue = if (isHovered || isFocused) 1.015f else 1f,
-        animationSpec = tween(180)
+        animationSpec = uiTween(180)
     )
 
     Row(
@@ -542,14 +542,14 @@ private fun BrowseCabinetButton(
 
     val buttonScale by animateFloatAsState(
         targetValue = if (isButtonHovered) 1.15f else 1f,
-        animationSpec = tween(150)
+        animationSpec = uiTween(150)
     )
     val iconColor by animateColorAsState(
         targetValue = when {
             isActive || isButtonHovered -> DesktopColors.TextPrimary
             else -> DesktopColors.TextGray
         },
-        animationSpec = tween(150)
+        animationSpec = uiTween(150)
     )
 
     Box(

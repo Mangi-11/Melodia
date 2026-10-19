@@ -46,6 +46,7 @@ import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaGridColumns
+import com.lin0721.linmusic.core.ui.theme.uiSpring
 import com.lin0721.linmusic.feature.home.ui.ErrorContent
 import com.lin0721.linmusic.feature.home.ui.LoadingIndicator
 import com.lin0721.linmusic.feature.music.domain.MusicStyle
@@ -126,7 +127,7 @@ private fun MusicPortraitSummary(portrait: StylePortrait) {
             .padding(horizontal = MusicEdgePadding)
             .clip(RoundedCornerShape(8.dp))
             .clickable { expanded = !expanded }
-            .animateContentSize()
+            .animateContentSize(uiSpring())
             .padding(bottom = 8.dp),
         verticalAlignment = Alignment.Top
     ) {

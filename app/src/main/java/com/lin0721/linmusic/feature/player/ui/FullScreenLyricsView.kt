@@ -3,8 +3,6 @@ package com.lin0721.linmusic.feature.player.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -58,6 +56,8 @@ import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.saturateIfChromatic
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeChild
@@ -343,22 +343,22 @@ fun FullScreenLyricsView(
 
                 val animatedTopCutoffPx by animateFloatAsState(
                     targetValue = targetTopCutoffPx,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                    animationSpec = uiSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
                     label = "fs_top_cutoff"
                 )
                 val animatedTopFeatherPx by animateFloatAsState(
                     targetValue = targetTopFeatherPx,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                    animationSpec = uiSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
                     label = "fs_top_feather"
                 )
                 val animatedBottomControlsHeightPx by animateFloatAsState(
                     targetValue = targetBottomControlsHeightPx,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                    animationSpec = uiSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
                     label = "fs_bottom_controls_height"
                 )
                 val animatedBottomFeatherPx by animateFloatAsState(
                     targetValue = targetBottomFeatherPx,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+                    animationSpec = uiSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
                     label = "fs_bottom_feather"
                 )
 
@@ -450,8 +450,8 @@ fun FullScreenLyricsView(
                 // 顶部栏：悬浮在屏幕顶部，包含状态栏和标题栏；底层配有覆盖状态栏及标题栏的实色遮罩与下方非线性渐变羽化
                 AnimatedVisibility(
                     visible = areControlsVisible,
-                    enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
-                    exit = fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it },
+                    enter = fadeIn(uiTween(220)) + slideInVertically(uiTween(220)) { -it },
+                    exit = fadeOut(uiTween(180)) + slideOutVertically(uiTween(180)) { -it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
@@ -518,8 +518,8 @@ fun FullScreenLyricsView(
                 // 底部播放控制条：悬浮于歌词区底部，底层配有上方非线性渐变羽化+控件区实色遮罩
                 AnimatedVisibility(
                     visible = areControlsVisible,
-                    enter = fadeIn(tween(240)) + slideInVertically(tween(240)) { it },
-                    exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
+                    enter = fadeIn(uiTween(240)) + slideInVertically(uiTween(240)) { it },
+                    exit = fadeOut(uiTween(200)) + slideOutVertically(uiTween(200)) { it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
@@ -602,8 +602,8 @@ fun FullScreenLyricsView(
             ) {
                 AnimatedVisibility(
                     visible = areControlsVisible,
-                    enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { -it / 3 },
-                    exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
+                    enter = fadeIn(uiTween(260)) + slideInVertically(uiTween(260)) { -it / 3 },
+                    exit = fadeOut(uiTween(220)) + slideOutVertically(uiTween(220)) { -it / 3 },
                     modifier = Modifier.pointerInput(fullScreenLyricAutoHideControls) {
                         if (fullScreenLyricAutoHideControls) {
                             awaitPointerEventScope {
@@ -666,8 +666,8 @@ fun FullScreenLyricsView(
 
                 AnimatedVisibility(
                     visible = areControlsVisible,
-                    enter = fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 3 },
-                    exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 3 },
+                    enter = fadeIn(uiTween(260)) + slideInVertically(uiTween(260)) { it / 3 },
+                    exit = fadeOut(uiTween(220)) + slideOutVertically(uiTween(220)) { it / 3 },
                     modifier = Modifier.pointerInput(fullScreenLyricAutoHideControls) {
                         if (fullScreenLyricAutoHideControls) {
                             awaitPointerEventScope {

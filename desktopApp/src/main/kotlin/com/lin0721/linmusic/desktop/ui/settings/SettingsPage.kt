@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -65,6 +66,7 @@ fun SettingsPage(
 ) {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
+    val motion = LocalUiMotion.current
     val density = LocalDensity.current
 
     LaunchedEffect(desktop) { desktop.refresh() }
@@ -110,7 +112,9 @@ fun SettingsPage(
             searching = searching,
             resultCount = sections.sumOf { it.second.size },
             onSelectCategory = { category ->
-                sectionTops[category]?.let { top -> scope.launch { scrollState.animateScrollTo(top) } }
+                sectionTops[category]?.let { top ->
+                    scope.launch { if (motion.enabled) scrollState.animateScrollTo(top) else scrollState.scrollTo(top) }
+                }
             }
         )
         HoverScrollbarBox(scrollState, Modifier.weight(1f).fillMaxWidth()) {

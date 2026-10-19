@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.playlist.ui
 
 import com.lin0721.linmusic.core.ui.components.PlayPauseIcon
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,6 +52,7 @@ import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
 import com.lin0721.linmusic.core.model.PlaylistDetail
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // ────────────────────────────────────────────────────────────────────────────
 // 全出血 Hero（LazyColumn Item 1）
@@ -111,7 +111,7 @@ fun PlaylistHeaderItem(
     val titleAlpha = 1f - ((progress - 0.4f) / 0.4f).coerceIn(0f, 1f)
     val animatedDominant by animateColorAsState(
         targetValue = dominantColor,
-        animationSpec = tween(800),
+        animationSpec = uiTween(800),
         label = "playlist_header_color"
     )
     val gradientTop = remember(animatedDominant) { animatedDominant.darken(0.35f) }

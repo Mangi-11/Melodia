@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -61,6 +60,8 @@ import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // 全屏歌词列表区：加载态/空态、当前行自动居中定位、居中行推导与拖动定位覆盖层
 @Composable
@@ -255,8 +256,8 @@ fun FullScreenLyricsList(
 private fun CenterTargetLine(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(spring(dampingRatio = 0.85f, stiffness = 300f)),
-        exit = fadeOut(tween(180)),
+        enter = fadeIn(uiSpring(dampingRatio = 0.85f, stiffness = 300f)),
+        exit = fadeOut(uiTween(180)),
         modifier = modifier
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -281,15 +282,15 @@ private fun PlayCapsule(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(spring(dampingRatio = 0.82f, stiffness = 380f)) +
+        enter = fadeIn(uiSpring(dampingRatio = 0.82f, stiffness = 380f)) +
                 scaleIn(
                     initialScale = 0.82f,
-                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f)
+                    animationSpec = uiSpring(dampingRatio = 0.75f, stiffness = 400f)
                 ),
-        exit = fadeOut(tween(160)) +
+        exit = fadeOut(uiTween(160)) +
                 scaleOut(
                     targetScale = 0.85f,
-                    animationSpec = tween(160)
+                    animationSpec = uiTween(160)
                 ),
         modifier = modifier
     ) {

@@ -41,6 +41,8 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.lin0721.linmusic.desktop.player.AudioOutputControl
+import com.lin0721.linmusic.desktop.ui.components.uiEnter
+import com.lin0721.linmusic.desktop.ui.components.uiExit
 import com.lin0721.linmusic.desktop.ui.login.LoginDialog
 import com.lin0721.linmusic.desktop.ui.lyricsview.CHROME_ANIM_MS
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
@@ -153,16 +155,16 @@ fun WindowScope.MelodiaDesktopApp(
                 // 全屏或歌词沉浸态时收起自绘标题栏，Esc 或底栏按钮退出
                 AnimatedVisibility(
                     visible = !isFullscreen && !lyricsView.isImmersive,
-                    enter = ChromeEnter,
-                    exit = ChromeExit
+                    enter = uiEnter(ChromeEnter),
+                    exit = uiExit(ChromeExit)
                 ) {
                     AppTitleBar(state, deps, windowState, userProfile, searchFocusRequests, searchDropdown, onClose)
                 }
                 Workspace(state, deps, frameHost, audioOutput, hasNowPlaying = nowPlaying != null, isFullscreen, Modifier.weight(1f))
                 AnimatedVisibility(
                     visible = !lyricsView.isImmersive,
-                    enter = ChromeEnter,
-                    exit = ChromeExit
+                    enter = uiEnter(ChromeEnter),
+                    exit = uiExit(ChromeExit)
                 ) {
                     AppPlayerBar(state, deps, audioOutput, fullscreen)
                 }

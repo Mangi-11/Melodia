@@ -5,7 +5,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -112,6 +111,7 @@ import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
 import com.lin0721.linmusic.desktop.ui.components.trackTextInputFocus
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.playlist.EditPlaylistDialog
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -313,12 +313,12 @@ private fun LibraryCompactToolbar(
     ) {
         val fieldWidth by animateDpAsState(
             if (searching) maxWidth - SearchHeight - 8.dp else SearchHeight,
-            tween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
+            uiTween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
             label = "librarySearchWidth"
         )
         val background by animateColorAsState(
             if (searching) DesktopColors.Surface else Color.Transparent,
-            tween(SEARCH_ANIMATION_MS),
+            uiTween(SEARCH_ANIMATION_MS),
             label = "librarySearchBackground"
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -517,7 +517,7 @@ private fun LibraryItems(
             is LibraryUiState.Success -> if (state.filteredItems.isEmpty() && query.isNotBlank()) {
                 CenteredBox { Text("未找到与“$query”相关的内容", color = DesktopColors.TextGray, fontSize = 13.sp) }
             } else {
-                Crossfade(viewMode, animationSpec = tween(VIEW_SWITCH_MS), label = "libraryView") { mode ->
+                Crossfade(viewMode, animationSpec = uiTween(VIEW_SWITCH_MS), label = "libraryView") { mode ->
                     when (mode) {
                         LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = true)
                         LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = false)
@@ -533,7 +533,7 @@ private fun LibraryItems(
 // 与移动端一致的吸顶边缘弥散阴影，仅在列表已向下滚动时显示
 @Composable
 internal fun BoxScope.ListTopShadow(visible: Boolean) {
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(VIEW_SWITCH_MS), label = "listTopShadow")
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, uiTween(VIEW_SWITCH_MS), label = "listTopShadow")
     Box(
         Modifier.fillMaxWidth().height(ShadowHeight).align(Alignment.TopCenter).graphicsLayer { this.alpha = alpha }
             .background(

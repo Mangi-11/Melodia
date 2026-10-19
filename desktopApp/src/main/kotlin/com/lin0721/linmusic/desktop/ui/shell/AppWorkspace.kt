@@ -1,5 +1,13 @@
 package com.lin0721.linmusic.desktop.ui.shell
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.player.AudioOutputControl
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.home.LocalPaneResizing
 import com.lin0721.linmusic.desktop.ui.library.LibraryPane
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewOverlay
@@ -26,6 +35,18 @@ import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingDock
 import com.lin0721.linmusic.desktop.ui.nowplaying.rememberNowPlayingDockState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
+
+private const val PAGE_ENTER_MS = 220
+private const val PAGE_EXIT_MS = 120
+private const val PAGE_ENTER_SCALE = 0.98f
+
+// 新页淡入并从略小放大到原尺寸，旧页只淡出；两页同尺寸，不需要尺寸过渡
+private val PageTransform = ContentTransform(
+    targetContentEnter = fadeIn(tween(PAGE_ENTER_MS, easing = LinearOutSlowInEasing)) +
+        scaleIn(tween(PAGE_ENTER_MS, easing = FastOutSlowInEasing), initialScale = PAGE_ENTER_SCALE),
+    initialContentExit = fadeOut(tween(PAGE_EXIT_MS)),
+    sizeTransform = null
+)
 
 // 标题栏与播放栏之间的工作区：音乐库、页面内容、正在播放栏，以及盖在上面的全屏歌词
 @Composable
@@ -78,8 +99,15 @@ internal fun Workspace(
                     onDragEnd = pane::endLibraryDrag
                 )
                 Pane(Modifier.weight(1f)) {
-                    Box(Modifier.settledLayoutWidth(LocalPaneWidthExtra.current).fillMaxSize()) {
-                        val entry = state.backStack.currentEntry
+                    val motion = LocalUiMotion.current
+                    // 同一栈帧内的界面步骤不换页，按栈帧 id 判定是否过渡
+                    AnimatedContent(
+                        targetState = state.backStack.currentEntry,
+                        modifier = Modifier.settledLayoutWidth(LocalPaneWidthExtra.current).fillMaxSize(),
+                        transitionSpec = { motion.transform(PageTransform) },
+                        contentKey = { it.id },
+                        label = "page"
+                    ) { entry ->
                         frameHost.Provide(entry) {
                             RouteContent(entry, frameHost, deps, state)
                         }

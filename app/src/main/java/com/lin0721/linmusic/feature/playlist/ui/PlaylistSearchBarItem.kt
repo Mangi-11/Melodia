@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.playlist.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 private val SearchBarHeight = 40.dp
 
@@ -46,7 +46,7 @@ fun SearchBarItem(
     // 取色完成时颜色平滑过渡
     val animatedBackground by animateColorAsState(
         targetValue = backgroundColor,
-        animationSpec = tween(800),
+        animationSpec = uiTween(800),
         label = "search_bar_color"
     )
     val fillColor = remember(animatedBackground) { animatedBackground.darken(0.35f) }

@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.localmusic.ui.components
 
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +68,7 @@ import com.lin0721.linmusic.core.ui.theme.SurfaceLight
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.localmusic.data.LocalCoverArtCache
 import com.lin0721.linmusic.feature.localmusic.domain.LocalTrack
 import com.lin0721.linmusic.feature.localmusic.domain.queueSongId
@@ -214,7 +214,7 @@ fun LocalHeroHeader(
     LaunchedEffect(coverUrl) {
         baseColor = coverUrl?.let { extractBaseColorFromUrl(context, it) } ?: FallbackBase
     }
-    val animatedBase by animateColorAsState(baseColor, tween(500), label = "local_hero_base")
+    val animatedBase by animateColorAsState(baseColor, uiTween(500), label = "local_hero_base")
 
     Column(
         modifier = Modifier

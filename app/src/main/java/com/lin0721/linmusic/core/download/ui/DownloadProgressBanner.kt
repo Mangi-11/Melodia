@@ -2,7 +2,6 @@ package com.lin0721.linmusic.core.download.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +30,9 @@ import com.lin0721.linmusic.core.ui.theme.DownloadFailedRed
 import com.lin0721.linmusic.core.ui.theme.DownloadedGreen
 import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import com.lin0721.linmusic.core.ui.theme.TextGray
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 
@@ -80,14 +82,14 @@ fun DownloadProgressBanner(modifier: Modifier = Modifier) {
 
     val animatedRunning by animateFloatAsState(
         targetValue = lastContent?.counts?.runningFraction ?: 0f,
-        animationSpec = tween(300),
+        animationSpec = uiTween(300),
         label = "downloadProgress"
     )
 
     AnimatedVisibility(
         visible = content != null,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
+        enter = uiEnter(expandVertically() + fadeIn()),
+        exit = uiExit(shrinkVertically() + fadeOut()),
         modifier = modifier
     ) {
         val shown = lastContent ?: return@AnimatedVisibility

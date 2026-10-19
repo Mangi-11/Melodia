@@ -23,6 +23,7 @@ import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiSpec
 
 // 切歌单排序方式时的行位移动画：与 Library 筛选胶囊的增删动效同一套规格
 private val trackPlacementSpec = spring<IntOffset>(
@@ -54,7 +55,7 @@ fun LazyListScope.playlistTrackItems(
         val selecting = selectionUi.active
         // SongRow 本身不接受外部 modifier，外层套 Box 挂 animateItem：
         // 切排序方式时 key 不变、位置变了，行会顺着新位置滑过去
-        Box(modifier = Modifier.animateItem(trackFadeInSpec, trackPlacementSpec, trackFadeOutSpec)) {
+        Box(modifier = Modifier.animateItem(uiSpec(trackFadeInSpec), uiSpec(trackPlacementSpec), uiSpec(trackFadeOutSpec))) {
             SongRow(
                 data = SongRowData(
                     id = track.id,

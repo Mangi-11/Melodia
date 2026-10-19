@@ -10,7 +10,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -74,6 +73,8 @@ import com.lin0721.linmusic.core.ui.theme.DownloadedGreen
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -163,8 +164,8 @@ fun SongRow(
         if (selectionChecked != null) lastChecked = selectionChecked
         AnimatedVisibility(
             visible = selectionChecked != null,
-            enter = expandHorizontally(tween(SELECTION_ANIM_MS)) + fadeIn(tween(SELECTION_ANIM_MS)),
-            exit = shrinkHorizontally(tween(SELECTION_ANIM_MS)) + fadeOut(tween(SELECTION_ANIM_MS))
+            enter = expandHorizontally(uiTween(SELECTION_ANIM_MS)) + fadeIn(uiTween(SELECTION_ANIM_MS)),
+            exit = shrinkHorizontally(uiTween(SELECTION_ANIM_MS)) + fadeOut(uiTween(SELECTION_ANIM_MS))
         ) {
             Checkbox(
                 checked = lastChecked,
@@ -366,7 +367,7 @@ fun DraggableSongRow(
     onDragEnd: () -> Unit,
     enabled: Boolean = true
 ) {
-    val liftSpec = remember { spring<Dp>(stiffness = Spring.StiffnessMediumLow) }
+    val liftSpec = uiSpring<Dp>(stiffness = Spring.StiffnessMediumLow)
     val elevation by animateDpAsState(
         targetValue = if (isDragging) 8.dp else 0.dp,
         animationSpec = liftSpec,
@@ -379,6 +380,7 @@ fun DraggableSongRow(
             isCurrent -> MaterialTheme.colorScheme.surface
             else -> MaterialTheme.colorScheme.background
         },
+        animationSpec = uiSpring(),
         label = "row_bg"
     )
 

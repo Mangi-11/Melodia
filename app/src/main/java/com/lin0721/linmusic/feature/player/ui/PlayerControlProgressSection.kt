@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.theme.SurfaceLight
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlin.math.abs
 
 // 副歌圆点的吸附半径
@@ -59,7 +59,7 @@ fun ProgressSection(
 
     val thumbSize by animateDpAsState(
         targetValue = if (isSeeking) 14.dp else 8.dp,
-        animationSpec = tween(150),
+        animationSpec = uiTween(150),
         label = "thumb_size"
     )
 

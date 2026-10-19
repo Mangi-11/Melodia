@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.comments
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -50,6 +49,7 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.OverlayPanelHeader
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 
@@ -164,8 +164,8 @@ fun CommentsPanel(
         // 楼层详情盖在评论列表之上，不透明底并吞掉点击，避免操作穿透到下层
         AnimatedVisibility(
             visible = floorState !is CommentFloorState.Idle,
-            enter = fadeIn(tween(FLOOR_FADE_MS)),
-            exit = fadeOut(tween(FLOOR_FADE_MS))
+            enter = fadeIn(uiTween(FLOOR_FADE_MS)),
+            exit = fadeOut(uiTween(FLOOR_FADE_MS))
         ) {
             CommentFloorPanel(
                 floorState = floorState,

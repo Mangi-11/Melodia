@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.artist.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -26,6 +25,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 private val TOP_BAR_HEIGHT = 56.dp
 
@@ -47,7 +47,7 @@ fun ArtistTopBarOverlay(
     val isCollapsed = progress >= 0.8f
     val animatedDominant by animateColorAsState(
         targetValue = dominantColor,
-        animationSpec = tween(800),
+        animationSpec = uiTween(800),
         label = "artist_topbar_color"
     )
     val fillColor = remember(animatedDominant) { animatedDominant.darken(0.35f) }

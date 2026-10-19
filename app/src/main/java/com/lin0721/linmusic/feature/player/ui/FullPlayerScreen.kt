@@ -8,20 +8,19 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.gestures.scrollBy
 import com.lin0721.linmusic.core.comment.domain.CommentFloorState
 import com.lin0721.linmusic.core.comment.ui.CommentFloorScreen
 import com.lin0721.linmusic.core.comment.ui.CommentFullScreen
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
@@ -65,6 +64,7 @@ import com.lin0721.linmusic.core.ui.theme.rememberMelodiaOrientationClass
 import com.lin0721.linmusic.core.player.PlaySource
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.Job
@@ -110,6 +110,7 @@ fun FullPlayerScreen(
     onLyricsFullScreenChange: (Boolean) -> Unit = {},
     onLyricsControlsVisibilityChange: (Boolean) -> Unit = {}
 ) {
+    val motion = LocalUiMotion.current
     if (currentTrack == null) return
 
     val context = LocalContext.current
@@ -399,12 +400,12 @@ fun FullPlayerScreen(
     )
     val animatedCoverPadding by animateDpAsState(
         targetValue = if (showMiniLyric) MelodiaSpacing.lg else 13.dp,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        animationSpec = uiTween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "cover_padding"
     )
     val animatedItemGap by animateDpAsState(
         targetValue = if (showMiniLyric) 0.dp else 3.dp,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        animationSpec = uiTween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "item_gap"
     )
 
@@ -424,10 +425,11 @@ fun FullPlayerScreen(
                 if (visibleItem != null) {
                     val deltaToScroll = (visibleItem.offset - desiredTopPx).toFloat()
                     if (kotlin.math.abs(deltaToScroll) > 1f) {
-                        listState.animateScrollBy(deltaToScroll)
+                        motion.scrollBy(listState, deltaToScroll)
                     }
                 } else {
-                    listState.animateScrollToItem(
+                    motion.scrollToItem(
+                        listState,
                         index = targetIndex,
                         scrollOffset = -desiredTopPx
                     )
@@ -459,7 +461,7 @@ fun FullPlayerScreen(
     LaunchedEffect(isColumnFullscreenWidth) {
         if (hasSettledColumnWidth) {
             columnReflowAlpha.snapTo(PanelReflowFadeFromAlpha)
-            columnReflowAlpha.animateTo(1f, PanelReflowFadeSpec)
+            columnReflowAlpha.animateTo(1f, motion.spec(PanelReflowFadeSpec))
         }
         hasSettledColumnWidth = true
     }
@@ -508,7 +510,7 @@ fun FullPlayerScreen(
                     initialValue = offsetY,
                     targetValue = 0f,
                     initialVelocity = velocity,
-                    animationSpec = spring(
+                    animationSpec = motion.spring(
                         dampingRatio = Spring.DampingRatioNoBouncy,
                         stiffness = Spring.StiffnessMediumLow
                     )
@@ -918,8 +920,8 @@ fun FullPlayerScreen(
 
         AnimatedVisibility(
             visible = showCommentsSheet,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             CommentFullScreen(
                 commentsState = commentsState,
@@ -952,8 +954,8 @@ fun FullPlayerScreen(
 
         AnimatedVisibility(
             visible = showCommentFloor,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             CommentFloorScreen(
                 floorState = floorState,

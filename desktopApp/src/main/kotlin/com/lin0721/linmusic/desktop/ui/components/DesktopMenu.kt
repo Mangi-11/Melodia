@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -117,8 +116,9 @@ fun DesktopMenu(
     val scope = remember { MenuScope() }
     val density = LocalDensity.current
     val positionProvider = remember(offset, width, density) { MenuPositionProvider(offset, width, density, scope) }
+    val motion = LocalUiMotion.current
     val fade = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { fade.animateTo(1f, tween(FADE_IN_MS)) }
+    LaunchedEffect(Unit) { fade.animateTo(1f, motion.tween(FADE_IN_MS)) }
     // 弹层透明，主菜单与二级菜单各自成面板；弹层位置只取决于主菜单
     Popup(
         popupPositionProvider = positionProvider,

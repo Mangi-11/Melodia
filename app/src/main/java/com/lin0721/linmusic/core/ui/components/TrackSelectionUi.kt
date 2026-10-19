@@ -2,7 +2,6 @@ package com.lin0721.linmusic.core.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -49,6 +48,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // 歌曲多选在列表行上的状态与回调，歌单页与歌手页共用
 @Immutable
@@ -168,7 +168,7 @@ fun SelectionActionBar(
 fun rememberSelectionBottomPadding(active: Boolean): Dp {
     val padding by animateDpAsState(
         targetValue = if (active) SelectionBarListPadding else 0.dp,
-        animationSpec = tween(SELECTION_ANIMATION_MS),
+        animationSpec = uiTween(SELECTION_ANIMATION_MS),
         label = "selection_bottom_padding"
     )
     return padding
@@ -202,8 +202,8 @@ fun BoxScope.TrackSelectionOverlay(
 
     AnimatedVisibility(
         visible = selectionUi.active,
-        enter = fadeIn(tween(SELECTION_ANIMATION_MS)) + slideInVertically(tween(SELECTION_ANIMATION_MS)) { -it / 2 },
-        exit = fadeOut(tween(SELECTION_ANIMATION_MS)) + slideOutVertically(tween(SELECTION_ANIMATION_MS)) { -it / 2 },
+        enter = fadeIn(uiTween(SELECTION_ANIMATION_MS)) + slideInVertically(uiTween(SELECTION_ANIMATION_MS)) { -it / 2 },
+        exit = fadeOut(uiTween(SELECTION_ANIMATION_MS)) + slideOutVertically(uiTween(SELECTION_ANIMATION_MS)) { -it / 2 },
         modifier = Modifier.align(Alignment.TopCenter).zIndex(SELECTION_Z_INDEX)
     ) {
         SelectionHeader(
@@ -216,8 +216,8 @@ fun BoxScope.TrackSelectionOverlay(
     }
     AnimatedVisibility(
         visible = selectionUi.active,
-        enter = fadeIn(tween(SELECTION_ANIMATION_MS)) + slideInVertically(tween(SELECTION_ANIMATION_MS)) { it },
-        exit = fadeOut(tween(SELECTION_ANIMATION_MS)) + slideOutVertically(tween(SELECTION_ANIMATION_MS)) { it },
+        enter = fadeIn(uiTween(SELECTION_ANIMATION_MS)) + slideInVertically(uiTween(SELECTION_ANIMATION_MS)) { it },
+        exit = fadeOut(uiTween(SELECTION_ANIMATION_MS)) + slideOutVertically(uiTween(SELECTION_ANIMATION_MS)) { it },
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .zIndex(SELECTION_Z_INDEX)

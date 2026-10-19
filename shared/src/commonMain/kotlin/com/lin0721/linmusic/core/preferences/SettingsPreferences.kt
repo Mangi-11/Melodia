@@ -89,6 +89,8 @@ class SettingsPreferences(
         private val KEY_AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
         // 是否接收测试版（beta/rc）更新推送，默认 false 只接收正式版
         private val KEY_ALLOW_PRERELEASE_CHANNEL = booleanPreferencesKey("allow_prerelease_channel")
+        // 界面过渡动画开关，默认 true；不影响歌词与音频淡入淡出
+        private val KEY_UI_ANIMATIONS_ENABLED = booleanPreferencesKey("ui_animations_enabled")
         // 用户主动忽略的更新版本 tag，默认空串表示未忽略任何版本
         private val KEY_IGNORED_UPDATE_TAG = stringPreferencesKey("ignored_update_tag")
         // 全屏歌词字体大小，默认 22sp
@@ -519,6 +521,17 @@ class SettingsPreferences(
     suspend fun saveAllowPrereleaseChannel(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_ALLOW_PRERELEASE_CHANNEL] = enabled
+        }
+    }
+
+    // 界面过渡动画开关 Flow
+    val uiAnimationsEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_UI_ANIMATIONS_ENABLED] ?: true
+    }
+
+    suspend fun saveUiAnimationsEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_UI_ANIMATIONS_ENABLED] = enabled
         }
     }
 

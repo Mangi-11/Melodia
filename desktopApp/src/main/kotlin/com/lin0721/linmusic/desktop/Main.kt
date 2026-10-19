@@ -1,5 +1,6 @@
 package com.lin0721.linmusic.desktop
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -58,7 +59,9 @@ import com.lin0721.linmusic.desktop.platform.MediaSessionService
 import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
+import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
 import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
@@ -152,6 +155,9 @@ fun main() {
     val initialUiScalePercent = runCatching {
         runBlocking { settingsPreferences.uiScalePercent.first() }
     }.getOrDefault(UiScale.DEFAULT_PERCENT)
+    val initialUiAnimationsEnabled = runCatching {
+        runBlocking { settingsPreferences.uiAnimationsEnabled.first() }
+    }.getOrDefault(true)
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
 
@@ -168,6 +174,9 @@ fun main() {
         val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
         val uiScalePercent by settingsPreferences.uiScalePercent.collectAsState(initial = initialUiScalePercent)
         val uiScaleFactor = UiScale.toFactor(uiScalePercent)
+        val uiAnimationsEnabled by settingsPreferences.uiAnimationsEnabled.collectAsState(initial = initialUiAnimationsEnabled)
+        val uiMotion = remember { UiMotion(initialUiAnimationsEnabled) }
+        LaunchedEffect(uiAnimationsEnabled) { uiMotion.enabled = uiAnimationsEnabled }
         val closeAction by desktopPreferences.closeAction.collectAsState(initial = CloseAction.TRAY)
         val isPlaying by controller.playWhenReady.collectAsState()
         val nowPlaying by controller.nowPlaying.collectAsState()
@@ -351,15 +360,17 @@ fun main() {
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
             CanvasClearColorEffect()
             TaskbarThumbnailEffect(taskbarThumbnail, controller)
-            MelodiaDesktopTheme(uiScale = uiScaleFactor) {
-                MelodiaDesktopApp(
-                    deps = appDependencies,
-                    windowState = windowState,
-                    fullscreen = fullscreen,
-                    lyricsView = lyricsView,
-                    searchFocusRequests = searchFocusRequests.receiveAsFlow(),
-                    onClose = closeMainWindow
-                )
+            CompositionLocalProvider(LocalUiMotion provides uiMotion) {
+                MelodiaDesktopTheme(uiScale = uiScaleFactor) {
+                    MelodiaDesktopApp(
+                        deps = appDependencies,
+                        windowState = windowState,
+                        fullscreen = fullscreen,
+                        lyricsView = lyricsView,
+                        searchFocusRequests = searchFocusRequests.receiveAsFlow(),
+                        onClose = closeMainWindow
+                    )
+                }
             }
         }
 

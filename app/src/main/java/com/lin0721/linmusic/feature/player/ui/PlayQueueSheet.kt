@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -52,6 +51,7 @@ import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import com.lin0721.linmusic.core.ui.components.SwipeDeleteBackground
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
@@ -85,6 +85,7 @@ fun PlayQueueSheet(
     onShowTimerClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val motion = LocalUiMotion.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -442,7 +443,7 @@ fun PlayQueueSheet(
                             )
                             Box(
                                 // 抬起中的行自己负责位移，交给 animateItem 会和手动 translationY 打架
-                                modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else Modifier.animateItem()
+                                modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier
                             ) {
                                 SwipeToDismissBox(
                                     state = dismissState,
@@ -497,7 +498,7 @@ fun PlayQueueSheet(
                                                         settleOffset.snapTo(releasedOffset)
                                                         settleOffset.animateTo(
                                                             targetValue = 0f,
-                                                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                                            animationSpec = motion.spring(stiffness = Spring.StiffnessMediumLow)
                                                         )
                                                         settlingIndex = -1
                                                     }

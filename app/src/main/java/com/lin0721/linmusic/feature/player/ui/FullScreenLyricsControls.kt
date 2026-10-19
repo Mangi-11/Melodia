@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -14,7 +13,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -75,6 +73,7 @@ import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
@@ -391,6 +390,7 @@ fun FullScreenLyricsSettingsSheet(
     onEdgeFadeChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    val motion = LocalUiMotion.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -491,12 +491,12 @@ fun FullScreenLyricsSettingsSheet(
                     targetState = selectedTab,
                     transitionSpec = {
                         val direction = if (targetState > initialState) 1 else -1
-                        (fadeIn(tween(220, delayMillis = 60)) +
-                            slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { it / 6 * direction }) togetherWith
-                            (fadeOut(tween(120)) +
-                                slideOutHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it / 6 * direction }) using
+                        (fadeIn(motion.tween(220, delayMillis = 60)) +
+                            slideInHorizontally(motion.tween(260, easing = FastOutSlowInEasing)) { it / 6 * direction }) togetherWith
+                            (fadeOut(motion.tween(120)) +
+                                slideOutHorizontally(motion.tween(260, easing = FastOutSlowInEasing)) { -it / 6 * direction }) using
                             SizeTransform(clip = true) { _, _ ->
-                                spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold)
+                                motion.spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold)
                             }
                     },
                     label = "lyric_settings_tab"
@@ -683,6 +683,7 @@ fun FullScreenControls(
     onLyricsSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val motion = LocalUiMotion.current
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
 
@@ -846,16 +847,16 @@ fun FullScreenControls(
 
                 LaunchedEffect(isPressed) {
                     if (isPressed) {
-                        buttonAlpha.animateTo(0.70f, tween(durationMillis = 80))
+                        buttonAlpha.animateTo(0.70f, motion.tween(durationMillis = 80))
                     } else if (clickTrigger == 0) {
-                        buttonAlpha.animateTo(1f, tween(durationMillis = 200, easing = FastOutSlowInEasing))
+                        buttonAlpha.animateTo(1f, motion.tween(durationMillis = 200, easing = FastOutSlowInEasing))
                     }
                 }
 
                 LaunchedEffect(clickTrigger) {
                     if (clickTrigger > 0) {
                         buttonAlpha.snapTo(0.70f)
-                        buttonAlpha.animateTo(1f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
+                        buttonAlpha.animateTo(1f, motion.tween(durationMillis = 220, easing = FastOutSlowInEasing))
                     }
                 }
 

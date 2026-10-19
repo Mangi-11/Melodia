@@ -6,7 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -33,10 +33,13 @@ import com.lin0721.linmusic.core.ui.components.TrackSelectionOverlay
 import com.lin0721.linmusic.core.ui.components.rememberSelectionBottomPadding
 import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.model.PlaylistDetail
 import com.lin0721.linmusic.core.ui.theme.FallbackBase
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -109,6 +112,7 @@ fun PlaylistContent(
     onToggleSelectAll: (List<Long>) -> Unit = {},
     onExitSelection: () -> Unit = {}
 ) {
+    val motion = LocalUiMotion.current
     val density = LocalDensity.current
 
     val isDailyRecommend = playlist.id == -1L || playlist.id == -2L
@@ -177,7 +181,7 @@ fun PlaylistContent(
         if (index < 0) return@LaunchedEffect
         val itemIndex = trackListStartIndex + index
         // 先粗定位让目标行进入可测量范围，再用真实测量结果二次校正，使其停在屏幕正中央
-        listState.animateScrollToItem(itemIndex)
+        motion.scrollToItem(listState, itemIndex)
         val info = listState.layoutInfo
         val itemInfo = info.visibleItemsInfo.find { it.index == itemIndex }
         if (itemInfo != null) {
@@ -187,7 +191,7 @@ fun PlaylistContent(
             val visibleCenter = (visibleTop + info.viewportEndOffset) / 2f
             val itemCenter = itemInfo.offset + itemInfo.size / 2f
             val delta = itemCenter - visibleCenter
-            if (kotlin.math.abs(delta) > 1f) listState.animateScrollBy(delta)
+            if (kotlin.math.abs(delta) > 1f) motion.scrollBy(listState, delta)
         }
         pendingLocateTrackId = null
     }
@@ -248,8 +252,8 @@ fun PlaylistContent(
                 Box(modifier = Modifier.heightIn(min = 1.dp)) {
                     AnimatedVisibility(
                         visible = !searchFullyRevealed,
-                        enter   = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit    = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        enter   = uiEnter(fadeIn() + expandVertically(expandFrom = Alignment.Top)),
+                        exit    = uiExit(fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top))
                     ) {
                         PlaylistHeaderItem(
                             playlist            = playlist,
@@ -289,8 +293,8 @@ fun PlaylistContent(
                 item(key = "action_pills") {
                     AnimatedVisibility(
                         visible = !searchFullyRevealed,
-                        enter   = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit    = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+                        enter   = uiEnter(fadeIn() + expandVertically(expandFrom = Alignment.Top)),
+                        exit    = uiExit(fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top))
                     ) {
                         PlaylistActionPillsRow(
                             isOwnedPlaylist = canRemoveFromPlaylist,
@@ -413,7 +417,7 @@ fun PlaylistContent(
             },
             onScrollToTop   = {
                 coroutineScope.launch {
-                    listState.animateScrollToItem(0)
+                    motion.scrollToItem(listState, 0)
                 }
             }
         )

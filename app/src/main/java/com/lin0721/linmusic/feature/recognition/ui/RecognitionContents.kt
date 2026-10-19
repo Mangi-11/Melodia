@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.recognition.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +67,7 @@ import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.TimerWarningRed
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.player.ui.formatTime
 import com.lin0721.linmusic.feature.recognition.domain.AttemptStatus
 import com.lin0721.linmusic.feature.recognition.domain.MatchAttempt
@@ -321,7 +321,7 @@ private fun BestMatchCard(
     LaunchedEffect(candidate.coverUrl) {
         baseColor = extractBaseColorFromUrl(context, candidate.coverUrl)
     }
-    val animatedBase by animateColorAsState(baseColor, tween(400), label = "recognition_card_color")
+    val animatedBase by animateColorAsState(baseColor, uiTween(400), label = "recognition_card_color")
     val positionText = formatTime(candidate.startTimeMs)
 
     val cardShape = RoundedCornerShape(InfoCardRadius)

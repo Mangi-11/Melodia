@@ -15,12 +15,19 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.lin0721.linmusic.core.player.FloatingLyricService
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaTheme
+import com.lin0721.linmusic.core.ui.theme.UiMotion
 import com.lin0721.linmusic.core.ui.theme.scaledBy
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -89,8 +96,13 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MelodiaTheme {
-                MelodiaApp()
+            val uiAnimationsEnabled by settingsPreferences.uiAnimationsEnabled.collectAsState(initial = true)
+            val uiMotion = remember { UiMotion() }
+            LaunchedEffect(uiAnimationsEnabled) { uiMotion.enabled = uiAnimationsEnabled }
+            CompositionLocalProvider(LocalUiMotion provides uiMotion) {
+                MelodiaTheme {
+                    MelodiaApp()
+                }
             }
         }
     }

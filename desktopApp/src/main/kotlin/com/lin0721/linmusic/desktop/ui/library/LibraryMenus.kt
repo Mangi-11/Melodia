@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.library
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,6 +73,7 @@ import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.settings.SettingSwitch
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -152,8 +152,8 @@ internal fun LibrarySortViewMenu(
             ) {
                 AnimatedVisibility(
                     visible = showSortLabel,
-                    enter = fadeIn(tween(SEARCH_ANIMATION_MS)) + expandHorizontally(tween(SEARCH_ANIMATION_MS)),
-                    exit = fadeOut(tween(SEARCH_ANIMATION_MS)) + shrinkHorizontally(tween(SEARCH_ANIMATION_MS))
+                    enter = fadeIn(uiTween(SEARCH_ANIMATION_MS)) + expandHorizontally(uiTween(SEARCH_ANIMATION_MS)),
+                    exit = fadeOut(uiTween(SEARCH_ANIMATION_MS)) + shrinkHorizontally(uiTween(SEARCH_ANIMATION_MS))
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(sortLabel(sortOrder), color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, softWrap = false)

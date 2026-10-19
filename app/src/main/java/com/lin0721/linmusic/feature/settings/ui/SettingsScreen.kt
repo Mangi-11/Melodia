@@ -38,6 +38,7 @@ import com.lin0721.linmusic.LocalGlobalOverlayOpen
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.*
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
@@ -118,18 +119,21 @@ fun SettingsScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             // 使用 AnimatedContent 实现主菜单和子菜单的平滑切换动画
+            val motion = LocalUiMotion.current
             AnimatedContent(
                 targetState = activeSubMenu,
                 transitionSpec = {
-                    if (targetState != null) {
-                        // 进入子菜单：从右往左滑入
-                        slideInHorizontally { width -> width } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> -width } + fadeOut()
-                    } else {
-                        // 返回主菜单：从左向右滑入
-                        slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                                slideOutHorizontally { width -> width } + fadeOut()
-                    }
+                    motion.transform(
+                        if (targetState != null) {
+                            // 进入子菜单：从右往左滑入
+                            slideInHorizontally { width -> width } + fadeIn() togetherWith
+                                    slideOutHorizontally { width -> -width } + fadeOut()
+                        } else {
+                            // 返回主菜单：从左向右滑入
+                            slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                                    slideOutHorizontally { width -> width } + fadeOut()
+                        }
+                    )
                 },
                 label = "SettingsMenuTransition"
             ) { subMenu ->

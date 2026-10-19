@@ -51,6 +51,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.uiSpring
 import com.lin0721.linmusic.feature.home.data.DailySong
 import com.lin0721.linmusic.feature.home.data.PersonalizedPlaylist
 import com.lin0721.linmusic.feature.home.domain.ToplistInfo
@@ -172,6 +173,7 @@ private fun DailySpotlightCard(
     }
     val containerColor by animateColorAsState(
         targetValue = lerp(baseColor, Color.Black, SPOTLIGHT_DARKEN_FRACTION),
+        animationSpec = uiSpring(),
         label = "daily_spotlight_color"
     )
     val today = remember { LocalDate.now() }

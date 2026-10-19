@@ -3,7 +3,6 @@ package com.lin0721.linmusic.feature.player.ui
 import com.lin0721.linmusic.core.ui.components.PlayPauseIcon
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.ui.interaction.pressScale
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.TextGray
@@ -49,6 +49,7 @@ fun PlaybackControls(
     // 播客没有随机与循环，隐藏后用等宽占位保持播放键居中
     showModeButtons: Boolean = true
 ) {
+    val motion = LocalUiMotion.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,16 +96,16 @@ fun PlaybackControls(
 
             LaunchedEffect(isPressed) {
                 if (isPressed) {
-                    buttonAlpha.animateTo(0.70f, tween(durationMillis = 80))
+                    buttonAlpha.animateTo(0.70f, motion.tween(durationMillis = 80))
                 } else if (clickTrigger == 0) {
-                    buttonAlpha.animateTo(1f, tween(durationMillis = 200, easing = FastOutSlowInEasing))
+                    buttonAlpha.animateTo(1f, motion.tween(durationMillis = 200, easing = FastOutSlowInEasing))
                 }
             }
 
             LaunchedEffect(clickTrigger) {
                 if (clickTrigger > 0) {
                     buttonAlpha.snapTo(0.70f)
-                    buttonAlpha.animateTo(1f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
+                    buttonAlpha.animateTo(1f, motion.tween(durationMillis = 220, easing = FastOutSlowInEasing))
                 }
             }
 

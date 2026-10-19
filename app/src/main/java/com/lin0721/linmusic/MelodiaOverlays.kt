@@ -2,7 +2,6 @@ package com.lin0721.linmusic
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -38,6 +37,9 @@ import com.lin0721.linmusic.core.ui.components.CustomToast
 import com.lin0721.linmusic.core.ui.components.MelodiaNavigationBar
 import com.lin0721.linmusic.core.ui.components.MiniPlayerCard
 import com.lin0721.linmusic.core.ui.components.MiniPlayerLikeMode
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.create.ui.CreatePopupMenu
 import com.lin0721.linmusic.feature.player.ui.FullPlayerScreen
 import com.lin0721.linmusic.feature.settings.ui.UpdateBanner
@@ -139,12 +141,12 @@ fun MelodiaBottomOverlay(
             visible = showCreateSheet && !isLoginScreenVisible,
             enter = slideInVertically(
                 initialOffsetY = { it / 2 },
-                animationSpec = tween(250, easing = FastOutSlowInEasing)
-            ) + fadeIn(tween(200)),
+                animationSpec = uiTween(250, easing = FastOutSlowInEasing)
+            ) + fadeIn(uiTween(200)),
             exit = slideOutVertically(
                 targetOffsetY = { it / 2 },
-                animationSpec = tween(200, easing = FastOutSlowInEasing)
-            ) + fadeOut(tween(150))
+                animationSpec = uiTween(200, easing = FastOutSlowInEasing)
+            ) + fadeOut(uiTween(150))
         ) {
             Box(
                 modifier = Modifier
@@ -173,8 +175,8 @@ fun MelodiaBottomOverlay(
                 // 更新横幅与下载进度横幅
                 AnimatedVisibility(
                     visible = !isLoginScreenVisible,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
+                    enter = uiEnter(expandVertically() + fadeIn()),
+                    exit = uiExit(shrinkVertically() + fadeOut()),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -197,8 +199,8 @@ fun MelodiaBottomOverlay(
                     ) {
                         AnimatedVisibility(
                             visible = !isLoginScreenVisible,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut(),
+                            enter = uiEnter(expandVertically() + fadeIn()),
+                            exit = uiExit(shrinkVertically() + fadeOut()),
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         ) {
                             // 面板收起时 Tab 栏铺满到迷你条前；面板让位后在内容卡片里居中限宽
@@ -231,8 +233,8 @@ fun MelodiaBottomOverlay(
                         if (!isPanelDocked) {
                             AnimatedVisibility(
                                 visible = currentTrack != null && !isLoginScreenVisible && !isMiniPlayerHidden,
-                                enter = fadeIn() + expandHorizontally(),
-                                exit = fadeOut() + shrinkHorizontally(),
+                                enter = uiEnter(fadeIn() + expandHorizontally()),
+                                exit = uiExit(fadeOut() + shrinkHorizontally()),
                                 modifier = Modifier.fillMaxHeight()
                             ) {
                                 MiniPlayerCard(
@@ -268,8 +270,8 @@ fun MelodiaBottomOverlay(
                     AnimatedVisibility(
                         visible = currentTrack != null && !isLoginScreenVisible && !isMiniPlayerHidden,
                         // 同时伸缩高度：底栏占用高度随之平滑变化，悬浮在其上的多选操作栏才不会在动画结束时突然掉落
-                        enter = slideInVertically(initialOffsetY = { it }) + expandVertically() + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + shrinkVertically() + fadeOut(),
+                        enter = uiEnter(slideInVertically(initialOffsetY = { it }) + expandVertically() + fadeIn()),
+                        exit = uiExit(slideOutVertically(targetOffsetY = { it }) + shrinkVertically() + fadeOut()),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         MiniPlayerCard(
@@ -298,8 +300,8 @@ fun MelodiaBottomOverlay(
 
                     AnimatedVisibility(
                         visible = !isLoginScreenVisible,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = uiEnter(expandVertically() + fadeIn()),
+                        exit = uiExit(shrinkVertically() + fadeOut())
                     ) {
                         MelodiaNavigationBar(
                             currentScreen = currentScreen,
@@ -394,12 +396,12 @@ fun MelodiaToastHost(toastMessage: String?) {
             visible = toastMessage != null,
             enter = slideInVertically(
                 initialOffsetY = { it },
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeIn(tween(250)),
+                animationSpec = uiTween(300, easing = FastOutSlowInEasing)
+            ) + fadeIn(uiTween(250)),
             exit = slideOutVertically(
                 targetOffsetY = { it },
-                animationSpec = tween(250, easing = FastOutSlowInEasing)
-            ) + fadeOut(tween(200)),
+                animationSpec = uiTween(250, easing = FastOutSlowInEasing)
+            ) + fadeOut(uiTween(200)),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 120.dp) // 位于底部浮岛上方

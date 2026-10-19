@@ -55,6 +55,8 @@ import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaSystemBarsConsumed
 import com.lin0721.linmusic.core.ui.theme.melodiaNavigationBarBottomPadding
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 
 // 评论区底部常驻输入栏：随软键盘升降，支持直接发表主评论与针对指定用户的回复
 @Composable
@@ -118,8 +120,8 @@ fun CommentInputBar(
         // 回复目标标签栏
         AnimatedVisibility(
             visible = replyTarget != null,
-            enter = fadeIn(),
-            exit = fadeOut()
+            enter = uiEnter(fadeIn()),
+            exit = uiExit(fadeOut())
         ) {
             if (replyTarget != null) {
                 Row(

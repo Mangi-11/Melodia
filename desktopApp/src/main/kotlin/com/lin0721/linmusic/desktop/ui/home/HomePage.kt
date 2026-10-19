@@ -3,7 +3,6 @@ package com.lin0721.linmusic.desktop.ui.home
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -88,8 +87,11 @@ import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.MenuScope
+import com.lin0721.linmusic.desktop.ui.components.uiSpring
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.ScrollArrow
 import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
@@ -201,7 +203,7 @@ fun HomePage(
         } else {
             DesktopColors.Pane
         },
-        animationSpec = tween(HOME_GRADIENT_ANIM_MS),
+        animationSpec = uiTween(HOME_GRADIENT_ANIM_MS),
         label = "homeTopGradient"
     )
 
@@ -396,7 +398,8 @@ private fun HomeFeed(
 // 区块高度随列数变化时，下方区块平滑让位；只做位移，不加淡入淡出
 @Composable
 private fun LazyItemScope.reflow(): Modifier =
-    if (LocalPaneResizing.current) Modifier else Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+    if (LocalPaneResizing.current || !LocalUiMotion.current.enabled) Modifier
+    else Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
 
 private fun LazyListScope.homeItems(
     data: HomeFeedData,
@@ -518,7 +521,7 @@ private fun RecentGrid(
             FlowRow(
                 modifier = Modifier.fillMaxWidth().then(
                     if (LocalPaneResizing.current) Modifier
-                    else Modifier.animateContentSize(tween(LAYOUT_REFLOW_MS, easing = FastOutSlowInEasing))
+                    else Modifier.animateContentSize(uiTween(LAYOUT_REFLOW_MS, easing = FastOutSlowInEasing))
                 ),
                 horizontalArrangement = Arrangement.spacedBy(RecentGridGap),
                 verticalArrangement = Arrangement.spacedBy(RecentGridGap),
@@ -577,7 +580,7 @@ private fun RecentTile(
     var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
         if (hovered || contextMenuOffset != null) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
-        tween(HOVER_FADE_MS),
+        uiTween(HOVER_FADE_MS),
         label = "recentTileBg"
     )
     Box(modifier = modifier) {
@@ -661,6 +664,7 @@ private fun DailySpotlight(songs: List<DailySong>, onOpen: () -> Unit, onPlay: (
     }
     val containerColor by animateColorAsState(
         lerp(baseColor, Color.Black, SPOTLIGHT_DARKEN_FRACTION),
+        uiSpring(),
         label = "dailySpotlightColor"
     )
     val today = remember { LocalDate.now() }
@@ -916,7 +920,7 @@ internal fun CardTile(
     var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
         if (hovered || contextMenuOffset != null) DesktopColors.CardSurface else Color.Transparent,
-        tween(HOVER_FADE_MS),
+        uiTween(HOVER_FADE_MS),
         label = "cardTileBg"
     )
     Box {

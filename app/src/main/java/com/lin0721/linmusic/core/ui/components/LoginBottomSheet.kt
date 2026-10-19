@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -43,10 +42,12 @@ import com.lin0721.linmusic.core.auth.LoginViewModel
 import com.lin0721.linmusic.core.auth.QrLoginState
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.ContentSwitchDurationMs
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
 import com.lin0721.linmusic.core.ui.theme.SurfaceLight
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import org.koin.androidx.compose.koinViewModel
 
 private enum class LoginMode { CHOICE, QR, COOKIE }
@@ -65,6 +66,7 @@ fun LoginBottomSheet(
     onWebLogin: () -> Unit,
     onLoginSuccess: (String) -> Unit
 ) {
+    val motion = LocalUiMotion.current
     val viewModel: LoginViewModel = koinViewModel()
     var mode by remember { mutableStateOf(LoginMode.CHOICE) }
 
@@ -96,10 +98,10 @@ fun LoginBottomSheet(
                 visible = mode != LoginMode.CHOICE,
                 // 只淡入淡出会导致这一行的高度在退场时一直占位，到组件真正移除才瞬间塌陷；
                 // 叠加 expand/shrink 让高度也跟着动画走，避免收尾那一下顿挫
-                enter = fadeIn(tween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)) +
-                    expandVertically(tween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)),
-                exit = fadeOut(tween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)) +
-                    shrinkVertically(tween(ContentSwitchDurationMs, easing = FastOutSlowInEasing))
+                enter = fadeIn(uiTween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)) +
+                    expandVertically(uiTween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)),
+                exit = fadeOut(uiTween(ContentSwitchDurationMs, easing = FastOutSlowInEasing)) +
+                    shrinkVertically(uiTween(ContentSwitchDurationMs, easing = FastOutSlowInEasing))
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MelodiaIconButton(onClick = {
@@ -114,8 +116,8 @@ fun LoginBottomSheet(
             AnimatedContent(
                 targetState = mode,
                 transitionSpec = {
-                    val offsetSpec = tween<androidx.compose.ui.unit.IntOffset>(ContentSwitchDurationMs, easing = FastOutSlowInEasing)
-                    val alphaSpec = tween<Float>(ContentSwitchDurationMs, easing = FastOutSlowInEasing)
+                    val offsetSpec = motion.tween<androidx.compose.ui.unit.IntOffset>(ContentSwitchDurationMs, easing = FastOutSlowInEasing)
+                    val alphaSpec = motion.tween<Float>(ContentSwitchDurationMs, easing = FastOutSlowInEasing)
                     val transform = if (targetState.depth() > initialState.depth()) {
                         // 前进：新内容从右滑入，旧内容向左滑出
                         (slideInHorizontally(offsetSpec) { it } + fadeIn(alphaSpec)) togetherWith

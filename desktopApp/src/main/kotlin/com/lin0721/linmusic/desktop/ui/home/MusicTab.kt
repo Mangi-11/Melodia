@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.uiSpring
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.music.domain.MusicStyle
 import com.lin0721.linmusic.feature.music.domain.StylePortrait
@@ -150,7 +151,7 @@ private fun PortraitSummary(portrait: StylePortrait) {
     Row(
         Modifier.padding(horizontal = EdgePadding).fillMaxWidth().clip(RoundedCornerShape(6.dp))
             .pointerHoverIcon(PointerIcon.Hand).clickable { expanded = !expanded }
-            .animateContentSize().padding(vertical = 4.dp),
+            .animateContentSize(uiSpring()).padding(vertical = 4.dp),
         verticalAlignment = Alignment.Top
     ) {
         Column(Modifier.weight(1f)) {

@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -108,9 +107,12 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
+import com.lin0721.linmusic.desktop.ui.components.uiSpring
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.library.CreatePlaylistDialog
 import com.lin0721.linmusic.desktop.ui.library.EMPTY_NAME_MESSAGE
 import com.lin0721.linmusic.desktop.ui.library.LibraryPopupMenu
@@ -500,7 +502,7 @@ private fun PlaylistContent(
     LaunchedEffect(playlist.coverImgUrl) {
         if (playlist.coverImgUrl.isNotBlank()) heroBase = extractCoverPaletteFromUrl(playlist.coverImgUrl).base
     }
-    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), label = "playlistHero")
+    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), uiSpring(), label = "playlistHero")
 
     val density = LocalDensity.current
     val barHeightPx = with(density) { StickyBarHeight.roundToPx() }
@@ -641,7 +643,7 @@ private fun PlaylistContent(
                     },
                     // 抬起中的行自己负责位移，交给 animateItem 会和手动位移打架
                     modifier = Modifier.padding(horizontal = 16.dp)
-                        .then(if (dragging || settling) Modifier.zIndex(1f) else Modifier.animateItem()),
+                        .then(if (dragging || settling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier),
                     addedAtText = if (hasDates) formatAddedDate(addedAt[track.id] ?: 0L) else null,
                     reorder = if (!selection.active && (canReorder || dragging)) {
                         TrackReorder(
@@ -712,8 +714,8 @@ private fun PlaylistContent(
         Box(Modifier.fillMaxWidth().clipToBounds()) {
             AnimatedVisibility(
                 visible = showTitleBar,
-                enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
-                exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
+                enter = fadeIn(uiTween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(uiTween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
+                exit = fadeOut(uiTween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(uiTween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
             ) {
                 PlaylistStickyBar(playlist.name, heroColor, showPlayButton, playbackState.isCurrentlyPlayingThis, listState, playbackState.onPlayClick)
             }
@@ -804,8 +806,8 @@ private fun PlaylistStickyBar(
     ) {
         AnimatedVisibility(
             visible = showPlay,
-            enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(tween(STICKY_BAR_ANIMATION_MS)),
-            exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(tween(STICKY_BAR_ANIMATION_MS))
+            enter = fadeIn(uiTween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(uiTween(STICKY_BAR_ANIMATION_MS)),
+            exit = fadeOut(uiTween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(uiTween(STICKY_BAR_ANIMATION_MS))
         ) {
             PlayCircleButton(StickyPlayButtonSize, 28.dp, isPlaying, onPlay, Modifier.padding(end = 12.dp))
         }
@@ -1013,12 +1015,12 @@ private fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
     val focusRequester = remember { FocusRequester() }
     val width by animateDpAsState(
         if (searching) SearchWidth else ControlHeight,
-        tween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
+        uiTween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
         label = "playlistSearchWidth"
     )
     val background by animateColorAsState(
         if (searching) DesktopColors.Surface else Color.Transparent,
-        tween(SEARCH_ANIMATION_MS),
+        uiTween(SEARCH_ANIMATION_MS),
         label = "playlistSearchBackground"
     )
     LaunchedEffect(searching) {

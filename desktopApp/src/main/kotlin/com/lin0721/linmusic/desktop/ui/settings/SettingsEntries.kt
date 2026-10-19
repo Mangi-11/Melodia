@@ -121,6 +121,7 @@ internal fun settingsEntries(
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
+    val uiAnimationsEnabled by common.uiAnimationsEnabled.collectAsState()
     val downloadFolder by common.downloadFolderUri.collectAsState()
     val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
     val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
@@ -406,6 +407,15 @@ internal fun settingsEntries(
                 keywords = listOf("缩放", "放大", "大小", "dpi", "字体")
             ) {
                 UiScaleSetting(uiScalePercent, common::updateUiScalePercent)
+            }
+        )
+        add(
+            rowEntry(
+                "uiAnimations", SettingsCategory.Interface, "界面过渡动画",
+                subtitle = "关闭后切页、面板展开收起等直接切换，不影响歌词滚动",
+                keywords = listOf("动画", "过渡", "减少动态", "流畅")
+            ) {
+                SettingSwitch(uiAnimationsEnabled, onChange = common::updateUiAnimationsEnabled)
             }
         )
 

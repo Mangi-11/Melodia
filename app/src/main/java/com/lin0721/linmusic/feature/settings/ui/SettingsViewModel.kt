@@ -131,6 +131,8 @@ class SettingsViewModel(
 
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
 
+    val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
+
     val lyricTextSize = settingsPreferences.lyricTextSize.asState(14)
 
     val lyricTextColor = settingsPreferences.lyricTextColor.asState("#FFFFFF")
@@ -378,6 +380,8 @@ class SettingsViewModel(
     fun updateTabletImmersiveMode(enabled: Boolean) = launchSave { settingsPreferences.saveTabletImmersiveMode(enabled) }
 
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
+
+    fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
 
     fun updateLyricTextSize(size: Int) = launchSave { settingsPreferences.saveLyricTextSize(size) }
 

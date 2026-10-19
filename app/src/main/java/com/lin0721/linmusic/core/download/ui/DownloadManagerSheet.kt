@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.ui.components.rememberDragReorderState
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -385,7 +386,7 @@ private fun EditableTaskList(
                     null
                 },
                 modifier = Modifier
-                    .then(if (dragging) Modifier.zIndex(1f) else Modifier.animateItem())
+                    .then(if (dragging) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier)
                     .graphicsLayer { translationY = if (dragging) reorder.dragOffset else 0f }
                     .background(if (dragging) SurfaceDark else Color.Transparent, RoundedCornerShape(12.dp))
             )

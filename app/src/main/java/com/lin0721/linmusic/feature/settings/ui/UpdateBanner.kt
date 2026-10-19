@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 import com.lin0721.linmusic.core.update.UpdateManager
 import com.lin0721.linmusic.core.update.UpdateUiState
 import com.lin0721.linmusic.core.ui.components.MiniStatusBanner
@@ -33,8 +35,8 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
 
     AnimatedVisibility(
         visible = isBannerVisible && state !is UpdateUiState.Idle,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
+        enter = uiEnter(expandVertically() + fadeIn()),
+        exit = uiExit(shrinkVertically() + fadeOut()),
         modifier = modifier
     ) {
         val onClick = { updateManager.showDialog() }

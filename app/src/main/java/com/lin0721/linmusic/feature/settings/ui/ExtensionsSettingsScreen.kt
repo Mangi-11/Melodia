@@ -48,6 +48,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
     val uiScalePercent by viewModel.uiScalePercent.collectAsStateWithLifecycle()
+    val uiAnimationsEnabled by viewModel.uiAnimationsEnabled.collectAsStateWithLifecycle()
     val isExpanded = LocalMelodiaWindowSizeClass.current == MelodiaWindowSizeClass.Expanded
 
     var showBottomBarSheet by remember { mutableStateOf(false) }
@@ -175,6 +176,13 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                             }
                         )
                     }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    SettingsSwitchRow(
+                        title = "界面过渡动画",
+                        subtitle = "关闭后切页、面板展开收起等直接切换，不影响歌词滚动",
+                        checked = uiAnimationsEnabled,
+                        onCheckedChange = { viewModel.updateUiAnimationsEnabled(it) }
+                    )
                 }
             }
         }

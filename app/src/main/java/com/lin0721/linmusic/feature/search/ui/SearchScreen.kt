@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -35,7 +34,9 @@ import com.lin0721.linmusic.core.ui.components.LoginBottomSheet
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.components.WebViewLoginScreen
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.playlist.ui.PlaylistSongOptionsSheet
 import com.lin0721.linmusic.feature.search.domain.SearchType
 import org.koin.androidx.compose.koinViewModel
@@ -54,6 +55,7 @@ fun SearchScreen(
     onPlaylistCategoryClick: (category: String) -> Unit = {},
     onOpenRecognition: () -> Unit = {}
 ) {
+    val motion = LocalUiMotion.current
     val discoveryState by viewModel.discoveryState.collectAsStateWithLifecycle()
     val featuredTrack by viewModel.featuredTrack.collectAsStateWithLifecycle()
     val inputState by viewModel.inputState.collectAsStateWithLifecycle()
@@ -141,8 +143,8 @@ fun SearchScreen(
             AnimatedContent(
                 targetState = mode,
                 transitionSpec = {
-                    fadeIn(tween(ANIM_DURATION, easing = FastOutSlowInEasing))
-                        .togetherWith(fadeOut(tween(ANIM_EXIT_DURATION)))
+                    fadeIn(motion.tween(ANIM_DURATION, easing = FastOutSlowInEasing))
+                        .togetherWith(fadeOut(motion.tween(ANIM_EXIT_DURATION)))
                 },
                 label = "search_mode_switch"
             ) { targetMode ->
@@ -246,8 +248,8 @@ fun SearchScreen(
 
         AnimatedVisibility(
             visible = showWebViewLogin,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             WebViewLoginScreen(
                 onClose = { showWebViewLogin = false },
