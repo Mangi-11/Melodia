@@ -73,6 +73,7 @@ fun NowPlayingPanel(
     val track = nowPlaying ?: return
     val detailState by playerViewModel.songDetailState.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
+    val isPlaying by controller.isPlaying.collectAsState()
     val podcast by playerViewModel.podcastState.collectAsState()
 
     val navigator = LocalDesktopNavigator.current
@@ -108,6 +109,7 @@ fun NowPlayingPanel(
                                     lines = detailState.lyrics,
                                     currentIndex = currentLyricIndex,
                                     base = base,
+                                    isPlaying = isPlaying,
                                     onSeek = playerViewModel::seekToTime,
                                     onOpenFullscreen = onOpenLyricsFullscreen,
                                     onOpenLyricsView = onOpenLyricsView,

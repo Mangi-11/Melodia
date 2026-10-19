@@ -76,6 +76,8 @@ import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import com.lin0721.linmusic.desktop.ui.track.CollectToPlaylistPopup
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private const val HOVER_SCALE = 1.1f
 private const val HOVER_SCALE_MS = 150
@@ -87,6 +89,8 @@ private val SideIconSize = 20.dp
 private val VolumeSliderWidth = 120.dp
 private val VolumeTooltipGap = 8.dp
 private const val NOT_SUPPORTED_MESSAGE = "暂未支持"
+// mpv 每秒上报几十次播放位置，进度条与秒级时间无需这么密，按此粒度取整去重
+private const val POSITION_STEP_MS = 250L
 
 @Composable
 fun PlayerBar(
@@ -113,7 +117,10 @@ fun PlayerBar(
     val nowPlaying by controller.nowPlaying.collectAsState()
     val isPlaying by controller.playWhenReady.collectAsState()
     val playMode by controller.playMode.collectAsState()
-    val position by controller.currentPosition.collectAsState()
+    val quantizedPosition = remember(controller) {
+        controller.currentPosition.map { it / POSITION_STEP_MS * POSITION_STEP_MS }.distinctUntilChanged()
+    }
+    val position by quantizedPosition.collectAsState(controller.currentPosition.value / POSITION_STEP_MS * POSITION_STEP_MS)
     val duration by controller.duration.collectAsState()
     val songDetail by playerViewModel.songDetailState.collectAsState()
     val podcast by playerViewModel.podcastState.collectAsState()

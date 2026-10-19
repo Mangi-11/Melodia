@@ -1,13 +1,8 @@
 package com.lin0721.linmusic.desktop.ui.nowplaying
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -37,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,12 +67,16 @@ import com.lin0721.linmusic.desktop.ui.icons.LyricCardIcons
 import com.lin0721.linmusic.desktop.ui.palette.darken
 import com.lin0721.linmusic.desktop.ui.palette.lighten
 import com.lin0721.linmusic.desktop.ui.palette.saturateIfChromatic
+import kotlinx.coroutines.delay
 
 private val MeshBlurRadius = 32.dp
 private val FadeHeight = 28.dp
 private val HeaderButtonSize = 28.dp
 private val HeaderIconSize = 22.dp
 private const val VIEWPORT_ANIM_MS = 300
+// 光斑漂移周期以十秒计，20fps 足够平滑，不必逐帧重绘模糊
+private const val MESH_TICK_MS = 50L
+private const val NANOS_PER_MS = 1_000_000L
 
 // 歌词卡：背景随封面主色着色并缓慢游走（移植自移动端）。
 // 折叠只看当前行与下一行，展开后显示六行；歌词随播放自动滚动，不响应滚轮，点击歌词行跳转到该处
@@ -85,31 +85,25 @@ fun LyricsCard(
     lines: List<LyricLine>,
     currentIndex: Int,
     base: Color,
+    isPlaying: Boolean,
     onSeek: (Long) -> Unit,
     onOpenFullscreen: () -> Unit,
     onOpenLyricsView: () -> Unit,
     modifier: Modifier = Modifier,
     sourceLabel: String? = null
 ) {
-    val transition = rememberInfiniteTransition(label = "lyricMesh")
-    val darkCenterX by transition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "meshX"
-    )
-    val darkCenterY by transition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(tween(13000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "meshY"
-    )
-    val darkRadiusScale by transition.animateFloat(
-        initialValue = 0.40f,
-        targetValue = 0.50f,
-        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "meshRadius"
-    )
+    // 漂移进度只在播放时推进，暂停即停在原处；仅在绘制阶段读取，不触发重组
+    var meshPhaseNanos by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        var last = System.nanoTime()
+        while (true) {
+            delay(MESH_TICK_MS)
+            val now = System.nanoTime()
+            meshPhaseNanos += now - last
+            last = now
+        }
+    }
     val vividBase = remember(base) { base.saturateIfChromatic(0.6f) }
     val fillColor = remember(vividBase) { vividBase.darken(0.35f) }
     val darkBlob = remember(vividBase) { vividBase.darken(0.15f) }
@@ -135,6 +129,10 @@ fun LyricsCard(
         backdrop = {
             Box(
                 Modifier.matchParentSize().blur(MeshBlurRadius).drawBehind {
+                    val phaseMs = meshPhaseNanos / NANOS_PER_MS
+                    val darkCenterX = pingPong(phaseMs, 15000L, 1.20f, 1.35f)
+                    val darkCenterY = pingPong(phaseMs, 13000L, 1.20f, 1.35f)
+                    val darkRadiusScale = pingPong(phaseMs, 10000L, 0.40f, 0.50f)
                     drawSingleHueMesh(
                         fill = fillColor,
                         darkBlob = darkBlob,
@@ -191,6 +189,13 @@ private fun HeaderIconButton(icon: ImageVector, description: String, revealed: B
             }
         }
     }
+}
+
+// 线性往返：等价于 LinearEasing 的 RepeatMode.Reverse 无限动画
+private fun pingPong(phaseMs: Long, periodMs: Long, from: Float, to: Float): Float {
+    val t = (phaseMs % (periodMs * 2)).toFloat() / periodMs
+    val fraction = if (t <= 1f) t else 2f - t
+    return from + (to - from) * fraction
 }
 
 // 单一色相的光斑：深色底 + 一枚渐隐光斑；fill 必须是明显压暗过的变体，不能直接传未处理的 base

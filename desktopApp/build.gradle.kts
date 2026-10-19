@@ -244,7 +244,13 @@ afterEvaluate {
             (task.name.startsWith("package") && task.name != "packageReleaseZip")
     }.configureEach { dependsOn(prepareNativeResources) }
     // gradle run 视为调试环境
-    tasks.named<JavaExec>("run") { jvmArgs("-Dmelodia.debug=true") }
+    tasks.named<JavaExec>("run") {
+        jvmArgs("-Dmelodia.debug=true")
+        // -PperfProbe 时由 Skiko 每 2 秒向 stdout 输出实际渲染帧率与长帧
+        if (providers.gradleProperty("perfProbe").isPresent) {
+            jvmArgs("-Dskiko.fps.enabled=true", "-Dskiko.fps.periodSeconds=2", "-Dskiko.fps.longFrames.show=true")
+        }
+    }
 }
 
 // 免安装版：把发布版程序目录打成 zip
