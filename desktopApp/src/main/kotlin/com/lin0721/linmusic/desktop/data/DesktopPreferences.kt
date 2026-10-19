@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.app.SavedWindow
 import com.lin0721.linmusic.desktop.app.WindowBounds
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
@@ -49,6 +50,7 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LYRICS_VIEW_FONT_SIZE = intPreferencesKey("lyrics_view_font_size")
         private val KEY_WINDOW_BOUNDS = stringPreferencesKey("window_bounds")
         private val KEY_WINDOW_MAXIMIZED = booleanPreferencesKey("window_maximized")
+        private val KEY_RENDER_BACKEND = stringPreferencesKey("render_backend")
     }
 
     val hotkeys: Flow<Map<HotkeyAction, HotkeyCombo?>> = dataStore.data.map { prefs ->
@@ -84,6 +86,9 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
     val lyricsViewFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRICS_VIEW_FONT_SIZE] ?: DEFAULT_LYRICS_VIEW_FONT_SIZE }.distinctUntilChanged()
 
     val audioDevice: Flow<String> = dataStore.data.map { it[KEY_AUDIO_DEVICE] ?: AUTO_AUDIO_DEVICE }.distinctUntilChanged()
+
+    // 下次启动才生效
+    val renderBackend: Flow<RenderBackend> = dataStore.data.map { RenderBackend.fromName(it[KEY_RENDER_BACKEND]) }.distinctUntilChanged()
 
     // 所选的缓存目录，缺省为默认位置；下次启动才生效
     val cacheRoot: Flow<String?> = dataStore.data.map { it[KEY_CACHE_ROOT]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
@@ -127,6 +132,10 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun saveCloseAction(action: CloseAction) {
         dataStore.edit { it[KEY_CLOSE_ACTION] = action.name }
+    }
+
+    suspend fun saveRenderBackend(backend: RenderBackend) {
+        dataStore.edit { it[KEY_RENDER_BACKEND] = backend.name }
     }
 
     suspend fun saveNowPlayingPanelOpen(open: Boolean) {

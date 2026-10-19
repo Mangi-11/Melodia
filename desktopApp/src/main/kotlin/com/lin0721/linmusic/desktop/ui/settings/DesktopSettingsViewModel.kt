@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheDirState
 import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CacheUsage
@@ -62,6 +63,7 @@ class DesktopSettingsViewModel(
     val closeAction = desktopPreferences.closeAction.asState(CloseAction.TRAY)
     val mediaKeysEnabled = desktopPreferences.mediaKeysEnabled.asState(true)
     val hotkeyMap = desktopPreferences.hotkeys.asState(HotkeyCombo.defaults)
+    val renderBackend = desktopPreferences.renderBackend.asState(RenderBackend.AUTO)
 
     val hotkeysSupported: Boolean = hotkeys.isSupported
     val failedHotkeys: StateFlow<Set<HotkeyAction>> = hotkeys.failed
@@ -107,6 +109,14 @@ class DesktopSettingsViewModel(
 
     fun updateCloseAction(action: CloseAction) {
         viewModelScope.launch { desktopPreferences.saveCloseAction(action) }
+    }
+
+    fun updateRenderBackend(backend: RenderBackend) {
+        if (backend == renderBackend.value) return
+        viewModelScope.launch {
+            desktopPreferences.saveRenderBackend(backend)
+            _messages.tryEmit("渲染方式已更改，重启后生效")
+        }
     }
 
     fun updateMediaKeysEnabled(enabled: Boolean) {

@@ -32,6 +32,7 @@ import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.update.data.UpdateRepository
 import com.lin0721.linmusic.desktop.app.AppInfo
+import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
@@ -133,6 +134,7 @@ internal fun settingsEntries(
     val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
     val cardLayout by common.fullPlayerCardLayout.collectAsState()
     val closeAction by desktop.closeAction.collectAsState()
+    val renderBackend by desktop.renderBackend.collectAsState()
     val mediaKeysEnabled by desktop.mediaKeysEnabled.collectAsState()
     val hotkeyMap by desktop.hotkeyMap.collectAsState()
     val failedHotkeys by desktop.failedHotkeys.collectAsState()
@@ -427,6 +429,20 @@ internal fun settingsEntries(
                 SettingSwitch(uiAnimationsEnabled, onChange = common::updateUiAnimationsEnabled)
             }
         )
+        add(
+            rowEntry(
+                "renderBackend", SettingsCategory.Interface, "渲染方式",
+                subtitle = "出现黑屏、闪烁或花屏时可尝试切换，重启后生效",
+                keywords = listOf("渲染", "gpu", "显卡", "硬件加速", "黑屏", "闪烁", "directx", "opengl")
+            ) {
+                SettingsDropdown(
+                    options = RenderBackend.entries,
+                    current = renderBackend,
+                    label = ::renderBackendLabel,
+                    onSelect = desktop::updateRenderBackend
+                )
+            }
+        )
 
         add(
             rowEntry(
@@ -599,6 +615,13 @@ private fun UiScaleSetting(percent: Int, onCommit: (Int) -> Unit) {
             modifier = Modifier.padding(top = 8.dp)
         )
     }
+}
+
+private fun renderBackendLabel(backend: RenderBackend): String = when (backend) {
+    RenderBackend.AUTO -> "自动"
+    RenderBackend.DIRECT3D -> "DirectX"
+    RenderBackend.OPENGL -> "OpenGL"
+    RenderBackend.SOFTWARE -> "软件渲染"
 }
 
 private fun logLevelLabel(level: AppLogger.LogLevel): String = when (level) {

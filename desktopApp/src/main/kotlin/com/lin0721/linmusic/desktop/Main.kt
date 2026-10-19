@@ -41,6 +41,8 @@ import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
 import com.lin0721.linmusic.desktop.app.DesktopCacheRoot
 import com.lin0721.linmusic.desktop.app.DesktopLogging
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.app.RenderBackend
+import com.lin0721.linmusic.desktop.app.applyRenderBackend
 import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
 import com.lin0721.linmusic.desktop.app.SingleInstance
 import com.lin0721.linmusic.desktop.app.WindowBounds
@@ -160,6 +162,7 @@ fun main() {
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
     val savedWindow = runBlocking { desktopPreferences.loadWindow() }
+    applyRenderBackend(runCatching { runBlocking { desktopPreferences.renderBackend.first() } }.getOrDefault(RenderBackend.AUTO))
     // 首帧即按已存缩放渲染，避免先以 100% 绘制再跳变
     val initialUiScalePercent = runCatching {
         runBlocking { settingsPreferences.uiScalePercent.first() }
