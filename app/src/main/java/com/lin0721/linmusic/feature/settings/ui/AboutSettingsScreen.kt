@@ -32,7 +32,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.update.UpdateManager
+import com.lin0721.linmusic.core.update.UpdateChecker
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,15 +71,15 @@ fun AboutSettingsView(viewModel: SettingsViewModel) {
         }
 
         item {
-            val updateManager: UpdateManager = koinInject()
+            val updateChecker: UpdateChecker = koinInject()
             val autoCheckUpdateEnabled by viewModel.autoCheckUpdateEnabled.collectAsStateWithLifecycle()
             val allowPrereleaseChannel by viewModel.allowPrereleaseChannel.collectAsStateWithLifecycle()
 
             SettingsGroupCard(SettingsSubMenu.ABOUT.sectionTitles[0]) {
                 SettingsRow(
                     title = "检查更新",
-                    subtitle = "前往 GitHub 获取最新安装包",
-                    onClick = { updateManager.checkForUpdate(manual = true) }
+                    subtitle = "发现新版本后前往 GitHub 发布页下载",
+                    onClick = { updateChecker.checkForUpdate(manual = true) }
                 )
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                 SettingsSwitchRow(

@@ -1,6 +1,7 @@
 package com.lin0721.linmusic
 
 import android.app.Application
+import android.app.NotificationManager
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import coil3.ImageLoader
@@ -15,7 +16,8 @@ import com.lin0721.linmusic.core.log.CrashHandler
 import com.lin0721.linmusic.core.log.init
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
-import com.lin0721.linmusic.core.update.UpdateManager
+import com.lin0721.linmusic.core.ui.components.ToastManager
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.vehicle.LeapmotorMediaClaim
 import com.lin0721.linmusic.core.vehicle.LeapmotorSteeringControl
 import com.lin0721.linmusic.di.downloadModule
@@ -45,7 +47,7 @@ import org.koin.core.logger.Level
 
 class MelodiaApplication : Application() {
 
-    private val updateManager: UpdateManager by inject()
+    private val updateChecker: UpdateChecker by inject()
     private val downloadWorkerFactory: DownloadWorkerFactory by inject()
     private val playbackController = inject<PlaybackController>()
     private val settingsPreferences: SettingsPreferences by inject()
@@ -82,7 +84,7 @@ class MelodiaApplication : Application() {
             androidContext(this@MelodiaApplication)
             modules(
                 networkModule, localModule, repositoryModule, sourceModule, lxPluginModule, viewModelModule, playerModule,
-                updateModule, downloadModule, localMusicModule, recognitionModule
+                updateModule(BuildConfig.VERSION_CODE), downloadModule, localMusicModule, recognitionModule
             )
         }
 
@@ -111,8 +113,15 @@ class MelodiaApplication : Application() {
 
         // 延迟几秒后台检查更新，避开启动关键路径；进程生命周期内只检查这一次
         CoroutineScope(Dispatchers.IO).launch {
+            launch { updateChecker.messages.collect(ToastManager::showToast) }
             delay(3000)
-            updateManager.checkForUpdate(manual = false)
+            updateChecker.checkForUpdate(manual = false)
         }
+        // 旧版内置下载遗留的更新通知渠道
+        getSystemService(NotificationManager::class.java)?.deleteNotificationChannel(LEGACY_UPDATE_CHANNEL_ID)
+    }
+
+    private companion object {
+        const val LEGACY_UPDATE_CHANNEL_ID = "app_update"
     }
 }

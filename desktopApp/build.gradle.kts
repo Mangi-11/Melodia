@@ -179,11 +179,15 @@ val prepareNativeResources by tasks.registering(Sync::class) {
 val generateAppInfo by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/appinfo")
     val version = desktopVersion
+    // 仅 CI 传入发布版本号的构建参与检查更新，本地构建的默认版本号不可信
+    val release = findProperty("releaseVersionName") != null
     inputs.property("version", version)
+    inputs.property("release", release)
     outputs.dir(outputDir)
     doLast {
         val dir = outputDir.get().asFile.apply { mkdirs() }
-        dir.resolve("app-info.properties").writeText("version=$version" + System.lineSeparator())
+        val sep = System.lineSeparator()
+        dir.resolve("app-info.properties").writeText("version=$version${sep}release=$release$sep")
     }
 }
 

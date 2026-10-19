@@ -51,6 +51,7 @@ import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.desktop.ui.update.UpdateDialog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -178,6 +179,18 @@ fun WindowScope.MelodiaDesktopApp(
             }
             WindowResizeHandles(enabled = !isMaximized && !isFullscreen)
         }
+    }
+
+    val availableUpdate by deps.updateChecker.availableUpdate.collectAsState()
+    val isUpdateDialogVisible by deps.updateChecker.isDialogVisible.collectAsState()
+    availableUpdate?.takeIf { isUpdateDialogVisible }?.let { info ->
+        UpdateDialog(
+            info = info,
+            onDismiss = deps.updateChecker::dismiss,
+            onHide = deps.updateChecker::hideDialog,
+            onIgnore = deps.updateChecker::ignoreCurrentVersion,
+            onMessage = state::showMessage
+        )
     }
 
     if (state.showLogin) {

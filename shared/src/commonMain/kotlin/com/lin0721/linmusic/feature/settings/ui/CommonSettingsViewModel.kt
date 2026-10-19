@@ -56,6 +56,8 @@ class CommonSettingsViewModel(
         settingsPreferences.fullPlayerCardLayout.asState(FullPlayerCardLayout.DEFAULT)
 
     val logLevel = settingsPreferences.logLevel.asState(AppLogger.LogLevel.WARN.name)
+    val autoCheckUpdateEnabled = settingsPreferences.autoCheckUpdateEnabled.asState(true)
+    val allowPrereleaseChannel = settingsPreferences.allowPrereleaseChannel.asState(false)
 
     fun updateWifiQuality(quality: String) = launchSave { settingsPreferences.saveWifiQuality(quality) }
 
@@ -99,6 +101,10 @@ class CommonSettingsViewModel(
     }
 
     // 立即生效，同时持久化供下次启动读取
+    fun updateAutoCheckUpdateEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveAutoCheckUpdateEnabled(enabled) }
+
+    fun updateAllowPrereleaseChannel(enabled: Boolean) = launchSave { settingsPreferences.saveAllowPrereleaseChannel(enabled) }
+
     fun updateLogLevel(level: AppLogger.LogLevel) {
         AppLogger.setLevel(level)
         launchSave { settingsPreferences.saveLogLevel(level.name) }

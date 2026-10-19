@@ -33,6 +33,7 @@ internal fun WindowScope.AppTitleBar(
     val searchInput by searchViewModel.inputState.collectAsState()
     val discovery by searchViewModel.discoveryState.collectAsState()
     val downloadTasks by deps.downloader.tasks.collectAsState()
+    val availableUpdate by deps.updateChecker.availableUpdate.collectAsState()
     LaunchedEffect(Unit) { searchViewModel.songHitsEnabled = true }
     val defaultKeyword = (discovery as? DiscoveryUiState.Success)?.defaultKeyword.orEmpty()
     val isMaximized = windowState.placement == WindowPlacement.Maximized
@@ -78,6 +79,7 @@ internal fun WindowScope.AppTitleBar(
         onProfileClick = { userProfile?.let { state.navigate(DesktopRoute.Profile(it.uid)) } },
         onRecentClick = { state.navigate(DesktopRoute.RecentPlay) },
         onSettingsClick = { state.navigate(DesktopRoute.Settings) },
+        hasUpdate = availableUpdate != null,
         onLogoutClick = deps.homeViewModel::logout,
         onMinimize = { windowState.isMinimized = true },
         onToggleMaximize = {

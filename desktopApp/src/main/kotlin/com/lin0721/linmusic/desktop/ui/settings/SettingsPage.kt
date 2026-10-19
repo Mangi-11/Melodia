@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
@@ -62,6 +63,7 @@ fun SettingsPage(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
     lxPlugins: LxPluginSettingsViewModel,
+    updateChecker: UpdateChecker,
     modifier: Modifier = Modifier
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -72,7 +74,7 @@ fun SettingsPage(
     LaunchedEffect(desktop) { desktop.refresh() }
     LaunchedEffect(desktop) { desktop.messages.collect { navigator.showMessage(it) } }
 
-    val entries = settingsEntries(common, desktop, lxPlugins)
+    val entries = settingsEntries(common, desktop, lxPlugins, updateChecker)
     var query by remember { mutableStateOf("") }
     val searching = query.isNotBlank()
     val sections = SettingsCategory.entries.mapNotNull { category ->

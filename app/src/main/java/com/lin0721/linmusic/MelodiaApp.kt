@@ -79,8 +79,7 @@ import com.lin0721.linmusic.core.ui.theme.BackgroundBlack
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.update.UpdateManager
-import com.lin0721.linmusic.core.update.UpdateUiState
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
@@ -770,17 +769,16 @@ fun MelodiaApp() {
         MelodiaToastHost(toastMessage = toastMessage)
 
         // 6. 全局更新弹窗，由更新横幅或设置页手动检查打开
-        val updateManager: UpdateManager = koinInject()
-        val updateState by updateManager.uiState.collectAsStateWithLifecycle()
-        val isDialogVisible by updateManager.isDialogVisible.collectAsStateWithLifecycle()
-        if (isDialogVisible && updateState !is UpdateUiState.Idle) {
+        val updateChecker: UpdateChecker = koinInject()
+        val availableUpdate by updateChecker.availableUpdate.collectAsStateWithLifecycle()
+        val isUpdateDialogVisible by updateChecker.isDialogVisible.collectAsStateWithLifecycle()
+        val shownUpdate = availableUpdate
+        if (isUpdateDialogVisible && shownUpdate != null) {
             UpdateDialog(
-                state = updateState,
-                onDismiss = { updateManager.dismiss() },
-                onHide = { updateManager.hideDialog() },
-                onIgnore = { updateManager.ignoreCurrentVersion() },
-                onStartDownload = { updateManager.startDownload() },
-                onInstall = { updateManager.retryInstall() }
+                info = shownUpdate,
+                onDismiss = { updateChecker.dismiss() },
+                onHide = { updateChecker.hideDialog() },
+                onIgnore = { updateChecker.ignoreCurrentVersion() }
             )
         }
 
