@@ -5,7 +5,7 @@
 
 
 [![GitHub Release](https://img.shields.io/github/v/release/rinchao0721/Melodia?style=flat-square&color=blue)](https://github.com/rinchao0721/Melodia/releases)
-[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green?style=flat-square)](https://developer.android.com)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B%20%7C%20Windows-green?style=flat-square)](https://github.com/rinchao0721/Melodia/releases)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-purple?style=flat-square)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 </div>
@@ -34,6 +34,18 @@
   <img src="docs/screenshots/tablet-landscape-panel.webp" width="32%" alt="平板横屏播放侧栏" />
   <img src="docs/screenshots/tablet-fullscreen-lyrics.webp" width="32%" alt="平板全屏播放页歌词" />
   <img src="docs/screenshots/tablet-fullscreen-info.webp" width="32%" alt="平板全屏播放页歌曲信息" />
+</div>
+
+### 桌面端
+
+<div align="center">
+  <img src="docs/screenshots/desktop-home.webp" width="49%" alt="桌面端首页" />
+  <img src="docs/screenshots/desktop-library.webp" width="49%" alt="桌面端音乐库" />
+</div>
+<div align="center">
+  <img src="docs/screenshots/desktop-lyrics.webp" width="32%" alt="桌面端歌词" />
+  <img src="docs/screenshots/desktop-artist.webp" width="32%" alt="桌面端歌手页" />
+  <img src="docs/screenshots/desktop-playlist.webp" width="32%" alt="桌面端歌单页" />
 </div>
 
 ---
