@@ -422,7 +422,12 @@ private fun PlaylistContent(
         onPrepareCollect = viewModel::prepareCollectDialog,
         onSaveCollect = viewModel::savePlaylistCollection,
         onCreateAndAdd = viewModel::createPlaylistAndAddSong,
-        onRemove = removeTrack
+        onRemove = removeTrack,
+        onReduceRecommend = if (playlist.id == DAILY_RECOMMEND_ID && navigator.isLoggedIn) {
+            { track -> viewModel.reduceDailyRecommend(track.id) }
+        } else {
+            null
+        }
     )
 
     val commentsHost = remember(viewModel) { viewModel.asCommentsHost() }

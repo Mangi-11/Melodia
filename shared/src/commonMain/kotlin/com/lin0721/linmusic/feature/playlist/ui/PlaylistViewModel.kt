@@ -617,6 +617,20 @@ class PlaylistViewModel(
         }
     }
 
+    // 日推“减少推荐”：成功后仅把该歌从日推列表移除，不打断正在播放的歌曲
+    fun reduceDailyRecommend(trackId: Long) {
+        viewModelScope.launch {
+            homeRepository.dislikeDailySong(trackId).collect { result ->
+                result.onSuccess {
+                    _toastEvent.emit("已减少此类推荐")
+                    dropTracksFromState(-1L, setOf(trackId))
+                }.onFailure { e ->
+                    _toastEvent.emit(e.toUserMessage(resourceProvider))
+                }
+            }
+        }
+    }
+
     private fun dropTracksFromState(playlistId: Long, trackIds: Set<Long>) {
         _uiState.update { state ->
             if (state is PlaylistUiState.Success && state.playlist.id == playlistId) {

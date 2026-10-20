@@ -641,6 +641,7 @@ fun PlaylistScreen(
                     onSelectedHistoryDateChange = { selectedHistoryDate = it },
                     onLoadHistoryDetail = { viewModel.loadHistoryDetail(it) },
                     onLoadDailyRecommend = { viewModel.loadPlaylist(-1L) },
+                    onReduceRecommend = viewModel::reduceDailyRecommend,
                     onCreatorClick = onNavigateToProfile,
                     selectionUi = TrackSelectionUi(
                         active = selection.active,

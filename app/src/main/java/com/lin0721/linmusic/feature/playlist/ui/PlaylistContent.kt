@@ -96,6 +96,7 @@ fun PlaylistContent(
     onSelectedHistoryDateChange: (String) -> Unit = {},
     onLoadHistoryDetail: (String) -> Unit = {},
     onLoadDailyRecommend: () -> Unit = {},
+    onReduceRecommend: (Long) -> Unit = {},
     canRemoveFromPlaylist: Boolean = false,
     onRemoveFromPlaylist: (Long) -> Unit = {},
     onAddMusicClick: () -> Unit = {},
@@ -510,7 +511,12 @@ fun PlaylistContent(
             onRequireLogin = onRequireLogin,
             canRemoveFromPlaylist = canRemoveFromPlaylist,
             onRemoveFromPlaylist = onRemoveFromPlaylist,
-            onDownloadClick = onDownloadSongClick
+            onDownloadClick = onDownloadSongClick,
+            onReduceRecommend = if (playlist.id == -1L && selectedHistoryDate == "今天" && isLoggedIn) {
+                { onReduceRecommend(it.id) }
+            } else {
+                null
+            }
         )
     }
 

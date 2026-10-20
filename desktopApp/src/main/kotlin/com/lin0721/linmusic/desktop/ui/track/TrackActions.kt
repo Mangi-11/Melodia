@@ -26,7 +26,9 @@ class TrackActions(
     val onCreateCollect: (Track) -> Unit,
     val onDownload: (Track) -> Unit,
     // 仅自建歌单传入，菜单才出现“从歌单中删除”
-    val onRemove: ((Track) -> Unit)? = null
+    val onRemove: ((Track) -> Unit)? = null,
+    // 仅每日推荐传入，菜单才出现“减少推荐”
+    val onReduceRecommend: ((Track) -> Unit)? = null
 )
 
 @Composable
@@ -38,7 +40,8 @@ fun rememberTrackActions(
     onPrepareCollect: (songId: Long) -> Unit,
     onSaveCollect: (songId: Long, items: List<PlaylistCollectItem>) -> Unit,
     onCreateAndAdd: (name: String, songId: Long) -> Unit,
-    onRemove: ((Track) -> Unit)? = null
+    onRemove: ((Track) -> Unit)? = null,
+    onReduceRecommend: ((Track) -> Unit)? = null
 ): TrackActions {
     val navigator = LocalDesktopNavigator.current
     var creatingFor by remember { mutableStateOf<Track?>(null) }
@@ -67,6 +70,7 @@ fun rememberTrackActions(
         onToggleCollect = { track, item -> onSaveCollect(track.id, listOf(item)) },
         onCreateCollect = { track -> requireLogin { creatingFor = track } },
         onDownload = navigator.downloadTrack,
-        onRemove = onRemove
+        onRemove = onRemove,
+        onReduceRecommend = onReduceRecommend
     )
 }

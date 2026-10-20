@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.HeartBroken
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -55,6 +56,8 @@ fun PlaylistSongOptionsSheet(
     canRemoveFromPlaylist: Boolean = false,
     onRemoveFromPlaylist: (Long) -> Unit = {},
     onDownloadClick: ((Track) -> Unit)? = null,
+    // 仅今天的日推传入，菜单才出现“减少推荐”
+    onReduceRecommend: ((Track) -> Unit)? = null,
     // 额外操作项
     extraOptions: @Composable ColumnScope.() -> Unit = {}
 ) {
@@ -173,6 +176,17 @@ fun PlaylistSongOptionsSheet(
                         onClick = {
                             onDismiss()
                             onDownloadClick(track)
+                        }
+                    )
+                }
+
+                if (onReduceRecommend != null) {
+                    OptionRow(
+                        icon = Icons.Default.HeartBroken,
+                        text = "减少推荐",
+                        onClick = {
+                            onDismiss()
+                            onReduceRecommend(track)
                         }
                     )
                 }

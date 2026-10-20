@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.HeartBroken
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
@@ -403,6 +404,12 @@ private fun TrackMenu(
             onDismiss()
             actions.onDownload(track)
         })
+        actions.onReduceRecommend?.let { reduce ->
+            MenuItem("减少推荐", icon = Icons.Rounded.HeartBroken, onClick = {
+                onDismiss()
+                reduce(track)
+            })
+        }
         MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
             onDismiss()
             val ok = copySongLink(track.id)
