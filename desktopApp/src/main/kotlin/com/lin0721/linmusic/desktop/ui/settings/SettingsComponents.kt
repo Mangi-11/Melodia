@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -100,7 +102,8 @@ internal fun <T> SettingsDropdown(
     current: T,
     label: (T) -> String,
     onSelect: (T) -> Unit,
-    menuWidth: Dp = 168.dp
+    menuWidth: Dp = 168.dp,
+    leading: (@Composable (T) -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -112,6 +115,10 @@ internal fun <T> SettingsDropdown(
                 .padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (leading != null) {
+                leading(current)
+                Spacer(Modifier.width(8.dp))
+            }
             Text(label(current), color = DesktopColors.TextPrimary, fontSize = 12.sp)
             Icon(Icons.Rounded.ArrowDropDown, null, tint = DesktopColors.TextGray, modifier = Modifier.size(18.dp))
         }
@@ -119,6 +126,7 @@ internal fun <T> SettingsDropdown(
             options.forEach { option ->
                 SimpleMenuItem(
                     text = label(option),
+                    leading = leading?.let { { it(option) } },
                     trailing = if (option == current) {
                         { Icon(Icons.Rounded.Check, null, tint = DesktopColors.Accent, modifier = Modifier.size(16.dp)) }
                     } else {

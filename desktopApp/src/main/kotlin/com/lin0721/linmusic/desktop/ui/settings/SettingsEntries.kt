@@ -5,8 +5,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -34,12 +38,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricAlign
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricColorOption
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricPalette
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricSecondary
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricShadow
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.update.UpdateChecker
@@ -115,6 +126,168 @@ private val QualityOptions = listOf(
 private val ActionSpacing = Arrangement.spacedBy(8.dp)
 private const val CARD_LAYOUT_EXPAND_MS = 200
 
+private const val DESKTOP_LYRIC_GROUP = "桌面歌词"
+private val DesktopLyricFontSizes = listOf(20, 24, 28, 32, 36, 40, 48)
+private val DesktopLyricBackgroundAlphas = listOf(0, 20, 40, 60, 80)
+
+private fun desktopLyricEntries(
+    style: FloatingLyricStyle,
+    locked: Boolean,
+    desktop: DesktopSettingsViewModel
+): List<SettingsEntry> {
+    val update = desktop::updateDesktopLyricStyle
+    return listOf(
+        rowEntry(
+            "desktopLyricLocked", SettingsCategory.Interface, "锁定桌面歌词",
+            subtitle = "锁定后鼠标穿透歌词窗口；也可在托盘菜单或双击歌词切换",
+            keywords = listOf("歌词", "锁定", "穿透", "解锁"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(locked, onChange = desktop::updateDesktopLyricLocked)
+        },
+        rowEntry(
+            "desktopLyricFontSize", SettingsCategory.Interface, "字号",
+            keywords = listOf("歌词", "字号", "大小"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = DesktopLyricFontSizes,
+                current = style.fontSizeSp,
+                label = { "$it sp" },
+                onSelect = { size -> update { it.copy(fontSizeSp = size) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricPlayedColor", SettingsCategory.Interface, "已播颜色",
+            subtitle = "逐字歌词唱过的部分与普通歌词的当前行",
+            keywords = listOf("歌词", "颜色", "高亮"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricPalette.played, style.playedColor) { hex -> update { it.copy(playedColor = hex) } }
+        },
+        rowEntry(
+            "desktopLyricUnplayedColor", SettingsCategory.Interface, "未播颜色",
+            keywords = listOf("歌词", "颜色"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricPalette.unplayed, style.unplayedColor) { hex -> update { it.copy(unplayedColor = hex) } }
+        },
+        rowEntry(
+            "desktopLyricSecondary", SettingsCategory.Interface, "第二行",
+            keywords = listOf("歌词", "翻译", "罗马音", "下一句", "双行"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricSecondary.entries,
+                current = style.secondary,
+                label = { it.label },
+                onSelect = { mode -> update { it.copy(secondary = mode) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricAlign", SettingsCategory.Interface, "对齐方式",
+            keywords = listOf("歌词", "对齐", "居中"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricAlign.entries,
+                current = style.align,
+                label = { it.label },
+                onSelect = { align -> update { it.copy(align = align) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricBackground", SettingsCategory.Interface, "背景不透明度",
+            subtitle = "0% 时只显示文字",
+            keywords = listOf("歌词", "背景", "透明"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = DesktopLyricBackgroundAlphas,
+                current = style.backgroundAlpha,
+                label = { "$it%" },
+                onSelect = { alpha -> update { it.copy(backgroundAlpha = alpha) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadow", SettingsCategory.Interface, "文字阴影",
+            subtitle = "浅色背景上也能看清歌词",
+            keywords = listOf("歌词", "阴影", "描边"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(style.shadow, onChange = { on -> update { it.copy(shadow = on) } })
+        },
+        *shadowEntries(style, update).toTypedArray(),
+        rowEntry(
+            "desktopLyricBold", SettingsCategory.Interface, "粗体",
+            keywords = listOf("歌词", "粗体", "字重"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(style.bold, onChange = { on -> update { it.copy(bold = on) } })
+        }
+    )
+}
+
+// 阴影开启时才出现的细项
+private fun shadowEntries(style: FloatingLyricStyle, update: ((FloatingLyricStyle) -> FloatingLyricStyle) -> Unit): List<SettingsEntry> {
+    if (!style.shadow) return emptyList()
+    return listOf(
+        rowEntry(
+            "desktopLyricShadowAlpha", SettingsCategory.Interface, "阴影强度",
+            keywords = listOf("歌词", "阴影", "不透明度"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricShadow.alphas,
+                current = style.shadowAlpha,
+                label = { "$it%" },
+                onSelect = { alpha -> update { it.copy(shadowAlpha = alpha) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadowBlur", SettingsCategory.Interface, "阴影模糊",
+            keywords = listOf("歌词", "阴影", "模糊", "发散"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricShadow.blursDp,
+                current = style.shadowBlurDp,
+                label = FloatingLyricShadow::blurLabel,
+                onSelect = { blur -> update { it.copy(shadowBlurDp = blur) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadowColor", SettingsCategory.Interface, "阴影颜色",
+            subtitle = "白色阴影在深色背景上呈发光效果",
+            keywords = listOf("歌词", "阴影", "颜色", "发光"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricShadow.colors, style.shadowColor) { hex -> update { it.copy(shadowColor = hex) } }
+        }
+    )
+}
+
+@Composable
+private fun LyricColorDropdown(options: List<FloatingLyricColorOption>, current: String, onSelect: (String) -> Unit) {
+    SettingsDropdown(
+        options = options.map { it.hex },
+        current = current,
+        label = { FloatingLyricPalette.labelOf(it, options) },
+        onSelect = onSelect,
+        leading = { hex -> ColorSwatch(hex) }
+    )
+}
+
+// 深色菜单上纯黑色块看不清，统一描一圈浅色边
+@Composable
+private fun ColorSwatch(hex: String) {
+    Box(
+        Modifier.size(14.dp).clip(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .background(Color((FloatingLyricPalette.parseArgb(hex) ?: 0xFFFFFFFFL).toInt()))
+    )
+}
+
 @Composable
 internal fun settingsEntries(
     common: CommonSettingsViewModel,
@@ -150,6 +323,8 @@ internal fun settingsEntries(
     val cardLayout by common.fullPlayerCardLayout.collectAsState()
     val closeAction by desktop.closeAction.collectAsState()
     val renderBackend by desktop.renderBackend.collectAsState()
+    val lyricStyle by desktop.desktopLyricStyle.collectAsState()
+    val lyricLocked by desktop.desktopLyricLocked.collectAsState()
     val mediaKeysEnabled by desktop.mediaKeysEnabled.collectAsState()
     val hotkeyMap by desktop.hotkeyMap.collectAsState()
     val failedHotkeys by desktop.failedHotkeys.collectAsState()
@@ -403,11 +578,13 @@ internal fun settingsEntries(
         add(
             rowEntry(
                 "desktopLyric", SettingsCategory.Interface, "显示桌面歌词",
-                keywords = listOf("歌词", "桌面", "悬浮")
+                keywords = listOf("歌词", "桌面", "悬浮"),
+                group = DESKTOP_LYRIC_GROUP
             ) {
                 SettingSwitch(showDesktopLyric, onChange = common::updateShowDesktopLrc)
             }
         )
+        if (showDesktopLyric) addAll(desktopLyricEntries(lyricStyle, lyricLocked, desktop))
         add(
             SettingsEntry(
                 key = "cardLayout",

@@ -64,7 +64,10 @@ fun SettingsPage(
     desktop: DesktopSettingsViewModel,
     lxPlugins: LxPluginSettingsViewModel,
     updateChecker: UpdateChecker,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // SettingsCategory.name，从外部入口打开时定位到该分区
+    focusCategory: String? = null,
+    onFocusConsumed: () -> Unit = {}
 ) {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
@@ -98,6 +101,20 @@ fun SettingsPage(
             val position = scrollState.value + spyOffsetPx
             currentSections.map { it.first }.lastOrNull { (sectionTops[it] ?: Int.MAX_VALUE) <= position }
                 ?: currentSections.firstOrNull()?.first
+        }
+    }
+
+    // 分区位置测量出来后才能滚动
+    val focusTarget = focusCategory?.let { name -> SettingsCategory.entries.firstOrNull { it.name == name } }
+    val focusTop = focusTarget?.let { sectionTops[it] }
+    LaunchedEffect(focusCategory, focusTop) {
+        if (focusCategory == null) return@LaunchedEffect
+        if (focusTarget == null) {
+            onFocusConsumed()
+        } else if (focusTop != null) {
+            query = ""
+            scrollState.scrollTo(focusTop)
+            onFocusConsumed()
         }
     }
 

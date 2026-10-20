@@ -71,6 +71,7 @@ fun WindowScope.MelodiaDesktopApp(
     fullscreen: FullscreenState,
     lyricsView: LyricsViewState,
     searchFocusRequests: Flow<Unit>,
+    settingsRequests: Flow<String>,
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -112,6 +113,14 @@ fun WindowScope.MelodiaDesktopApp(
     }
     // 播放组件加载失败时启动就提示一次，之后每次尝试播放再提示
     LaunchedEffect(Unit) { controller.unavailableReason?.let { snackbarHostState.showSnackbar(it) } }
+    // 桌面歌词控制栏的设置按钮：收起全屏歌词后打开设置页并定位分区
+    LaunchedEffect(state) {
+        settingsRequests.collect { category ->
+            lyricsView.close()
+            state.settingsFocus = category
+            state.navigate(DesktopRoute.Settings)
+        }
+    }
     LaunchedEffect(state) { appMessages(deps, state).collect { snackbarHostState.showSnackbar(it) } }
 
     val navigator = desktopNavigator(state, deps, userProfile != null, downloadLevel, defaultPlaylistPrivate)

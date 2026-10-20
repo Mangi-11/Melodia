@@ -112,7 +112,9 @@ internal fun RouteContent(
             common = deps.commonSettingsViewModel,
             desktop = deps.desktopSettingsViewModel,
             lxPlugins = deps.lxPluginSettingsViewModel,
-            updateChecker = deps.updateChecker
+            updateChecker = deps.updateChecker,
+            focusCategory = state.settingsFocus,
+            onFocusConsumed = { state.settingsFocus = null }
         )
         DesktopRoute.Search -> SearchPage(
             viewModel = deps.searchViewModel,

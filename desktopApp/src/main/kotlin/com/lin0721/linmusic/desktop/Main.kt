@@ -68,6 +68,7 @@ import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
+import com.lin0721.linmusic.desktop.ui.settings.SettingsCategory
 import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
 import com.lin0721.linmusic.desktop.ui.shell.TaskbarThumbnailEffect
@@ -104,6 +105,9 @@ private const val VOLUME_STEP = 5
 private const val SEEK_STEP_MS = 5_000L
 private const val EXIT_ANIMATION_MS = 250L
 private const val WINDOW_SAVE_DEBOUNCE_MS = 400L
+
+// 判断桌面歌词上次位置是否仍在屏幕内时假定的窗口高度
+private const val LYRIC_REACH_HEIGHT = 100
 private val DEFAULT_WINDOW_SIZE = DpSize(1280.dp, 800.dp)
 
 private data class WindowSnapshot(
@@ -159,6 +163,7 @@ fun main() {
     val windowEffects = koin.get<WindowEffects>()
     val taskbarThumbnail = koin.get<TaskbarThumbnailService>()
     val searchFocusRequests = Channel<Unit>(Channel.CONFLATED)
+    val settingsRequests = Channel<String>(Channel.CONFLATED)
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
     val savedWindow = runBlocking { desktopPreferences.loadWindow() }
@@ -172,6 +177,8 @@ fun main() {
     }.getOrDefault(true)
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
+    val restoredLyricBounds = runCatching { runBlocking { desktopPreferences.loadDesktopLyricBounds() } }.getOrNull()
+        ?.takeIf { WindowBounds(it.x, it.y, it.width, LYRIC_REACH_HEIGHT).isReachableOn(currentScreenBounds()) }
 
     application {
         val scope = rememberCoroutineScope()
@@ -182,7 +189,10 @@ fun main() {
             isMainVisible = true
             bringToFrontRequest++
         }
-        var isLyricLocked by remember { mutableStateOf(false) }
+        val isLyricLocked by desktopPreferences.desktopLyricLocked.collectAsState(initial = false)
+        val setLyricLocked: (Boolean) -> Unit = { locked ->
+            scope.launch { desktopPreferences.saveDesktopLyricLocked(locked) }
+        }
         val showDesktopLyric by settingsPreferences.showDesktopLrc.collectAsState(initial = false)
         val uiScalePercent by settingsPreferences.uiScalePercent.collectAsState(initial = initialUiScalePercent)
         val uiScaleFactor = UiScale.toFactor(uiScalePercent)
@@ -235,6 +245,7 @@ fun main() {
                 HotkeyAction.VolumeUp -> adjustVolume(VOLUME_STEP)
                 HotkeyAction.VolumeDown -> adjustVolume(-VOLUME_STEP)
                 HotkeyAction.ToggleDesktopLyric -> setDesktopLyric(!showDesktopLyric)
+                HotkeyAction.ToggleDesktopLyricLock -> setLyricLocked(!isLyricLocked)
             }
         }
         DisposableEffect(Unit) {
@@ -265,7 +276,7 @@ fun main() {
                 TrayMenuEntry.Action("下一首", controller::playNext),
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Toggle("桌面歌词", showDesktopLyric, setDesktopLyric),
-                TrayMenuEntry.Toggle("锁定桌面歌词", isLyricLocked) { isLyricLocked = it }
+                TrayMenuEntry.Toggle("锁定桌面歌词", isLyricLocked, setLyricLocked)
                     .takeIf { windowEffects.supportsClickThrough },
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Action("退出", exit)
@@ -380,6 +391,7 @@ fun main() {
                         fullscreen = fullscreen,
                         lyricsView = lyricsView,
                         searchFocusRequests = searchFocusRequests.receiveAsFlow(),
+                        settingsRequests = settingsRequests.receiveAsFlow(),
                         onClose = closeMainWindow
                     )
                 }
@@ -389,10 +401,16 @@ fun main() {
         DesktopLyricWindow(
             visible = showDesktopLyric && !isExiting,
             locked = isLyricLocked,
+            initialBounds = restoredLyricBounds,
             playerViewModel = playerViewModel,
             controller = controller,
-            settingsPreferences = settingsPreferences,
+            desktopPreferences = desktopPreferences,
             windowEffects = windowEffects,
+            onLockedChange = setLyricLocked,
+            onOpenSettings = {
+                showMainWindow()
+                settingsRequests.trySend(SettingsCategory.Interface.name)
+            },
             onHide = { setDesktopLyric(false) }
         )
     }

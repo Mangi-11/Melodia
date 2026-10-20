@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricAlign
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricSecondary
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.app.SavedWindow
 import com.lin0721.linmusic.desktop.app.WindowBounds
@@ -51,6 +54,67 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_WINDOW_BOUNDS = stringPreferencesKey("window_bounds")
         private val KEY_WINDOW_MAXIMIZED = booleanPreferencesKey("window_maximized")
         private val KEY_RENDER_BACKEND = stringPreferencesKey("render_backend")
+        private val KEY_DESKTOP_LYRIC_BOUNDS = stringPreferencesKey("desktop_lyric_bounds")
+        private val KEY_DESKTOP_LYRIC_LOCKED = booleanPreferencesKey("desktop_lyric_locked")
+        private val KEY_DESKTOP_LYRIC_FONT_SIZE = intPreferencesKey("desktop_lyric_font_size")
+        private val KEY_DESKTOP_LYRIC_PLAYED_COLOR = stringPreferencesKey("desktop_lyric_played_color")
+        private val KEY_DESKTOP_LYRIC_UNPLAYED_COLOR = stringPreferencesKey("desktop_lyric_unplayed_color")
+        private val KEY_DESKTOP_LYRIC_SHADOW = booleanPreferencesKey("desktop_lyric_shadow")
+        private val KEY_DESKTOP_LYRIC_BACKGROUND_ALPHA = intPreferencesKey("desktop_lyric_background_alpha")
+        private val KEY_DESKTOP_LYRIC_ALIGN = stringPreferencesKey("desktop_lyric_align")
+        private val KEY_DESKTOP_LYRIC_SECONDARY = stringPreferencesKey("desktop_lyric_secondary")
+        private val KEY_DESKTOP_LYRIC_BOLD = booleanPreferencesKey("desktop_lyric_bold")
+        private val KEY_DESKTOP_LYRIC_SHADOW_ALPHA = intPreferencesKey("desktop_lyric_shadow_alpha")
+        private val KEY_DESKTOP_LYRIC_SHADOW_BLUR = intPreferencesKey("desktop_lyric_shadow_blur")
+        private val KEY_DESKTOP_LYRIC_SHADOW_COLOR = stringPreferencesKey("desktop_lyric_shadow_color")
+
+        val DEFAULT_DESKTOP_LYRIC_STYLE = FloatingLyricStyle(fontSizeSp = 28)
+    }
+
+    val desktopLyricStyle: Flow<FloatingLyricStyle> = dataStore.data.map { prefs ->
+        val default = DEFAULT_DESKTOP_LYRIC_STYLE
+        FloatingLyricStyle(
+            fontSizeSp = prefs[KEY_DESKTOP_LYRIC_FONT_SIZE] ?: default.fontSizeSp,
+            playedColor = prefs[KEY_DESKTOP_LYRIC_PLAYED_COLOR] ?: default.playedColor,
+            unplayedColor = prefs[KEY_DESKTOP_LYRIC_UNPLAYED_COLOR] ?: default.unplayedColor,
+            shadow = prefs[KEY_DESKTOP_LYRIC_SHADOW] ?: default.shadow,
+            backgroundAlpha = (prefs[KEY_DESKTOP_LYRIC_BACKGROUND_ALPHA] ?: default.backgroundAlpha).coerceIn(0, 100),
+            align = FloatingLyricAlign.fromKey(prefs[KEY_DESKTOP_LYRIC_ALIGN]),
+            secondary = FloatingLyricSecondary.fromKey(prefs[KEY_DESKTOP_LYRIC_SECONDARY]),
+            bold = prefs[KEY_DESKTOP_LYRIC_BOLD] ?: default.bold,
+            shadowAlpha = (prefs[KEY_DESKTOP_LYRIC_SHADOW_ALPHA] ?: default.shadowAlpha).coerceIn(0, 100),
+            shadowBlurDp = (prefs[KEY_DESKTOP_LYRIC_SHADOW_BLUR] ?: default.shadowBlurDp).coerceAtLeast(0),
+            shadowColor = prefs[KEY_DESKTOP_LYRIC_SHADOW_COLOR] ?: default.shadowColor
+        )
+    }.distinctUntilChanged()
+
+    val desktopLyricLocked: Flow<Boolean> = dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }.distinctUntilChanged()
+
+    suspend fun loadDesktopLyricBounds(): DesktopLyricBounds? =
+        dataStore.data.first()[KEY_DESKTOP_LYRIC_BOUNDS]?.let(DesktopLyricBounds::decode)
+
+    suspend fun saveDesktopLyricBounds(bounds: DesktopLyricBounds) {
+        dataStore.edit { it[KEY_DESKTOP_LYRIC_BOUNDS] = bounds.encode() }
+    }
+
+    suspend fun saveDesktopLyricLocked(locked: Boolean) {
+        dataStore.edit { it[KEY_DESKTOP_LYRIC_LOCKED] = locked }
+    }
+
+    suspend fun saveDesktopLyricStyle(style: FloatingLyricStyle) {
+        dataStore.edit { prefs ->
+            prefs[KEY_DESKTOP_LYRIC_FONT_SIZE] = style.fontSizeSp
+            prefs[KEY_DESKTOP_LYRIC_PLAYED_COLOR] = style.playedColor
+            prefs[KEY_DESKTOP_LYRIC_UNPLAYED_COLOR] = style.unplayedColor
+            prefs[KEY_DESKTOP_LYRIC_SHADOW] = style.shadow
+            prefs[KEY_DESKTOP_LYRIC_BACKGROUND_ALPHA] = style.backgroundAlpha.coerceIn(0, 100)
+            prefs[KEY_DESKTOP_LYRIC_ALIGN] = style.align.key
+            prefs[KEY_DESKTOP_LYRIC_SECONDARY] = style.secondary.key
+            prefs[KEY_DESKTOP_LYRIC_BOLD] = style.bold
+            prefs[KEY_DESKTOP_LYRIC_SHADOW_ALPHA] = style.shadowAlpha.coerceIn(0, 100)
+            prefs[KEY_DESKTOP_LYRIC_SHADOW_BLUR] = style.shadowBlurDp.coerceAtLeast(0)
+            prefs[KEY_DESKTOP_LYRIC_SHADOW_COLOR] = style.shadowColor
+        }
     }
 
     val hotkeys: Flow<Map<HotkeyAction, HotkeyCombo?>> = dataStore.data.map { prefs ->

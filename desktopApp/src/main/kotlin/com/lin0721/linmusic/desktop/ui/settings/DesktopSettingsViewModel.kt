@@ -3,6 +3,7 @@ package com.lin0721.linmusic.desktop.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.desktop.app.DesktopPaths
 import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheDirState
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,6 +66,8 @@ class DesktopSettingsViewModel(
     val mediaKeysEnabled = desktopPreferences.mediaKeysEnabled.asState(true)
     val hotkeyMap = desktopPreferences.hotkeys.asState(HotkeyCombo.defaults)
     val renderBackend = desktopPreferences.renderBackend.asState(RenderBackend.AUTO)
+    val desktopLyricStyle = desktopPreferences.desktopLyricStyle.asState(DesktopPreferences.DEFAULT_DESKTOP_LYRIC_STYLE)
+    val desktopLyricLocked = desktopPreferences.desktopLyricLocked.asState(false)
 
     val hotkeysSupported: Boolean = hotkeys.isSupported
     val failedHotkeys: StateFlow<Set<HotkeyAction>> = hotkeys.failed
@@ -117,6 +121,14 @@ class DesktopSettingsViewModel(
             desktopPreferences.saveRenderBackend(backend)
             _messages.tryEmit("渲染方式已更改，重启后生效")
         }
+    }
+
+    fun updateDesktopLyricStyle(transform: (FloatingLyricStyle) -> FloatingLyricStyle) {
+        viewModelScope.launch { desktopPreferences.saveDesktopLyricStyle(transform(desktopPreferences.desktopLyricStyle.first())) }
+    }
+
+    fun updateDesktopLyricLocked(locked: Boolean) {
+        viewModelScope.launch { desktopPreferences.saveDesktopLyricLocked(locked) }
     }
 
     fun updateMediaKeysEnabled(enabled: Boolean) {

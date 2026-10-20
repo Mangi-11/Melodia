@@ -35,6 +35,9 @@ class DesktopAppState(
         private set
     var showLogin by mutableStateOf(false)
 
+    // 打开设置页后要滚动到的分区（SettingsCategory.name），滚动完即清空
+    var settingsFocus by mutableStateOf<String?>(null)
+
     // 初值为关闭：读到已保存的开启状态后，侧栏随动画展开
     private var savedDockOpen by mutableStateOf(false)
 
