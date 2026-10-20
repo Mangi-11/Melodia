@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.BuildConfig
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -133,9 +134,9 @@ class SettingsViewModel(
 
     val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
 
-    val lyricTextSize = settingsPreferences.lyricTextSize.asState(14)
+    val floatingLyricStyle = settingsPreferences.floatingLyricStyle.asState(FloatingLyricStyle(fontSizeSp = 14, backgroundAlpha = 70))
 
-    val lyricTextColor = settingsPreferences.lyricTextColor.asState("#FFFFFF")
+    val floatingLyricLocked = settingsPreferences.floatingLyricLocked.asState(false)
 
     val fullScreenLyricTextSize = settingsPreferences.fullScreenLyricTextSize.asState(22)
 
@@ -383,9 +384,10 @@ class SettingsViewModel(
 
     fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
 
-    fun updateLyricTextSize(size: Int) = launchSave { settingsPreferences.saveLyricTextSize(size) }
+    fun updateFloatingLyricStyle(transform: (FloatingLyricStyle) -> FloatingLyricStyle) =
+        launchSave { settingsPreferences.saveFloatingLyricStyle(transform(settingsPreferences.floatingLyricStyle.first())) }
 
-    fun updateLyricTextColor(color: String) = launchSave { settingsPreferences.saveLyricTextColor(color) }
+    fun updateFloatingLyricLocked(locked: Boolean) = launchSave { settingsPreferences.saveFloatingLyricLocked(locked) }
 
     fun updateFullScreenLyricTextSize(size: Int) = launchSave { settingsPreferences.saveFullScreenLyricTextSize(size) }
 

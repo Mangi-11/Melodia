@@ -72,6 +72,7 @@ import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.ui.components.MiniPlayerCard
 import com.lin0721.linmusic.core.ui.components.MiniPlayerLikeMode
 import com.lin0721.linmusic.core.ui.theme.uiTween
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricRequests
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import com.lin0721.linmusic.feature.recognition.ui.RecognitionScreen
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
@@ -213,6 +214,12 @@ fun MelodiaApp() {
     val pendingRecognitionResult by playbackRecognitionState.pendingOpenResult.collectAsStateWithLifecycle()
     LaunchedEffect(pendingRecognitionResult) {
         if (pendingRecognitionResult) showRecognition = true
+    }
+    // 悬浮歌词的设置按钮：先进设置页，由设置页消费请求并展开歌词子菜单
+    val floatingLyricRequests: FloatingLyricRequests = koinInject()
+    val pendingLyricSettings by floatingLyricRequests.pendingOpenSettings.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingLyricSettings) {
+        if (pendingLyricSettings) navigation.navigateTo(Screen.Settings)
     }
     // 网页登录界面可见性状态
     var isLoginScreenVisible by remember { mutableStateOf(false) }

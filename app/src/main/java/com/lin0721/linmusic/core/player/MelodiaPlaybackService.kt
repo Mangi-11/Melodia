@@ -44,6 +44,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -54,6 +56,7 @@ private const val TAG = "MelodiaPlaybackService"
 private const val NOTIFICATION_ID = 1001
 private const val PLAYBACK_CHANNEL_ID = "melodia_playback_channel"
 private const val PLAYBACK_CHANNEL_NAME = "正在播放"
+private const val ACTION_UNLOCK_FLOATING_LYRIC = "ACTION_UNLOCK_FLOATING_LYRIC"
 
 class MelodiaPlaybackService : MediaSessionService() {
 
@@ -67,6 +70,8 @@ class MelodiaPlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var isLikedListLoaded = false
     private var isShowLockscreenEnabled = true
+    // 悬浮歌词开启且已锁定时，通知栏提供解锁按钮
+    private var isFloatingLyricLocked = false
 
     private var player: Player? = null
     private var crossfadePlayer: CrossfadePlayer? = null
@@ -135,6 +140,15 @@ class MelodiaPlaybackService : MediaSessionService() {
             settingsPreferences.showLockscreen.collect { enabled ->
                 isShowLockscreenEnabled = enabled
             }
+        }
+
+        serviceScope.launch {
+            combine(settingsPreferences.showDesktopLrc, settingsPreferences.floatingLyricLocked) { shown, locked -> shown && locked }
+                .distinctUntilChanged()
+                .collect { locked ->
+                    isFloatingLyricLocked = locked
+                    updateMediaSessionButtons()
+                }
         }
 
         // 允许跨协议重定向（如 HTTPS 到 HTTP）
@@ -328,8 +342,18 @@ class MelodiaPlaybackService : MediaSessionService() {
     }
 
     @OptIn(UnstableApi::class)
+    private fun buildUnlockLyricButton(): CommandButton =
+        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_lock_open)
+            .setSessionCommand(SessionCommand(ACTION_UNLOCK_FLOATING_LYRIC, Bundle()))
+            .setDisplayName("解锁歌词")
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build()
+
+    // 解锁按钮随锁定状态增删，布局变化会让 Media3 重建通知
+    @OptIn(UnstableApi::class)
     private fun buildCustomLayout(): List<CommandButton> {
-        return listOf(buildLikeButton())
+        return listOfNotNull(buildLikeButton(), buildUnlockLyricButton().takeIf { isFloatingLyricLocked })
     }
 
     // 不能在这里声明 SLOT_BACK / SLOT_FORWARD 的上/下一首按钮：Media3 一旦发现这两个槽位被占用，
@@ -346,6 +370,7 @@ class MelodiaPlaybackService : MediaSessionService() {
             .add(SessionCommand("ACTION_TOGGLE_LIKE", Bundle()))
             .add(SessionCommand("ACTION_TOGGLE_PLAY_MODE", Bundle()))
             .add(SessionCommand("ACTION_SET_PREFERRED_AUDIO_DEVICE", Bundle()))
+            .add(SessionCommand(ACTION_UNLOCK_FLOATING_LYRIC, Bundle()))
             .build()
     }
 
@@ -431,6 +456,12 @@ class MelodiaPlaybackService : MediaSessionService() {
                     if (songId != -1L) {
                         toggleLike(songId)
                     }
+                    return com.google.common.util.concurrent.Futures.immediateFuture(
+                        SessionResult(SessionResult.RESULT_SUCCESS)
+                    )
+                }
+                ACTION_UNLOCK_FLOATING_LYRIC -> {
+                    serviceScope.launch { settingsPreferences.saveFloatingLyricLocked(false) }
                     return com.google.common.util.concurrent.Futures.immediateFuture(
                         SessionResult(SessionResult.RESULT_SUCCESS)
                     )
@@ -525,6 +556,18 @@ class MelodiaPlaybackService : MediaSessionService() {
                 .addAction(playPauseAction)
                 .addAction(nextAction)
                 .addAction(likeAction)
+
+            if (isFloatingLyricLocked) {
+                builder.addAction(
+                    actionFactory.createCustomAction(
+                        session,
+                        IconCompat.createWithResource(this@MelodiaPlaybackService, R.drawable.ic_lock_open),
+                        "解锁歌词",
+                        ACTION_UNLOCK_FLOATING_LYRIC,
+                        Bundle.EMPTY
+                    )
+                )
+            }
 
             val lyricInfo = metadata?.extras?.getString(EXTRA_LYRIC_INFO)
             if (!lyricInfo.isNullOrBlank()) {

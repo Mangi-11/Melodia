@@ -40,7 +40,10 @@ import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.*
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import kotlinx.coroutines.flow.collectLatest
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricRequests
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
 // 定义多级菜单类型。sectionTitles 与子页面 SettingsGroupCard 的标题及顺序一致，子页面按下标引用；主菜单预览取前两项
@@ -67,6 +70,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     // 缩放变更会重建 Activity，当前打开的子菜单要随之保留
     var activeSubMenu by rememberSaveable { mutableStateOf<SettingsSubMenu?>(null) }
+    val floatingLyricRequests: FloatingLyricRequests = koinInject()
+    val pendingLyricSettings by floatingLyricRequests.pendingOpenSettings.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingLyricSettings) {
+        if (pendingLyricSettings && floatingLyricRequests.consumeOpenSettings()) activeSubMenu = SettingsSubMenu.LYRICS
+    }
 
     // 全局浮层开着时让位，避免抢先吞掉本该用来关浮层的返回事件
     BackHandler(enabled = activeSubMenu != null && !LocalGlobalOverlayOpen.current) {

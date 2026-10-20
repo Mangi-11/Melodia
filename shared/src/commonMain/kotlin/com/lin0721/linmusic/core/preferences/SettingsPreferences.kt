@@ -489,28 +489,6 @@ class SettingsPreferences(
         }
     }
 
-    // 悬浮歌词字号 Flow
-    val lyricTextSize: Flow<Int> = dataStore.data.map { prefs ->
-        prefs[KEY_LYRIC_TEXT_SIZE] ?: 14
-    }
-
-    suspend fun saveLyricTextSize(size: Int) {
-        dataStore.edit { prefs ->
-            prefs[KEY_LYRIC_TEXT_SIZE] = size
-        }
-    }
-
-    // 悬浮歌词颜色 Flow
-    val lyricTextColor: Flow<String> = dataStore.data.map { prefs ->
-        prefs[KEY_LYRIC_TEXT_COLOR] ?: "#FFFFFF"
-    }
-
-    suspend fun saveLyricTextColor(color: String) {
-        dataStore.edit { prefs ->
-            prefs[KEY_LYRIC_TEXT_COLOR] = color
-        }
-    }
-
     // 悬浮歌词完整样式；旧版只有 70% 黑底，背景默认值与之保持一致
     val floatingLyricStyle: Flow<FloatingLyricStyle> = dataStore.data.map { prefs ->
         FloatingLyricStyle(
