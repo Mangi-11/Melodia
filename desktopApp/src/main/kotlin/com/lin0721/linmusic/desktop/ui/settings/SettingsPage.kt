@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.update.UpdateChecker
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
@@ -64,6 +65,7 @@ fun SettingsPage(
     desktop: DesktopSettingsViewModel,
     lxPlugins: LxPluginSettingsViewModel,
     updateChecker: UpdateChecker,
+    localLibrary: LocalLibraryRepository,
     modifier: Modifier = Modifier,
     // SettingsCategory.name，从外部入口打开时定位到该分区
     focusCategory: String? = null,
@@ -77,7 +79,7 @@ fun SettingsPage(
     LaunchedEffect(desktop) { desktop.refresh() }
     LaunchedEffect(desktop) { desktop.messages.collect { navigator.showMessage(it) } }
 
-    val entries = settingsEntries(common, desktop, lxPlugins, updateChecker)
+    val entries = settingsEntries(common, desktop, lxPlugins, updateChecker, localLibrary)
     var query by remember { mutableStateOf("") }
     val searching = query.isNotBlank()
     val sections = SettingsCategory.entries.mapNotNull { category ->

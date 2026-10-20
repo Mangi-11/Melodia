@@ -62,8 +62,12 @@ import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.MiniLyricFontSize
 import com.lin0721.linmusic.desktop.data.MiniLyricSettings
 import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
+import com.lin0721.linmusic.desktop.data.local.LocalScanFilter
+import com.lin0721.linmusic.desktop.data.local.LocalScanState
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.chooseDirectory
+import com.lin0721.linmusic.desktop.ui.local.musicHome
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
@@ -76,6 +80,7 @@ import com.lin0721.linmusic.desktop.ui.update.openInBrowser
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.io.File
@@ -355,7 +360,8 @@ internal fun settingsEntries(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
     lxPlugins: LxPluginSettingsViewModel,
-    updateChecker: UpdateChecker
+    updateChecker: UpdateChecker,
+    localLibrary: LocalLibraryRepository
 ): List<SettingsEntry> {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
@@ -381,6 +387,8 @@ internal fun settingsEntries(
     val uiAnimationsEnabled by common.uiAnimationsEnabled.collectAsState()
     val downloadFolder by common.downloadFolderUri.collectAsState()
     val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
+    val localData by localLibrary.data.collectAsState()
+    val localScan by localLibrary.scanState.collectAsState()
     val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
     val cardLayout by common.fullPlayerCardLayout.collectAsState()
     val closeAction by desktop.closeAction.collectAsState()
@@ -639,6 +647,7 @@ internal fun settingsEntries(
                 SettingSwitch(defaultPlaylistPrivate, onChange = common::updateDefaultPlaylistPrivate)
             }
         )
+        addAll(localMusicEntries(localLibrary, localData.filter, localScan, scope))
 
         add(
             rowEntry(
@@ -858,6 +867,72 @@ internal fun settingsEntries(
             }
         )
     }
+}
+
+private const val LOCAL_MUSIC_GROUP = "本地音乐"
+private val LocalMinDurationOptions = listOf(0, 30, 60, 90, 120)
+
+private fun localMusicEntries(
+    repository: LocalLibraryRepository,
+    filter: LocalScanFilter,
+    scan: LocalScanState,
+    scope: CoroutineScope
+): List<SettingsEntry> {
+    val scanSubtitle = when (scan) {
+        is LocalScanState.Scanning -> "正在扫描 ${scan.done}/${scan.total}"
+        LocalScanState.Idle -> "启动时会自动扫描本地歌单绑定的文件夹"
+    }
+    val excludedSubtitle = if (filter.excludedFolders.isEmpty()) "扫描文件夹时跳过这些子文件夹" else "已排除 ${filter.excludedFolders.size} 个文件夹"
+    return listOf(
+        rowEntry(
+            "localMinDuration", SettingsCategory.Storage, "忽略短音频",
+            subtitle = "扫描文件夹时跳过时长不足的音频，如铃声、提示音",
+            keywords = listOf("本地", "扫描", "时长", "过滤"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = LocalMinDurationOptions,
+                current = filter.minDurationSec,
+                label = { if (it == 0) "不过滤" else "短于 $it 秒" },
+                onSelect = { repository.updateFilter(filter.copy(minDurationSec = it)) }
+            )
+        },
+        SettingsEntry(
+            key = "localExcludedFolders",
+            category = SettingsCategory.Storage,
+            title = "排除文件夹",
+            subtitle = excludedSubtitle,
+            keywords = listOf("本地", "扫描", "排除", "文件夹", "过滤"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            Column {
+                SettingRow("排除文件夹", excludedSubtitle) {
+                    SettingsActionButton("添加", onClick = {
+                        scope.launch {
+                            chooseDirectory(musicHome, "选择要排除的文件夹")?.let { folder ->
+                                repository.updateFilter(filter.copy(excludedFolders = filter.excludedFolders + folder.absolutePath))
+                            }
+                        }
+                    })
+                }
+                filter.excludedFolders.forEach { folder ->
+                    SettingRow(folder, null) {
+                        SettingsActionButton("移除", onClick = {
+                            repository.updateFilter(filter.copy(excludedFolders = filter.excludedFolders - folder))
+                        })
+                    }
+                }
+            }
+        },
+        rowEntry(
+            "localRescan", SettingsCategory.Storage, "重新扫描本地音乐",
+            subtitle = scanSubtitle,
+            keywords = listOf("本地", "扫描", "刷新"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            SettingsActionButton("立即扫描", onClick = repository::rescan, enabled = scan is LocalScanState.Idle)
+        }
+    )
 }
 
 private fun appVersionLabel(): String = when {

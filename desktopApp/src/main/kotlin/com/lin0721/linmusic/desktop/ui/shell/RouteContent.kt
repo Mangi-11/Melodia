@@ -120,6 +120,7 @@ internal fun RouteContent(
             desktop = deps.desktopSettingsViewModel,
             lxPlugins = deps.lxPluginSettingsViewModel,
             updateChecker = deps.updateChecker,
+            localLibrary = deps.localMusic.repository,
             focusCategory = state.settingsFocus,
             onFocusConsumed = { state.settingsFocus = null }
         )
