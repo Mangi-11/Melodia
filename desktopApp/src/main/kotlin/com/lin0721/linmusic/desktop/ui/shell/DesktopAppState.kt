@@ -76,6 +76,7 @@ class DesktopAppState(
         libraryMode = pane.libraryMode,
         libraryViewMode = pane.libraryViewMode,
         libraryFilter = library.filter,
+        libraryLocal = library.localSelected,
         librarySortOrder = library.sortOrder,
         dockOpen = dockOpen,
         dockOverlay = dockOverlay,
@@ -116,6 +117,7 @@ class DesktopAppState(
         applyLibraryMode(ui.libraryMode)
         pane.updateViewMode(ui.libraryViewMode)
         if (library.filter != ui.libraryFilter) library.selectFilter(ui.libraryFilter)
+        if (library.localSelected != ui.libraryLocal) library.selectLocal(ui.libraryLocal)
         if (library.sortOrder != ui.librarySortOrder) library.updateSortOrder(ui.librarySortOrder)
         applyDockOpen(ui.dockOpen)
         if (ui.dockOpen) {
@@ -186,6 +188,14 @@ class DesktopAppState(
     fun setLibraryViewMode(mode: LibraryViewMode) = record { pane.updateViewMode(mode) }
 
     fun toggleLibraryFilter(filter: LibraryFilter) = record { library.toggleFilter(filter) }
+
+    val libraryLocalSelected: Boolean get() = library.localSelected
+
+    fun toggleLibraryLocal() = record { library.selectLocal(!library.localSelected) }
+
+    fun openLocalPlaylist(id: Long, name: String) = record(DesktopRoute.LocalPlaylist(id, name)) {
+        if (pane.libraryMode == LibraryMode.EXPANDED) applyLibraryMode(LibraryMode.DEFAULT)
+    }
 
     fun setLibrarySortOrder(order: LibrarySortOrder) = record { library.updateSortOrder(order) }
 

@@ -2,6 +2,7 @@ package com.lin0721.linmusic.desktop.platform
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -39,4 +40,36 @@ suspend fun chooseFile(title: String, filter: String): File? = onEventThread {
         isVisible = true
     }
     dialog.file?.let { File(dialog.directory.orEmpty(), it) }
+}
+
+// 在系统文件管理器中定位文件；Windows 直接选中，其他平台打开所在文件夹
+fun revealInFileManager(file: File): Boolean = try {
+    when {
+        !file.exists() -> false
+        File.separatorChar == '\\' -> {
+            ProcessBuilder("explorer.exe", "/select,${file.absolutePath}").start()
+            true
+        }
+        Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE_FILE_DIR) -> {
+            Desktop.getDesktop().browseFileDirectory(file)
+            true
+        }
+        Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN) -> {
+            Desktop.getDesktop().open(file.parentFile ?: file)
+            true
+        }
+        else -> false
+    }
+} catch (_: Exception) {
+    false
+}
+
+// 多选版本；取消返回空列表
+suspend fun chooseFiles(title: String, filter: String): List<File> = onEventThread {
+    val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
+        isMultipleMode = true
+        file = filter
+        isVisible = true
+    }
+    dialog.files?.toList().orEmpty()
 }

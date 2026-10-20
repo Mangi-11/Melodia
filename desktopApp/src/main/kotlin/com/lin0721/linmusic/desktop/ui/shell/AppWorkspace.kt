@@ -27,6 +27,7 @@ import com.lin0721.linmusic.desktop.player.AudioOutputControl
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.home.LocalPaneResizing
 import com.lin0721.linmusic.desktop.ui.library.LibraryPane
+import com.lin0721.linmusic.desktop.ui.library.LocalLibraryEntry
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewOverlay
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
 import com.lin0721.linmusic.desktop.ui.nowplaying.DockOverlay
@@ -88,7 +89,13 @@ internal fun Workspace(
                     viewMode = pane.libraryViewMode,
                     onViewModeChange = state::setLibraryViewMode,
                     onFilterToggle = state::toggleLibraryFilter,
-                    onSortOrderChange = state::setLibrarySortOrder
+                    onSortOrderChange = state::setLibrarySortOrder,
+                    local = LocalLibraryEntry(
+                        actions = deps.localMusic,
+                        selected = state.libraryLocalSelected,
+                        onToggle = state::toggleLibraryLocal,
+                        onOpen = state::openLocalPlaylist
+                    )
                 )
                 // 缝隙即拖动条：拖窄过阈值吸附成窄条，拖宽只停在上限，不会变成展开态
                 PaneResizeHandle(

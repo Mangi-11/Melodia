@@ -36,12 +36,19 @@ class DesktopAppStateTest {
 
     private class FakeLibrary : LibraryViewControl {
         override var filter: LibraryFilter? = null
+        override var localSelected: Boolean = false
         override var sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_PLAYED
         override fun toggleFilter(filter: LibraryFilter) {
+            localSelected = false
             this.filter = if (this.filter == filter) null else filter
         }
         override fun selectFilter(filter: LibraryFilter?) {
+            localSelected = false
             this.filter = filter
+        }
+        override fun selectLocal(selected: Boolean) {
+            if (selected) filter = null
+            localSelected = selected
         }
         override fun updateSortOrder(order: LibrarySortOrder) {
             sortOrder = order
@@ -198,6 +205,31 @@ class DesktopAppStateTest {
         state.navigateForward()
         assertEquals(LibraryFilter.ALBUM, library.filter)
         assertEquals(LibrarySortOrder.NAME, library.sortOrder)
+    }
+
+    @Test
+    fun localLibraryChipIsRestoredWithHistory() {
+        val state = create()
+        state.toggleLibraryFilter(LibraryFilter.ALBUM)
+        state.toggleLibraryLocal()
+        assertTrue(library.localSelected)
+        assertNull(library.filter)
+
+        state.navigateBack()
+        assertFalse(library.localSelected)
+        assertEquals(LibraryFilter.ALBUM, library.filter)
+
+        state.navigateForward()
+        assertTrue(library.localSelected)
+        assertNull(library.filter)
+    }
+
+    @Test
+    fun openLocalPlaylistPushesRouteAndLeavesExpandedLibrary() {
+        val state = create(LibraryMode.EXPANDED)
+        state.openLocalPlaylist(7, "本地")
+        assertEquals(DesktopRoute.LocalPlaylist(7, "本地"), state.backStack.current)
+        assertEquals(LibraryMode.DEFAULT, state.pane.libraryMode)
     }
 
     @Test

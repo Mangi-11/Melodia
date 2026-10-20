@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.lin0721.linmusic.desktop.ui.artist.ArtistPage
 import com.lin0721.linmusic.desktop.ui.home.HomePage
 import com.lin0721.linmusic.desktop.ui.home.StyleDetailPage
+import com.lin0721.linmusic.desktop.ui.local.LocalPlaylistPage
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopEntry
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
@@ -64,6 +65,12 @@ internal fun RouteContent(
             isAlbum = route.isAlbum,
             viewModel = frameHost.pageViewModel(entry, factory) { it.toastEvent },
             controller = controller
+        )
+        is DesktopRoute.LocalPlaylist -> LocalPlaylistPage(
+            playlistId = route.id,
+            actions = deps.localMusic,
+            controller = controller,
+            songActions = deps.songActions
         )
         DesktopRoute.Browse -> BrowsePage(
             viewModel = deps.searchViewModel,

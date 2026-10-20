@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.LibraryAdd
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.PlaylistAdd
 import androidx.compose.material3.AlertDialog
@@ -44,6 +45,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,11 +76,13 @@ import com.lin0721.linmusic.desktop.ui.components.DialogTextField
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
 import com.lin0721.linmusic.desktop.ui.components.uiTween
+import com.lin0721.linmusic.desktop.ui.local.AddLocalPlaylistDialog
 import com.lin0721.linmusic.desktop.ui.settings.SettingSwitch
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.library.ui.LibrarySortOrder
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
+import kotlinx.coroutines.launch
 
 private const val PLAYLIST_NAME_MAX_LENGTH = 40
 internal const val EMPTY_NAME_MESSAGE = "名字不能为空哦！"
@@ -236,12 +240,14 @@ private fun ViewModeOption(mode: LibraryViewMode, selected: Boolean, modifier: M
     }
 }
 
-// 创建入口：点击弹出菜单，选“创建歌单”再弹对话框输入名称，创建成功后跳转新歌单页
+// 创建入口：“创建歌单”建云端歌单（需登录），“添加歌单”建本地歌单；创建成功后跳转新歌单页
 @Composable
-internal fun LibraryCreateButton(viewModel: LibraryViewModel, pill: Boolean) {
+internal fun LibraryCreateButton(viewModel: LibraryViewModel, local: LocalLibraryEntry, isLoggedIn: Boolean, pill: Boolean) {
     val navigator = LocalDesktopNavigator.current
+    val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var dialogOpen by remember { mutableStateOf(false) }
+    var localDialogOpen by remember { mutableStateOf(false) }
     var anchorWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     Box(Modifier.onSizeChanged { anchorWidth = with(density) { it.width.toDp() } }) {
@@ -265,16 +271,39 @@ internal fun LibraryCreateButton(viewModel: LibraryViewModel, pill: Boolean) {
             LibraryIconButton(Icons.Rounded.Add, "创建", filled = true) { menuOpen = true }
         }
         LibraryPopupMenu(menuOpen, { menuOpen = false }, anchorWidth, CreateMenuWidth) {
+            if (isLoggedIn) {
+                SimpleMenuItem(
+                    text = "创建歌单",
+                    icon = Icons.Rounded.PlaylistAdd,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    onClick = {
+                        menuOpen = false
+                        dialogOpen = true
+                    }
+                )
+            }
             SimpleMenuItem(
-                text = "创建歌单",
-                icon = Icons.Rounded.PlaylistAdd,
+                text = "添加歌单",
+                icon = Icons.Rounded.LibraryAdd,
                 modifier = Modifier.padding(horizontal = 4.dp),
                 onClick = {
                     menuOpen = false
-                    dialogOpen = true
+                    localDialogOpen = true
                 }
             )
         }
+    }
+    if (localDialogOpen) {
+        AddLocalPlaylistDialog(
+            onDismiss = { localDialogOpen = false },
+            onCreate = { name, folder ->
+                localDialogOpen = false
+                scope.launch {
+                    val id = local.actions.repository.createPlaylist(name, folder)
+                    local.onOpen(id, name.ifBlank { folder?.name.orEmpty() })
+                }
+            }
+        )
     }
     if (dialogOpen) {
         CreatePlaylistDialog(

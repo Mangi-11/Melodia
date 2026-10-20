@@ -790,11 +790,11 @@ private fun PlaylistHero(playlist: PlaylistDetail, isAlbum: Boolean, count: Int,
 }
 
 // 表头项已滚出视野，或滚动距离达到阈值
-private fun LazyListState.scrolledPast(thresholdPx: Int): Boolean =
+internal fun LazyListState.scrolledPast(thresholdPx: Int): Boolean =
     firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset >= thresholdPx
 
 @Composable
-private fun PlaylistStickyBar(
+internal fun PlaylistStickyBar(
     name: String,
     color: Color,
     showPlay: Boolean,
@@ -828,7 +828,7 @@ private fun PlaylistStickyBar(
 }
 
 @Composable
-private fun PlayCircleButton(
+internal fun PlayCircleButton(
     size: Dp,
     iconSize: Dp,
     isPlaying: Boolean,
@@ -925,7 +925,7 @@ private fun PlaylistActionBar(
 }
 
 @Composable
-private fun ActionIcon(
+internal fun ActionIcon(
     icon: ImageVector,
     description: String,
     tint: Color = DesktopColors.TextGray,
@@ -994,7 +994,7 @@ private fun PlaylistMoreMenu(
 }
 
 @Composable
-private fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
+internal fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(
         Modifier.clip(RoundedCornerShape(16.dp)).background(DesktopColors.Surface)
             .pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
@@ -1014,7 +1014,7 @@ private fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
 
 // 点图标展开成输入框，失焦且为空时收回；Esc 清空并收回
 @Composable
-private fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
+internal fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
     var searching by remember { mutableStateOf(false) }
     var focusedOnce by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -1065,7 +1065,7 @@ private fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
 }
 
 @Composable
-private fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSelect: (PlaylistSortKey) -> Unit) {
+internal fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSelect: (PlaylistSortKey) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var anchorWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
@@ -1093,7 +1093,7 @@ private fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSel
 
 // 列宽与 TrackRow 逐项对齐：序号 32、封面槽 56、标题 0.45、专辑 0.35、[添加日期]、红心槽 32、时长 48、更多槽 36
 @Composable
-private fun TrackColumnHeader(order: PlaylistSortOrder, showAdded: Boolean, onSort: (PlaylistSortKey) -> Unit) {
+internal fun TrackColumnHeader(order: PlaylistSortOrder, showAdded: Boolean, onSort: (PlaylistSortKey) -> Unit) {
     Column(Modifier.fillMaxWidth().background(DesktopColors.Pane)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(horizontal = 12.dp, vertical = 8.dp),

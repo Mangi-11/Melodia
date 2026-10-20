@@ -1,6 +1,9 @@
 package com.lin0721.linmusic.desktop.ui.shell
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.nowplaying.DockOverlay
@@ -16,25 +19,45 @@ data class UiSnapshot(
     val libraryMode: LibraryMode,
     val libraryViewMode: LibraryViewMode,
     val libraryFilter: LibraryFilter?,
+    // 选中「本地音乐」胶囊时为 true，此时 libraryFilter 为空
+    val libraryLocal: Boolean,
     val librarySortOrder: LibrarySortOrder,
     val dockOpen: Boolean,
     val dockOverlay: DockOverlay?,
     val lyricsOpen: Boolean
 )
 
-// 音乐库筛选与排序的读写口，状态在共享 ViewModel 里
+// 音乐库筛选与排序的读写口，云端筛选在共享 ViewModel 里，「本地音乐」胶囊为桌面端独有
 interface LibraryViewControl {
     val filter: LibraryFilter?
+    val localSelected: Boolean
     val sortOrder: LibrarySortOrder
     fun toggleFilter(filter: LibraryFilter)
     fun selectFilter(filter: LibraryFilter?)
+    fun selectLocal(selected: Boolean)
     fun updateSortOrder(order: LibrarySortOrder)
 }
 
 fun LibraryViewModel.asViewControl(): LibraryViewControl = object : LibraryViewControl {
+    private var local by mutableStateOf(false)
     override val filter: LibraryFilter? get() = selectedFilter.value
+    override val localSelected: Boolean get() = local
     override val sortOrder: LibrarySortOrder get() = this@asViewControl.sortOrder.value
-    override fun toggleFilter(filter: LibraryFilter) = this@asViewControl.toggleFilter(filter)
-    override fun selectFilter(filter: LibraryFilter?) = this@asViewControl.selectFilter(filter)
+    override fun toggleFilter(filter: LibraryFilter) {
+        if (local) {
+            local = false
+            this@asViewControl.selectFilter(filter)
+        } else {
+            this@asViewControl.toggleFilter(filter)
+        }
+    }
+    override fun selectFilter(filter: LibraryFilter?) {
+        local = false
+        this@asViewControl.selectFilter(filter)
+    }
+    override fun selectLocal(selected: Boolean) {
+        if (selected) this@asViewControl.selectFilter(null)
+        local = selected
+    }
     override fun updateSortOrder(order: LibrarySortOrder) = this@asViewControl.updateSortOrder(order)
 }

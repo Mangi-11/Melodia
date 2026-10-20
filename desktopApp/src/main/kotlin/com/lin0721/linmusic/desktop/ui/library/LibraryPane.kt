@@ -50,7 +50,8 @@ fun LibraryPane(
     viewMode: LibraryViewMode,
     onViewModeChange: (LibraryViewMode) -> Unit,
     onFilterToggle: (LibraryFilter) -> Unit,
-    onSortOrderChange: (LibrarySortOrder) -> Unit
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
+    local: LocalLibraryEntry
 ) {
     val motion = LocalUiMotion.current
     val scrollAnchor = remember { LibraryScrollAnchor() }
@@ -84,14 +85,14 @@ fun LibraryPane(
                 ) {
                     Box(Modifier.fixedWidthAtStart(contentWidth)) {
                         when (current) {
-                            LibraryMode.RAIL -> LibraryRail(viewModel, isLoggedIn, onItemClick, onModeChange)
+                            LibraryMode.RAIL -> LibraryRail(viewModel, isLoggedIn, onItemClick, onModeChange, local)
                             LibraryMode.DEFAULT -> LibrarySidebar(
                                 viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange,
-                                onFilterToggle, onSortOrderChange
+                                onFilterToggle, onSortOrderChange, local
                             )
                             LibraryMode.EXPANDED -> LibraryExpanded(
                                 viewModel, isLoggedIn, onLoginClick, onItemClick, onModeChange, viewMode, onViewModeChange,
-                                onFilterToggle, onSortOrderChange
+                                onFilterToggle, onSortOrderChange, local
                             )
                         }
                     }

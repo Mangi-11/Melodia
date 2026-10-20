@@ -46,6 +46,7 @@ import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.player.MpvPlaybackController
 import com.lin0721.linmusic.desktop.player.SilentPlaybackController
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
+import com.lin0721.linmusic.desktop.ui.local.LocalMusicActions
 import com.lin0721.linmusic.desktop.ui.settings.DesktopSettingsViewModel
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
@@ -181,6 +182,7 @@ val desktopPlatformModule = module {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         )
     }
+    single { LocalMusicActions(get(), get<PlaybackController>(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()

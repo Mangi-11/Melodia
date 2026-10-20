@@ -108,6 +108,9 @@ class LocalLibraryRepository(
 
     fun tracksOf(playlistId: Long): Flow<List<LocalTrack>> = view.map { it.tracksOf(playlistId) }.distinctUntilChanged()
 
+    // 页面首帧直接取当前值，避免先闪一下空列表
+    fun currentTracks(playlistId: Long): List<LocalTrack> = view.value.tracksOf(playlistId)
+
     fun playlist(playlistId: Long): Flow<LocalPlaylistSummary?> =
         view.map { view -> view.summaries.firstOrNull { it.id == playlistId } }.distinctUntilChanged()
 
