@@ -95,7 +95,8 @@ internal fun AppPlayerBar(
     state: DesktopAppState,
     deps: DesktopAppDependencies,
     audioOutput: AudioOutputControl?,
-    fullscreen: FullscreenState
+    fullscreen: FullscreenState,
+    onEnterMiniPlayer: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val controller = deps.playbackController
@@ -121,6 +122,7 @@ internal fun AppPlayerBar(
         lyricVisible = showDesktopLyric,
         onToggleLyric = { scope.launch { deps.settingsPreferences.saveShowDesktopLrc(!showDesktopLyric) } },
         lyricsViewOpen = lyricsView.isOpen,
-        onToggleLyricsView = state::toggleLyricsView
+        onToggleLyricsView = state::toggleLyricsView,
+        onEnterMiniPlayer = onEnterMiniPlayer
     )
 }

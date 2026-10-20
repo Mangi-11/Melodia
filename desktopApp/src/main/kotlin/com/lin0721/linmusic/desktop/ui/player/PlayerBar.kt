@@ -88,7 +88,6 @@ private val SideButtonSize = 32.dp
 private val SideIconSize = 20.dp
 private val VolumeSliderWidth = 120.dp
 private val VolumeTooltipGap = 8.dp
-private const val NOT_SUPPORTED_MESSAGE = "暂未支持"
 // mpv 每秒上报几十次播放位置，进度条与秒级时间无需这么密，按此粒度取整去重
 private const val POSITION_STEP_MS = 250L
 
@@ -111,6 +110,7 @@ fun PlayerBar(
     onToggleLyric: () -> Unit,
     lyricsViewOpen: Boolean,
     onToggleLyricsView: () -> Unit,
+    onEnterMiniPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -125,7 +125,6 @@ fun PlayerBar(
     val songDetail by playerViewModel.songDetailState.collectAsState()
     val podcast by playerViewModel.podcastState.collectAsState()
     val hasTrack = nowPlaying != null
-    val notSupported = { navigator.showMessage(NOT_SUPPORTED_MESSAGE) }
 
     Row(
         modifier.fillMaxWidth().height(DesktopDimens.PlayerBarHeight).padding(horizontal = 16.dp),
@@ -271,7 +270,7 @@ fun PlayerBar(
             )
             // 占位播放器没有音量能力时不显示
             if (volume != null) VolumeControl(volume, lastAudibleVolume, onVolumeChange)
-            BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = notSupported)
+            BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = onEnterMiniPlayer)
             BarIconButton(
                 if (isFullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
                 if (isFullscreen) "退出全屏" else "全屏",

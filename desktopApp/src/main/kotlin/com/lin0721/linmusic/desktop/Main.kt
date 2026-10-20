@@ -53,6 +53,7 @@ import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopImageLoader
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.di.desktopAppDependencies
 import com.lin0721.linmusic.desktop.di.desktopPlatformModule
 import com.lin0721.linmusic.desktop.di.desktopViewModelModule
@@ -68,6 +69,7 @@ import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
+import com.lin0721.linmusic.desktop.ui.miniplayer.MiniPlayerWindow
 import com.lin0721.linmusic.desktop.ui.settings.SettingsCategory
 import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
@@ -108,6 +110,8 @@ private const val WINDOW_SAVE_DEBOUNCE_MS = 400L
 
 // 判断桌面歌词上次位置是否仍在屏幕内时假定的窗口高度
 private const val LYRIC_REACH_HEIGHT = 100
+// 判断迷你窗上次位置是否仍在屏幕内时假定的窗口宽度，取各样式中最窄的
+private const val MINI_PLAYER_REACH_WIDTH = 240
 private val DEFAULT_WINDOW_SIZE = DpSize(1280.dp, 800.dp)
 
 private data class WindowSnapshot(
@@ -164,6 +168,7 @@ fun main() {
     val taskbarThumbnail = koin.get<TaskbarThumbnailService>()
     val searchFocusRequests = Channel<Unit>(Channel.CONFLATED)
     val settingsRequests = Channel<String>(Channel.CONFLATED)
+    val loginRequests = Channel<Unit>(Channel.CONFLATED)
     // 系统媒体卡片可用时由它接管媒体键，否则回退全局热键
     val mediaSessionActive = mediaSession.start()
     val savedWindow = runBlocking { desktopPreferences.loadWindow() }
@@ -179,15 +184,29 @@ fun main() {
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
     val restoredLyricBounds = runCatching { runBlocking { desktopPreferences.loadDesktopLyricBounds() } }.getOrNull()
         ?.takeIf { WindowBounds(it.x, it.y, it.width, LYRIC_REACH_HEIGHT).isReachableOn(currentScreenBounds()) }
+    val restoredMiniPlayerPosition = runCatching { runBlocking { desktopPreferences.loadMiniPlayerPosition() } }.getOrNull()
+        ?.takeIf { WindowBounds(it.x, it.y, MINI_PLAYER_REACH_WIDTH, 0).isReachableOn(currentScreenBounds()) }
+    val initialMiniPlayerStyle = runCatching { runBlocking { desktopPreferences.miniPlayerStyle.first() } }
+        .getOrDefault(MiniPlayerStyle.DEFAULT)
+    val initialMiniPlayerSizes = runCatching { runBlocking { desktopPreferences.miniPlayerSizes.first() } }
+        .getOrDefault(MiniPlayerStyle.entries.associateWith { it.defaultSize })
+    val initialMiniPlayerOnTop = runCatching { runBlocking { desktopPreferences.miniPlayerAlwaysOnTop.first() } }.getOrDefault(true)
 
     application {
         val scope = rememberCoroutineScope()
         var isMainVisible by remember { mutableStateOf(true) }
+        // 迷你模式下主窗口隐藏，由迷你窗取代
+        var isMiniMode by remember { mutableStateOf(false) }
         // 已可见但被遮挡或最小化时，靠计数触发再次置前
         var bringToFrontRequest by remember { mutableStateOf(0) }
         val showMainWindow: () -> Unit = {
+            isMiniMode = false
             isMainVisible = true
             bringToFrontRequest++
+        }
+        val enterMiniPlayer: () -> Unit = {
+            isMiniMode = true
+            isMainVisible = false
         }
         val isLyricLocked by desktopPreferences.desktopLyricLocked.collectAsState(initial = false)
         val setLyricLocked: (Boolean) -> Unit = { locked ->
@@ -202,6 +221,7 @@ fun main() {
         val closeAction by desktopPreferences.closeAction.collectAsState(initial = CloseAction.TRAY)
         val isPlaying by controller.playWhenReady.collectAsState()
         val nowPlaying by controller.nowPlaying.collectAsState()
+        val userProfile by appDependencies.homeViewModel.userProfile.collectAsState()
 
         val setDesktopLyric: (Boolean) -> Unit = { enabled ->
             scope.launch { settingsPreferences.saveShowDesktopLrc(enabled) }
@@ -270,6 +290,7 @@ fun main() {
             header = trackText?.let { "正在播放：$it" },
             entries = listOfNotNull(
                 TrayMenuEntry.Action("显示主窗口", showMainWindow),
+                TrayMenuEntry.Action("迷你播放器", enterMiniPlayer),
                 TrayMenuEntry.Divider,
                 TrayMenuEntry.Action(if (isPlaying) "暂停" else "播放", controller::togglePlayPause),
                 TrayMenuEntry.Action("上一首", controller::skipToPrevious),
@@ -392,6 +413,8 @@ fun main() {
                         lyricsView = lyricsView,
                         searchFocusRequests = searchFocusRequests.receiveAsFlow(),
                         settingsRequests = settingsRequests.receiveAsFlow(),
+                        loginRequests = loginRequests.receiveAsFlow(),
+                        onEnterMiniPlayer = enterMiniPlayer,
                         onClose = closeMainWindow
                     )
                 }
@@ -412,6 +435,30 @@ fun main() {
                 settingsRequests.trySend(SettingsCategory.Interface.name)
             },
             onHide = { setDesktopLyric(false) }
+        )
+
+        MiniPlayerWindow(
+            visible = isMiniMode && !isExiting,
+            initialPosition = restoredMiniPlayerPosition,
+            initialStyle = initialMiniPlayerStyle,
+            initialSizes = initialMiniPlayerSizes,
+            initialAlwaysOnTop = initialMiniPlayerOnTop,
+            uiScale = uiScaleFactor,
+            uiMotion = uiMotion,
+            icon = appIcon,
+            isLoggedIn = userProfile != null,
+            playerViewModel = playerViewModel,
+            controller = controller,
+            desktopPreferences = desktopPreferences,
+            onRestore = showMainWindow,
+            onOpenLyricSettings = {
+                showMainWindow()
+                settingsRequests.trySend(SettingsCategory.Interface.name)
+            },
+            onRequireLogin = {
+                showMainWindow()
+                loginRequests.trySend(Unit)
+            }
         )
     }
 }

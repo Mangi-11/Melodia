@@ -67,6 +67,15 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_DESKTOP_LYRIC_SHADOW_ALPHA = intPreferencesKey("desktop_lyric_shadow_alpha")
         private val KEY_DESKTOP_LYRIC_SHADOW_BLUR = intPreferencesKey("desktop_lyric_shadow_blur")
         private val KEY_DESKTOP_LYRIC_SHADOW_COLOR = stringPreferencesKey("desktop_lyric_shadow_color")
+        private val KEY_MINI_PLAYER_POSITION = stringPreferencesKey("mini_player_position")
+        private val KEY_MINI_PLAYER_STYLE = stringPreferencesKey("mini_player_style")
+        private val KEY_MINI_PLAYER_ALWAYS_ON_TOP = booleanPreferencesKey("mini_player_always_on_top")
+        private val KEY_MINI_PLAYER_SIZES = MiniPlayerStyle.entries.associateWith { stringPreferencesKey("mini_player_size_${it.name.lowercase()}") }
+        private val KEY_MINI_LYRIC_FONT_SIZE = stringPreferencesKey("mini_lyric_font_size")
+        private val KEY_MINI_LYRIC_SECONDARY = stringPreferencesKey("mini_lyric_secondary")
+        private val KEY_MINI_LYRIC_KARAOKE = booleanPreferencesKey("mini_lyric_karaoke")
+        private val KEY_MINI_LYRIC_SIDE_LINES = booleanPreferencesKey("mini_lyric_side_lines")
+        private val KEY_MINI_LYRIC_ALIGN = stringPreferencesKey("mini_lyric_align")
 
         val DEFAULT_DESKTOP_LYRIC_STYLE = FloatingLyricStyle(fontSizeSp = 28)
     }
@@ -115,6 +124,58 @@ class DesktopPreferences(private val dataStore: DataStore<Preferences>) {
             prefs[KEY_DESKTOP_LYRIC_SHADOW_BLUR] = style.shadowBlurDp.coerceAtLeast(0)
             prefs[KEY_DESKTOP_LYRIC_SHADOW_COLOR] = style.shadowColor
         }
+    }
+
+    val miniPlayerStyle: Flow<MiniPlayerStyle> =
+        dataStore.data.map { MiniPlayerStyle.fromName(it[KEY_MINI_PLAYER_STYLE]) }.distinctUntilChanged()
+
+    val miniPlayerAlwaysOnTop: Flow<Boolean> = dataStore.data.map { it[KEY_MINI_PLAYER_ALWAYS_ON_TOP] ?: true }.distinctUntilChanged()
+
+    suspend fun saveMiniPlayerStyle(style: MiniPlayerStyle) {
+        dataStore.edit { it[KEY_MINI_PLAYER_STYLE] = style.name }
+    }
+
+    suspend fun saveMiniPlayerAlwaysOnTop(onTop: Boolean) {
+        dataStore.edit { it[KEY_MINI_PLAYER_ALWAYS_ON_TOP] = onTop }
+    }
+
+    val miniLyricSettings: Flow<MiniLyricSettings> = dataStore.data.map { prefs ->
+        val default = MiniLyricSettings()
+        MiniLyricSettings(
+            fontSize = MiniLyricFontSize.fromName(prefs[KEY_MINI_LYRIC_FONT_SIZE]),
+            secondary = MiniLyricSettings.secondaryFromKey(prefs[KEY_MINI_LYRIC_SECONDARY]),
+            karaoke = prefs[KEY_MINI_LYRIC_KARAOKE] ?: default.karaoke,
+            showSideLines = prefs[KEY_MINI_LYRIC_SIDE_LINES] ?: default.showSideLines,
+            align = MiniLyricSettings.alignFromKey(prefs[KEY_MINI_LYRIC_ALIGN])
+        )
+    }.distinctUntilChanged()
+
+    suspend fun saveMiniLyricSettings(settings: MiniLyricSettings) {
+        dataStore.edit { prefs ->
+            prefs[KEY_MINI_LYRIC_FONT_SIZE] = settings.fontSize.name
+            prefs[KEY_MINI_LYRIC_SECONDARY] = settings.secondary.key
+            prefs[KEY_MINI_LYRIC_KARAOKE] = settings.karaoke
+            prefs[KEY_MINI_LYRIC_SIDE_LINES] = settings.showSideLines
+            prefs[KEY_MINI_LYRIC_ALIGN] = settings.align.key
+        }
+    }
+
+    // 每种样式各存一份，缺失或损坏时用默认尺寸
+    val miniPlayerSizes: Flow<Map<MiniPlayerStyle, MiniPlayerSize>> = dataStore.data.map { prefs ->
+        MiniPlayerStyle.entries.associateWith { style ->
+            prefs[KEY_MINI_PLAYER_SIZES.getValue(style)]?.let { MiniPlayerSize.decode(it, style) } ?: style.defaultSize
+        }
+    }.distinctUntilChanged()
+
+    suspend fun saveMiniPlayerSize(style: MiniPlayerStyle, size: MiniPlayerSize) {
+        dataStore.edit { it[KEY_MINI_PLAYER_SIZES.getValue(style)] = size.constrainedTo(style).encode() }
+    }
+
+    suspend fun loadMiniPlayerPosition(): MiniPlayerPosition? =
+        dataStore.data.first()[KEY_MINI_PLAYER_POSITION]?.let(MiniPlayerPosition::decode)
+
+    suspend fun saveMiniPlayerPosition(position: MiniPlayerPosition) {
+        dataStore.edit { it[KEY_MINI_PLAYER_POSITION] = position.encode() }
     }
 
     val hotkeys: Flow<Map<HotkeyAction, HotkeyCombo?>> = dataStore.data.map { prefs ->

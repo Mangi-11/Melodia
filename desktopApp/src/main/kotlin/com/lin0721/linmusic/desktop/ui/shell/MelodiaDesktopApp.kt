@@ -72,6 +72,8 @@ fun WindowScope.MelodiaDesktopApp(
     lyricsView: LyricsViewState,
     searchFocusRequests: Flow<Unit>,
     settingsRequests: Flow<String>,
+    loginRequests: Flow<Unit>,
+    onEnterMiniPlayer: () -> Unit,
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -119,6 +121,13 @@ fun WindowScope.MelodiaDesktopApp(
             lyricsView.close()
             state.settingsFocus = category
             state.navigate(DesktopRoute.Settings)
+        }
+    }
+    // 迷你播放器里未登录点喜欢：回到主窗口后提示并打开登录框
+    LaunchedEffect(state) {
+        loginRequests.collect {
+            state.showMessage("请先登录账号")
+            state.showLogin = true
         }
     }
     LaunchedEffect(state) { appMessages(deps, state).collect { snackbarHostState.showSnackbar(it) } }
@@ -176,7 +185,7 @@ fun WindowScope.MelodiaDesktopApp(
                     enter = uiEnter(ChromeEnter),
                     exit = uiExit(ChromeExit)
                 ) {
-                    AppPlayerBar(state, deps, audioOutput, fullscreen)
+                    AppPlayerBar(state, deps, audioOutput, fullscreen, onEnterMiniPlayer)
                 }
             }
             SearchDropdown(searchDropdown, deps.searchViewModel) { keyword ->

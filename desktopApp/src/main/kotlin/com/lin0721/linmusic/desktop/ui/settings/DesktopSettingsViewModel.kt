@@ -12,6 +12,8 @@ import com.lin0721.linmusic.desktop.data.CacheUsage
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.MiniLyricSettings
+import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.data.RelocationProgress
 import com.lin0721.linmusic.desktop.data.RelocationResult
 import com.lin0721.linmusic.desktop.platform.AutoStartService
@@ -68,6 +70,9 @@ class DesktopSettingsViewModel(
     val renderBackend = desktopPreferences.renderBackend.asState(RenderBackend.AUTO)
     val desktopLyricStyle = desktopPreferences.desktopLyricStyle.asState(DesktopPreferences.DEFAULT_DESKTOP_LYRIC_STYLE)
     val desktopLyricLocked = desktopPreferences.desktopLyricLocked.asState(false)
+    val miniPlayerStyle = desktopPreferences.miniPlayerStyle.asState(MiniPlayerStyle.DEFAULT)
+    val miniPlayerAlwaysOnTop = desktopPreferences.miniPlayerAlwaysOnTop.asState(true)
+    val miniLyricSettings = desktopPreferences.miniLyricSettings.asState(MiniLyricSettings())
 
     val hotkeysSupported: Boolean = hotkeys.isSupported
     val failedHotkeys: StateFlow<Set<HotkeyAction>> = hotkeys.failed
@@ -129,6 +134,18 @@ class DesktopSettingsViewModel(
 
     fun updateDesktopLyricLocked(locked: Boolean) {
         viewModelScope.launch { desktopPreferences.saveDesktopLyricLocked(locked) }
+    }
+
+    fun updateMiniPlayerStyle(style: MiniPlayerStyle) {
+        viewModelScope.launch { desktopPreferences.saveMiniPlayerStyle(style) }
+    }
+
+    fun updateMiniPlayerAlwaysOnTop(onTop: Boolean) {
+        viewModelScope.launch { desktopPreferences.saveMiniPlayerAlwaysOnTop(onTop) }
+    }
+
+    fun updateMiniLyricSettings(transform: (MiniLyricSettings) -> MiniLyricSettings) {
+        viewModelScope.launch { desktopPreferences.saveMiniLyricSettings(transform(desktopPreferences.miniLyricSettings.first())) }
     }
 
     fun updateMediaKeysEnabled(enabled: Boolean) {

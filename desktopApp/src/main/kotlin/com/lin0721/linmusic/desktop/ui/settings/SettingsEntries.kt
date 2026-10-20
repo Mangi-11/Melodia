@@ -59,6 +59,9 @@ import com.lin0721.linmusic.desktop.app.AppInfo
 import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
+import com.lin0721.linmusic.desktop.data.MiniLyricFontSize
+import com.lin0721.linmusic.desktop.data.MiniLyricSettings
+import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.chooseDirectory
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
@@ -127,8 +130,67 @@ private val ActionSpacing = Arrangement.spacedBy(8.dp)
 private const val CARD_LAYOUT_EXPAND_MS = 200
 
 private const val DESKTOP_LYRIC_GROUP = "桌面歌词"
+private const val MINI_PLAYER_GROUP = "迷你播放器"
 private val DesktopLyricFontSizes = listOf(20, 24, 28, 32, 36, 40, 48)
 private val DesktopLyricBackgroundAlphas = listOf(0, 20, 40, 60, 80)
+
+private fun miniLyricEntries(settings: MiniLyricSettings, desktop: DesktopSettingsViewModel): List<SettingsEntry> {
+    val update = desktop::updateMiniLyricSettings
+    return listOf(
+        rowEntry(
+            "miniLyricFontSize", SettingsCategory.Interface, "歌词字号",
+            subtitle = "歌词卡的基准字号，窗口拉宽后按比例放大",
+            keywords = listOf("迷你", "小窗", "歌词", "字号", "大小"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = MiniLyricFontSize.entries,
+                current = settings.fontSize,
+                label = { it.label },
+                onSelect = { size -> update { it.copy(fontSize = size) } }
+            )
+        },
+        rowEntry(
+            "miniLyricSecondary", SettingsCategory.Interface, "歌词第二行",
+            keywords = listOf("迷你", "小窗", "歌词", "翻译", "罗马音"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = MiniLyricSettings.SecondaryOptions,
+                current = settings.secondary,
+                label = { it.label },
+                onSelect = { mode -> update { it.copy(secondary = mode) } }
+            )
+        },
+        rowEntry(
+            "miniLyricKaraoke", SettingsCategory.Interface, "逐字高亮",
+            subtitle = "关闭后当前行整行高亮",
+            keywords = listOf("迷你", "小窗", "歌词", "逐字", "卡拉OK"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingSwitch(settings.karaoke, onChange = { enabled -> update { it.copy(karaoke = enabled) } })
+        },
+        rowEntry(
+            "miniLyricSideLines", SettingsCategory.Interface, "显示上下行",
+            keywords = listOf("迷你", "小窗", "歌词", "上一行", "下一行"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingSwitch(settings.showSideLines, onChange = { enabled -> update { it.copy(showSideLines = enabled) } })
+        },
+        rowEntry(
+            "miniLyricAlign", SettingsCategory.Interface, "歌词对齐",
+            keywords = listOf("迷你", "小窗", "歌词", "对齐", "居中", "左对齐"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricAlign.entries,
+                current = settings.align,
+                label = { it.label },
+                onSelect = { align -> update { it.copy(align = align) } }
+            )
+        }
+    )
+}
 
 private fun desktopLyricEntries(
     style: FloatingLyricStyle,
@@ -325,6 +387,9 @@ internal fun settingsEntries(
     val renderBackend by desktop.renderBackend.collectAsState()
     val lyricStyle by desktop.desktopLyricStyle.collectAsState()
     val lyricLocked by desktop.desktopLyricLocked.collectAsState()
+    val miniPlayerStyle by desktop.miniPlayerStyle.collectAsState()
+    val miniPlayerOnTop by desktop.miniPlayerAlwaysOnTop.collectAsState()
+    val miniLyric by desktop.miniLyricSettings.collectAsState()
     val mediaKeysEnabled by desktop.mediaKeysEnabled.collectAsState()
     val hotkeyMap by desktop.hotkeyMap.collectAsState()
     val failedHotkeys by desktop.failedHotkeys.collectAsState()
@@ -585,6 +650,31 @@ internal fun settingsEntries(
             }
         )
         if (showDesktopLyric) addAll(desktopLyricEntries(lyricStyle, lyricLocked, desktop))
+        add(
+            rowEntry(
+                "miniPlayerStyle", SettingsCategory.Interface, "默认样式",
+                subtitle = "悬停迷你播放器时也可点右上角按钮切换",
+                keywords = listOf("迷你", "小窗", "样式", "横条", "方卡", "歌词卡"),
+                group = MINI_PLAYER_GROUP
+            ) {
+                SettingsDropdown(
+                    options = MiniPlayerStyle.entries,
+                    current = miniPlayerStyle,
+                    label = { it.label },
+                    onSelect = desktop::updateMiniPlayerStyle
+                )
+            }
+        )
+        add(
+            rowEntry(
+                "miniPlayerAlwaysOnTop", SettingsCategory.Interface, "始终置顶",
+                keywords = listOf("迷你", "小窗", "置顶"),
+                group = MINI_PLAYER_GROUP
+            ) {
+                SettingSwitch(miniPlayerOnTop, onChange = desktop::updateMiniPlayerAlwaysOnTop)
+            }
+        )
+        addAll(miniLyricEntries(miniLyric, desktop))
         add(
             SettingsEntry(
                 key = "cardLayout",
