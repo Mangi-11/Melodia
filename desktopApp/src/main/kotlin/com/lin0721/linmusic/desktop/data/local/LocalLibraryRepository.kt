@@ -316,6 +316,9 @@ class LocalLibraryRepository(
 
     suspend fun searchCandidates(keyword: String) = matcher.search(keyword)
 
+    // 下载的歌曲以下载记录的 songId 为准，不提供手动匹配
+    fun isDownloadedFile(path: String): Boolean = records.value.any { samePath(normalizePath(it.mediaStoreUri), path) }
+
     fun setManualMatch(path: String, songId: Long) = launchMutation { data ->
         data.updateTrack(path) { it.copy(songId = songId, matchState = LocalMatchState.MANUAL) }
     }
