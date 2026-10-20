@@ -10,7 +10,14 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricAlign
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricPalette
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricSecondary
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricShadow
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private const val TAG = "SettingsPreferences"
@@ -83,6 +90,19 @@ class SettingsPreferences(
         private val KEY_LYRIC_TEXT_SIZE = intPreferencesKey("lyric_text_size")
         // 悬浮歌词颜色，默认 "#FFFFFF"
         private val KEY_LYRIC_TEXT_COLOR = stringPreferencesKey("lyric_text_color")
+        // 悬浮歌词其余样式；字号与已播色沿用上面两个旧键
+        private val KEY_FLOATING_LYRIC_UNPLAYED_COLOR = stringPreferencesKey("floating_lyric_unplayed_color")
+        private val KEY_FLOATING_LYRIC_SHADOW = booleanPreferencesKey("floating_lyric_shadow")
+        private val KEY_FLOATING_LYRIC_BACKGROUND_ALPHA = intPreferencesKey("floating_lyric_background_alpha")
+        private val KEY_FLOATING_LYRIC_ALIGN = stringPreferencesKey("floating_lyric_align")
+        private val KEY_FLOATING_LYRIC_SECONDARY = stringPreferencesKey("floating_lyric_secondary")
+        private val KEY_FLOATING_LYRIC_BOLD = booleanPreferencesKey("floating_lyric_bold")
+        private val KEY_FLOATING_LYRIC_SHADOW_ALPHA = intPreferencesKey("floating_lyric_shadow_alpha")
+        private val KEY_FLOATING_LYRIC_SHADOW_BLUR = intPreferencesKey("floating_lyric_shadow_blur")
+        private val KEY_FLOATING_LYRIC_SHADOW_COLOR = stringPreferencesKey("floating_lyric_shadow_color")
+        private val KEY_FLOATING_LYRIC_LOCKED = booleanPreferencesKey("floating_lyric_locked")
+        // 悬浮窗位置与宽度（px），未保存过时为空
+        private val KEY_FLOATING_LYRIC_BOUNDS = stringPreferencesKey("floating_lyric_bounds")
         // 日志级别 KEY，默认 debug 包 "DEBUG"、release 包 "WARN"
         private val KEY_LOG_LEVEL = stringPreferencesKey("log_level")
         // 启动时自动检查更新，默认 true
@@ -489,6 +509,57 @@ class SettingsPreferences(
         dataStore.edit { prefs ->
             prefs[KEY_LYRIC_TEXT_COLOR] = color
         }
+    }
+
+    // 悬浮歌词完整样式；旧版只有 70% 黑底，背景默认值与之保持一致
+    val floatingLyricStyle: Flow<FloatingLyricStyle> = dataStore.data.map { prefs ->
+        FloatingLyricStyle(
+            fontSizeSp = prefs[KEY_LYRIC_TEXT_SIZE] ?: 14,
+            playedColor = prefs[KEY_LYRIC_TEXT_COLOR] ?: FloatingLyricPalette.DEFAULT_PLAYED,
+            unplayedColor = prefs[KEY_FLOATING_LYRIC_UNPLAYED_COLOR] ?: FloatingLyricPalette.DEFAULT_UNPLAYED,
+            shadow = prefs[KEY_FLOATING_LYRIC_SHADOW] ?: true,
+            backgroundAlpha = (prefs[KEY_FLOATING_LYRIC_BACKGROUND_ALPHA] ?: 70).coerceIn(0, 100),
+            align = FloatingLyricAlign.fromKey(prefs[KEY_FLOATING_LYRIC_ALIGN]),
+            secondary = FloatingLyricSecondary.fromKey(prefs[KEY_FLOATING_LYRIC_SECONDARY]),
+            bold = prefs[KEY_FLOATING_LYRIC_BOLD] ?: true,
+            shadowAlpha = (prefs[KEY_FLOATING_LYRIC_SHADOW_ALPHA] ?: FloatingLyricShadow.DEFAULT_ALPHA).coerceIn(0, 100),
+            shadowBlurDp = (prefs[KEY_FLOATING_LYRIC_SHADOW_BLUR] ?: FloatingLyricShadow.DEFAULT_BLUR_DP).coerceAtLeast(0),
+            shadowColor = prefs[KEY_FLOATING_LYRIC_SHADOW_COLOR] ?: FloatingLyricShadow.DEFAULT_COLOR
+        )
+    }.distinctUntilChanged()
+
+    suspend fun saveFloatingLyricStyle(style: FloatingLyricStyle) {
+        dataStore.edit { prefs ->
+            prefs[KEY_LYRIC_TEXT_SIZE] = style.fontSizeSp
+            prefs[KEY_LYRIC_TEXT_COLOR] = style.playedColor
+            prefs[KEY_FLOATING_LYRIC_UNPLAYED_COLOR] = style.unplayedColor
+            prefs[KEY_FLOATING_LYRIC_SHADOW] = style.shadow
+            prefs[KEY_FLOATING_LYRIC_BACKGROUND_ALPHA] = style.backgroundAlpha.coerceIn(0, 100)
+            prefs[KEY_FLOATING_LYRIC_ALIGN] = style.align.key
+            prefs[KEY_FLOATING_LYRIC_SECONDARY] = style.secondary.key
+            prefs[KEY_FLOATING_LYRIC_BOLD] = style.bold
+            prefs[KEY_FLOATING_LYRIC_SHADOW_ALPHA] = style.shadowAlpha.coerceIn(0, 100)
+            prefs[KEY_FLOATING_LYRIC_SHADOW_BLUR] = style.shadowBlurDp.coerceAtLeast(0)
+            prefs[KEY_FLOATING_LYRIC_SHADOW_COLOR] = style.shadowColor
+        }
+    }
+
+    val floatingLyricLocked: Flow<Boolean> = dataStore.data.map { it[KEY_FLOATING_LYRIC_LOCKED] ?: false }.distinctUntilChanged()
+
+    suspend fun saveFloatingLyricLocked(locked: Boolean) {
+        dataStore.edit { it[KEY_FLOATING_LYRIC_LOCKED] = locked }
+    }
+
+    // 格式 "x,y,width"，解析失败视为未保存
+    suspend fun loadFloatingLyricBounds(): Triple<Int, Int, Int>? {
+        val raw = dataStore.data.first()[KEY_FLOATING_LYRIC_BOUNDS] ?: return null
+        val parts = raw.split(',').map { it.trim().toIntOrNull() ?: return null }
+        if (parts.size != 3 || parts[2] <= 0) return null
+        return Triple(parts[0], parts[1], parts[2])
+    }
+
+    suspend fun saveFloatingLyricBounds(x: Int, y: Int, width: Int) {
+        dataStore.edit { it[KEY_FLOATING_LYRIC_BOUNDS] = "$x,$y,$width" }
     }
 
     // 日志级别 Flow，取值为 AppLogger.LogLevel 的 name（DEBUG/INFO/WARN/ERROR）

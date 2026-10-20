@@ -16,8 +16,7 @@ import com.lin0721.linmusic.core.model.ArtistDetailInfo
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.model.ArtistInfo
 import com.lin0721.linmusic.core.player.domain.LyricLine
-import com.lin0721.linmusic.core.player.domain.LyricPlaybackState
-import com.lin0721.linmusic.core.player.domain.LyricTimeline
+import com.lin0721.linmusic.core.player.domain.LyricProgressTracker
 import com.lin0721.linmusic.feature.artist.data.ArtistRepository
 import com.lin0721.linmusic.core.comment.data.CommentRepository
 import com.lin0721.linmusic.core.songlike.LoadLikedSongIdsUseCase
@@ -226,10 +225,7 @@ class PlayerViewModel(
 
     // 有状态的歌词播放进度。advance() 的 displayIndices 需要「旧行在新行加入前继续保持显示」，
     // 这个判断依赖上一次的状态，所以必须跨进度回调持有；无状态的 activeIndices 表达不了。
-    private var lyricPlaybackState = LyricPlaybackState()
-
-    // 上一次进度回调的位置，用来识别跳转（拖动进度条、点歌词行、切歌续播）
-    private var lastLyricPositionMs: Long? = null
+    private val lyricProgress = LyricProgressTracker()
 
     private val _songDetailState = MutableStateFlow(PlayerSongDetailState())
     val songDetailState: StateFlow<PlayerSongDetailState> = _songDetailState.asStateFlow()
@@ -370,8 +366,7 @@ class PlayerViewModel(
     // 作废累积的歌词播放状态。换歌、换歌词、清空状态时都要调用，
     // 否则上一套歌词的暂留行会挂在新歌词上
     private fun resetLyricPlayback() {
-        lyricPlaybackState = LyricPlaybackState()
-        lastLyricPositionMs = null
+        lyricProgress.reset()
         _primaryLyricIndex.value = -1
         _activeLyricIndices.value = emptySet()
     }
@@ -379,26 +374,11 @@ class PlayerViewModel(
     private fun updateLyricPlayback(positionMs: Long, isSeek: Boolean = false) {
         val lines = _songDetailState.value.lyrics
         if (lines.isEmpty()) return
-        val previousPosition = lastLyricPositionMs
-        // 进度回退、或前进远超一个轮询周期，都视为跳转：此时不做旧行暂留，
-        // 直接对齐目标位置，否则拖动进度条会看到一路残留的高亮。
-        // 这里不读 playerManager 的轮询间隔 —— PlaybackController 只暴露了 setter；
-        // 而需要这个判断的场合（全屏播放页）间隔固定 50ms，2000ms 已远大于它。
-        val discontinuity = previousPosition != null && (
-            positionMs < previousPosition - LyricSeekBackwardToleranceMs ||
-                positionMs - previousPosition > LyricSeekForwardThresholdMs
-            )
-        lyricPlaybackState = LyricTimeline.advance(
-            lines = lines,
-            positionMs = positionMs,
-            previous = lyricPlaybackState,
-            isSeek = isSeek || discontinuity
-        )
-        lastLyricPositionMs = positionMs
-        _activeLyricIndices.value = lyricPlaybackState.displayIndices
+        val state = lyricProgress.update(lines, positionMs, isSeek)
+        _activeLyricIndices.value = state.displayIndices
         // 与原版一致：锚点跟随过渡显示状态，重叠旧行暂留时不跳到后面的行；
         // 手动跳转由 advance(isSeek = true) 立即重置高亮集合与锚点。
-        _primaryLyricIndex.value = lyricPlaybackState.primaryIndex
+        _primaryLyricIndex.value = state.primaryIndex
     }
 
     private fun observePosition() {
@@ -727,10 +707,3 @@ class PlayerViewModel(
         playerManager.clearQueue()
     }
 }
-
-// 进度小幅回退不算跳转：播放器采样与四舍五入会带来 1~2ms 级别的抖动
-private const val LyricSeekBackwardToleranceMs = 250L
-
-// 进度前进超过该值即判定为跳转。全屏播放页的进度轮询间隔是 50ms，
-// 3 个周期才 150ms，取 2000ms 是留足余量避免把正常推进误判为跳转
-private const val LyricSeekForwardThresholdMs = 2000L
