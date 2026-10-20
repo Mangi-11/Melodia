@@ -72,6 +72,13 @@ class LocalScannerTest {
     }
 
     @Test
+    fun coverUriUsesTripleSlashFileScheme() {
+        val track = LocalTrack(normalizePath(File(dir, "a.mp3").path), "a", "b", lastModified = 1, hasCover = true)
+        assertEquals(true, scanner.coverUri(track)?.startsWith("file:///"))
+        assertNull(scanner.coverUri(track.copy(hasCover = false)))
+    }
+
+    @Test
     fun missingFileReturnsNull() {
         assertNull(scanner.refresh(normalizePath(File(dir, "nope.mp3").path), null))
     }

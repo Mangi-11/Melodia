@@ -67,8 +67,9 @@ class LocalScanner(private val coverDirProvider: () -> File) {
 
     fun coverFile(track: LocalTrack): File = coverFile(track.path, track.lastModified)
 
+    // File.toURI 生成的 file:/C:/ 单斜杠形式 Coil 无法识别，需用 file:///
     fun coverUri(track: LocalTrack): String? =
-        if (track.hasCover) coverFile(track).toURI().toString() else null
+        if (track.hasCover) coverFile(track).toPath().toUri().toString() else null
 
     // 删掉已不对应任何曲目的缩略图
     fun pruneCovers(tracks: Collection<LocalTrack>) {
