@@ -37,6 +37,10 @@ import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.DesktopResourceProvider
 import com.lin0721.linmusic.desktop.data.download.DesktopDownloadPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryStore
+import com.lin0721.linmusic.desktop.data.local.LocalMatcher
+import com.lin0721.linmusic.desktop.data.local.LocalScanner
 import com.lin0721.linmusic.desktop.plugin.GraalLxPluginRuntime
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.player.MpvPlaybackController
@@ -71,6 +75,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
@@ -165,15 +170,26 @@ val desktopPlatformModule = module {
     single { AmllLyricsClient(get<LyricsCache>()) }
     single { QqLyricsClient() }
     single { QqLyricsSource(get(), get()) }
-    // 桌面第一版没有本地音乐，只取在线歌词
+    // 启动即加载并后台扫描
+    single(createdAtStart = true) {
+        LocalLibraryRepository(
+            store = LocalLibraryStore(DesktopPaths.localLibraryFile),
+            scanner = LocalScanner { DesktopPaths.localCoverDir },
+            matcher = LocalMatcher(get()),
+            downloadPreferences = get(),
+            onlineState = get(),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        )
+    }
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()
         val qqLyricsSource = get<QqLyricsSource>()
+        val localLibrary = get<LocalLibraryRepository>()
         LyricsResolver(
             playbackRepository = get(),
-            readLocalLyrics = { null },
-            localUriOf = { null },
+            readLocalLyrics = { path -> withContext(Dispatchers.IO) { localLibrary.readLyrics(path) } },
+            localUriOf = localLibrary::pathForSongId,
             readAmllLyrics = { songId -> amllLyricsClient.fetch(songId) },
             isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() },
             isQqEnabled = { settingsPreferences.qqLyricsEnabled.first() },
