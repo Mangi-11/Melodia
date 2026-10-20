@@ -76,7 +76,9 @@ object LocalTagIo {
             artist = tag.field(FieldKey.ARTIST).ifBlank { fallbackArtist.orEmpty() },
             album = tag.field(FieldKey.ALBUM),
             year = tag.field(FieldKey.YEAR),
-            trackNumber = tag.field(FieldKey.TRACK),
+            trackNumber = listOf(tag.field(FieldKey.TRACK), tag.field(FieldKey.TRACK_TOTAL))
+                .filter { it.isNotEmpty() }
+                .joinToString("/"),
             lyrics = tag.field(FieldKey.LYRICS)
         )
     }
@@ -91,7 +93,10 @@ object LocalTagIo {
         tag.putOrDelete(FieldKey.ARTIST, edit.artist)
         tag.putOrDelete(FieldKey.ALBUM, edit.album)
         tag.putOrDelete(FieldKey.YEAR, edit.year)
-        tag.putOrDelete(FieldKey.TRACK, edit.trackNumber)
+        // “3/12” 拆成音轨号与总数，部分格式的音轨号字段只接受数字
+        val trackParts = edit.trackNumber.split('/')
+        tag.putOrDelete(FieldKey.TRACK, trackParts.getOrNull(0).orEmpty())
+        tag.putOrDelete(FieldKey.TRACK_TOTAL, trackParts.getOrNull(1).orEmpty())
         tag.putOrDelete(FieldKey.LYRICS, edit.lyrics)
         when (cover) {
             CoverChange.Keep -> Unit

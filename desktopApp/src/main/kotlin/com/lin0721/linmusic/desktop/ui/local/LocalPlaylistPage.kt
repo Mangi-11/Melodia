@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FolderOff
@@ -163,6 +164,7 @@ fun LocalPlaylistPage(
     var order by remember(playlistId) { mutableStateOf(PlaylistSortOrder()) }
     var renaming by remember(playlistId) { mutableStateOf(false) }
     var removing by remember(playlistId) { mutableStateOf(false) }
+    var editingTrack by remember(playlistId) { mutableStateOf<LocalTrack?>(null) }
 
     val rows = remember(tracks) { tracks.map { LocalRow(it.toDisplayTrack(repository.coverUri(it)), it) } }
     val shown = remember(rows, query, order) {
@@ -324,6 +326,7 @@ fun LocalPlaylistPage(
                                 navigator.showMessage("已添加至下一首播放")
                             },
                             onToggleLike = songId?.let { id -> { toggleLike(id) } },
+                            onEditTags = { editingTrack = row.track },
                             onRemove = if (isUserPlaylist) {
                                 { repository.removeTracks(playlistId, listOf(row.track.path)) }
                             } else {
@@ -357,6 +360,9 @@ fun LocalPlaylistPage(
             repository.rename(playlistId, name)
             renaming = false
         }
+    }
+    editingTrack?.let { track ->
+        LocalTagEditorDialog(track, repository) { editingTrack = null }
     }
     if (removing) {
         RemoveLocalPlaylistDialog(summary.name, onDismiss = { removing = false }) {
@@ -483,6 +489,7 @@ private fun MenuScope.LocalTrackMenuItems(
     onPlay: () -> Unit,
     onPlayNext: () -> Unit,
     onToggleLike: (() -> Unit)?,
+    onEditTags: () -> Unit,
     onRemove: (() -> Unit)?
 ) {
     val navigator = LocalDesktopNavigator.current
@@ -505,6 +512,10 @@ private fun MenuScope.LocalTrackMenuItems(
         )
     }
     MenuDivider()
+    MenuItem("编辑歌曲信息", icon = Icons.Rounded.Edit, onClick = {
+        dismiss()
+        onEditTags()
+    })
     MenuItem("在文件夹中显示", icon = Icons.Rounded.FolderOpen, onClick = {
         dismiss()
         if (!revealInFileManager(File(track.path))) navigator.showMessage("文件不存在或无法打开")
