@@ -130,6 +130,8 @@ class CloudLibraryTest {
         assertEquals("正版", updated.name)
         assertEquals("专辑", updated.album)
         assertFalse(updated.isUnmatched)
+        assertEquals(99L, updated.playSongId)
+        assertEquals(2L, updated.songId)
     }
 
     @Test

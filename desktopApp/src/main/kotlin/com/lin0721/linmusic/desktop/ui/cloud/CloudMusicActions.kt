@@ -40,6 +40,6 @@ class CloudMusicActions(
         const val PLAY_CONTEXT = "cloud"
 
         fun toQueueItem(song: CloudSong): QueueItem =
-            QueueItem(song.songId, song.name, song.artist, song.coverUrl.orEmpty())
+            QueueItem(song.playSongId, song.name, song.artist, song.coverUrl.orEmpty())
     }
 }

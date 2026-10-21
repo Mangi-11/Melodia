@@ -290,7 +290,7 @@ fun CloudScreen(
         is CloudOverlay.Options -> {
             CloudSongOptionsSheet(
                 song = current.song,
-                isLiked = current.song.songId in likedSongIds,
+                isLiked = current.song.playSongId in likedSongIds,
                 onDismiss = { viewModel.dismissOverlay() },
                 onToggleLikeClick = { viewModel.toggleLike() },
                 onAddToPlaylistClick = { viewModel.openAddToPlaylist() },
@@ -301,7 +301,7 @@ fun CloudScreen(
 
         is CloudOverlay.AddToPlaylist -> {
             PlaylistCollectSheet(
-                songId = current.song.songId,
+                songId = current.song.playSongId,
                 collectState = collectState,
                 onDismiss = { viewModel.dismissOverlay() },
                 onSaveCollection = { songId, items -> viewModel.saveAddToPlaylist(songId, items) },

@@ -139,7 +139,8 @@ class CloudLibrary(
                             album = target.al.name.ifBlank { it.album },
                             coverUrl = target.al.picUrl.ifBlank { null },
                             durationMs = if (target.dt > 0) target.dt else it.durationMs,
-                            isUnmatched = false
+                            isUnmatched = false,
+                            playSongId = target.id
                         )
                     }
                 })

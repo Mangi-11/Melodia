@@ -23,6 +23,7 @@ fun CloudSongItem.toDomain(nowMs: Long): CloudSong {
         coverUrl = if (isUnmatched) null else simpleSong.al.picUrl.ifBlank { null },
         isUnmatched = isUnmatched,
         durationMs = simpleSong.dt,
-        addedAtMs = addTime
+        addedAtMs = addTime,
+        playSongId = if (!isUnmatched && simpleSong.id > 0) simpleSong.id else songId
     )
 }

@@ -100,6 +100,7 @@ import com.lin0721.linmusic.feature.playlist.presentation.PlaylistSortOrder
 import com.lin0721.linmusic.feature.playlist.presentation.filterTracks
 import com.lin0721.linmusic.feature.playlist.presentation.sortTracks
 import kotlinx.coroutines.launch
+import java.util.IdentityHashMap
 
 private const val HERO_DARKEN_FRACTION = 0.35f
 private const val STICKY_BAR_ANIMATION_MS = 200
@@ -109,10 +110,16 @@ private val PlayButtonSize = 56.dp
 private val StickyBarHeight = 64.dp
 private val QuotaBarWidth = 280.dp
 
-private class CloudRow(val display: Track, val song: CloudSong)
+// sortKey 以云盘 songId 为 id 用于筛选排序；display 以正版 id 为 id，喜欢、收藏、评论都认它
+private class CloudRow(val sortKey: Track, val display: Track, val song: CloudSong)
 
-private fun CloudSong.toDisplayTrack(): Track = Track(
-    id = songId,
+private fun CloudSong.toRow(): CloudRow {
+    val sortKey = toTrack(songId)
+    return CloudRow(sortKey, sortKey.copy(id = playSongId), this)
+}
+
+private fun CloudSong.toTrack(id: Long): Track = Track(
+    id = id,
     name = name,
     ar = artist.split(" / ").filter { it.isNotBlank() }.map { Artist(name = it) },
     al = Album(name = album, picUrl = coverUrl.orEmpty()),
@@ -188,13 +195,14 @@ private fun CloudSongList(
     var deleting by remember { mutableStateOf<CloudSong?>(null) }
     var matching by remember { mutableStateOf<CloudSong?>(null) }
 
-    val rows = remember(state.songs) { state.songs.map { CloudRow(it.toDisplayTrack(), it) } }
+    val rows = remember(state.songs) { state.songs.map { it.toRow() } }
     val addedAt = remember(state.songs) { state.songs.associate { it.songId to it.addedAtMs } }
     val shown = remember(rows, query, order) {
-        val byId = rows.associateBy { it.display.id }
-        sortTracks(filterTracks(rows.map { it.display }, query), order, addedAt).mapNotNull { byId[it.id] }
+        val byId = rows.associateBy { it.sortKey.id }
+        sortTracks(filterTracks(rows.map { it.sortKey }, query), order, addedAt).mapNotNull { byId[it.id] }
     }
-    val songsById = remember(state.songs) { state.songs.associateBy { it.songId } }
+    // 同一首正版歌可能对应多条云盘记录，菜单回调按行内 Track 实例找回对应记录
+    val songsByTrack = remember(rows) { IdentityHashMap<Track, CloudSong>().apply { rows.forEach { put(it.display, it.song) } } }
     val isThisContext = playContext == CloudMusicActions.PLAY_CONTEXT
     val isShuffleActive = playMode == PlayMode.SHUFFLE
 
@@ -227,7 +235,7 @@ private fun CloudSongList(
             }
         },
         onPlayNext = { track ->
-            songsById[track.id]?.let { actions.addToPlayNext(listOf(it)) }
+            songsByTrack[track]?.let { actions.addToPlayNext(listOf(it)) }
             navigator.showMessage("已添加至下一首播放")
         },
         onPrepareCollect = { songId ->
@@ -252,7 +260,7 @@ private fun CloudSongList(
             }
         },
         extraMenuItems = { track, dismiss ->
-            val song = songsById[track.id]
+            val song = songsByTrack[track]
             if (song != null) {
                 MenuDivider()
                 MenuItem(if (song.isUnmatched) "匹配网易云歌曲" else "纠正匹配", icon = Icons.Rounded.CloudSync, onClick = {
@@ -353,7 +361,7 @@ private fun CloudSongList(
                 TrackRow(
                     index = index,
                     track = row.display,
-                    isCurrent = nowPlaying?.songId == row.song.songId,
+                    isCurrent = nowPlaying?.songId == row.song.playSongId,
                     onPlay = { playFrom(row.song) },
                     modifier = Modifier.padding(horizontal = 16.dp)
                         .then(if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier),
@@ -412,7 +420,7 @@ private fun CloudSongList(
             title = if (song.isUnmatched) "匹配网易云歌曲" else "纠正匹配",
             subtitle = "${song.name} · ${song.artist}",
             initialKeyword = "${song.name} ${song.artist}".trim(),
-            currentSongId = song.songId.takeUnless { song.isUnmatched },
+            currentSongId = song.playSongId.takeUnless { song.isUnmatched },
             search = actions::searchCandidates,
             onPick = { target ->
                 if (!busy) {
