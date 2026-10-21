@@ -1,6 +1,5 @@
 package com.lin0721.linmusic.feature.cloud.upload
 
-import android.net.Uri
 import java.util.UUID
 
 enum class UploadStatus {
@@ -12,7 +11,7 @@ enum class UploadStatus {
 // 每次进入 UPLOADING 前都重新申请，避免使用可能已过期的旧凭证
 data class UploadTask(
     val id: String = UUID.randomUUID().toString(),
-    val uri: Uri,
+    val source: UploadSource,
     val fileName: String,
     val progress: Float = 0f,
     val status: UploadStatus = UploadStatus.QUEUED,
@@ -22,4 +21,6 @@ data class UploadTask(
     val metadata: LocalAudioMetadata? = null,
     val checkedSongId: String? = null,
     val needUpload: Boolean? = null
-)
+) {
+    val isActive: Boolean get() = status != UploadStatus.SUCCESS && status != UploadStatus.FAILED
+}

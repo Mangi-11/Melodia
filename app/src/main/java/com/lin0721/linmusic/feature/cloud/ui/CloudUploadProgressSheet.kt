@@ -160,9 +160,10 @@ private fun UploadTaskRow(task: UploadTask, onRetry: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (task.status == UploadStatus.FAILED && task.errorMessage != null) {
+            val errorMessage = task.errorMessage
+            if (task.status == UploadStatus.FAILED && errorMessage != null) {
                 Text(
-                    text = task.errorMessage,
+                    text = errorMessage,
                     color = NeteaseRed.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     maxLines = 1,
