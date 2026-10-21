@@ -48,6 +48,7 @@ import com.lin0721.linmusic.desktop.ui.lyricsview.CHROME_ANIM_MS
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
+import com.lin0721.linmusic.desktop.ui.recognition.RecognitionDialog
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -196,6 +197,15 @@ fun WindowScope.MelodiaDesktopApp(
                 Snackbar(data, containerColor = DesktopColors.PopupSurface, contentColor = DesktopColors.TextPrimary)
             }
             WindowResizeHandles(enabled = !isMaximized && !isFullscreen)
+        }
+        // 弹窗内的歌曲菜单依赖导航器，须放在 Provider 内
+        if (state.showRecognition) {
+            RecognitionDialog(
+                recognition = deps.recognition,
+                controller = deps.playbackController,
+                songActions = deps.songActions,
+                onDismiss = { state.showRecognition = false }
+            )
         }
     }
 

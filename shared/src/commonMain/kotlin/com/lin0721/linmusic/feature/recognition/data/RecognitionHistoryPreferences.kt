@@ -1,11 +1,9 @@
 package com.lin0721.linmusic.feature.recognition.data
 
-import android.content.Context
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.feature.recognition.domain.RecognitionCandidate
 import com.lin0721.linmusic.feature.recognition.domain.RecognitionHistoryEntry
@@ -16,30 +14,22 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 
 private const val TAG = "RecognitionHistoryPreferences"
-internal const val MAX_RECOGNITION_HISTORY = 100
-
-private val Context.recognitionHistoryDataStore by preferencesDataStore(
-    name = "recognition_history_prefs",
-    corruptionHandler = ReplaceFileCorruptionHandler { ex ->
-        AppLogger.e(TAG, "识别历史数据损坏，已重置为默认值", ex)
-        emptyPreferences()
-    }
-)
+const val MAX_RECOGNITION_HISTORY = 100
 
 // 听歌识曲历史，最近优先，同一首歌多次识别各记一条，限量 100 条
-class RecognitionHistoryPreferences(private val context: Context) {
+class RecognitionHistoryPreferences(private val dataStore: DataStore<Preferences>) {
 
     companion object {
         private val KEY_HISTORY = stringPreferencesKey("recognition_history")
         private val json = Json { ignoreUnknownKeys = true }
     }
 
-    val history: Flow<List<RecognitionHistoryEntry>> = context.recognitionHistoryDataStore.data.map { prefs ->
+    val history: Flow<List<RecognitionHistoryEntry>> = dataStore.data.map { prefs ->
         decode(prefs[KEY_HISTORY])
     }
 
     suspend fun add(entry: RecognitionHistoryEntry) {
-        context.recognitionHistoryDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val updated = prependCapped(decode(prefs[KEY_HISTORY]), entry, MAX_RECOGNITION_HISTORY)
             prefs[KEY_HISTORY] = json.encodeToString(updated)
         }
@@ -60,14 +50,14 @@ class RecognitionHistoryPreferences(private val context: Context) {
     }
 
     suspend fun remove(id: String) {
-        context.recognitionHistoryDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val current = decode(prefs[KEY_HISTORY])
             prefs[KEY_HISTORY] = json.encodeToString(current.filterNot { it.id == id })
         }
     }
 
     suspend fun clear() {
-        context.recognitionHistoryDataStore.edit { prefs -> prefs.remove(KEY_HISTORY) }
+        dataStore.edit { prefs -> prefs.remove(KEY_HISTORY) }
     }
 
     private fun decode(raw: String?): List<RecognitionHistoryEntry> {

@@ -36,6 +36,8 @@ import com.lin0721.linmusic.desktop.data.DesktopOnlineStateProvider
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.DesktopResourceProvider
 import com.lin0721.linmusic.desktop.data.cloud.CloudLibrary
+import com.lin0721.linmusic.desktop.data.recognition.DesktopRecognition
+import com.lin0721.linmusic.desktop.data.recognition.GraalAfpFingerprintEngine
 import com.lin0721.linmusic.desktop.data.download.DesktopDownloadPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
 import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
@@ -69,6 +71,8 @@ import com.lin0721.linmusic.feature.podcast.ui.RadioDetailViewModel
 import com.lin0721.linmusic.feature.profile.ui.FollowListViewModel
 import com.lin0721.linmusic.feature.profile.ui.ProfileViewModel
 import com.lin0721.linmusic.feature.recent.ui.RecentPlayViewModel
+import com.lin0721.linmusic.feature.recognition.data.RecognitionHistoryPreferences
+import com.lin0721.linmusic.feature.recognition.data.RecognitionPreferences
 import com.lin0721.linmusic.feature.search.data.SearchHistoryPreferences
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
@@ -188,6 +192,13 @@ val desktopPlatformModule = module {
     // 启动即监听账号变化，退出登录时清空云盘数据与上传队列
     single(createdAtStart = true) { CloudLibrary(get(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
     single { CloudMusicActions(get(), get(), get(), get(), get<PlaybackController>()) }
+    single { RecognitionHistoryPreferences(store(PreferencesStores.RECOGNITION_HISTORY)) }
+    single { RecognitionPreferences(store(PreferencesStores.RECOGNITION)) }
+    single { GraalAfpFingerprintEngine() }
+    single {
+        val engine = get<GraalAfpFingerprintEngine>()
+        DesktopRecognition(get(), get(), get(), engine, get(), CoroutineScope(SupervisorJob() + Dispatchers.Main), warmUp = engine::warmUp)
+    }
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()

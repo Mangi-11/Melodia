@@ -2,6 +2,7 @@ package com.lin0721.linmusic.desktop.platform.windows.taskbar
 
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.platform.windows.Ole32
+import com.lin0721.linmusic.desktop.platform.windows.comGuid
 import com.sun.jna.Function
 import com.sun.jna.Memory
 import com.sun.jna.Native
@@ -70,17 +71,10 @@ internal class TaskbarList3 private constructor(private val self: Pointer) {
     companion object {
 
         // CLSID_TaskbarList {56FDF344-FD6D-11d0-958A-006097C9A090}
-        private val ClsidTaskbarList = guid(0x56FDF344, 0xFD6D, 0x11D0, 0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90)
+        private val ClsidTaskbarList = comGuid(0x56FDF344, 0xFD6D, 0x11D0, 0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90)
 
         // IID_ITaskbarList3 {EA1AFB91-9E28-4B86-90E9-9E9F8A5EEFAF}
-        private val IidTaskbarList3 = guid(0xEA1AFB91.toInt(), 0x9E28, 0x4B86, 0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEF, 0xAF)
-
-        private fun guid(data1: Int, data2: Int, data3: Int, vararg data4: Int): Memory = Memory(16).apply {
-            setInt(0, data1)
-            setShort(4, data2.toShort())
-            setShort(6, data3.toShort())
-            data4.forEachIndexed { index, value -> setByte(8L + index, value.toByte()) }
-        }
+        private val IidTaskbarList3 = comGuid(0xEA1AFB91.toInt(), 0x9E28, 0x4B86, 0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEF, 0xAF)
 
         // 创建并初始化；失败返回 null
         fun create(): TaskbarList3? {

@@ -7,9 +7,9 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 // 指纹库要求的输入格式：8 kHz 单声道 Float32
-internal const val RECOGNITION_SAMPLE_RATE = 8000
+const val RECOGNITION_SAMPLE_RATE = 8000
 
-internal object PcmMath {
+object PcmMath {
 
     // 归一化参数沿用 SPlayer-Next：弱信号放大到目标 RMS，增益封顶避免把底噪放大成指纹
     private const val TARGET_RMS = 0.1f
@@ -47,7 +47,7 @@ internal object PcmMath {
 
 // 按区间平均把任意采样率抽到目标采样率，跨块保留余量。
 // 区间边界用整数有理数计算：浮点累加在 44.1k 这类非整数倍时会让分块与整段结果分叉
-internal class Downsampler(private val sourceRate: Int, private val targetRate: Int) {
+class Downsampler(private val sourceRate: Int, private val targetRate: Int) {
 
     init {
         require(sourceRate > 0 && targetRate > 0) { "采样率必须为正: $sourceRate -> $targetRate" }

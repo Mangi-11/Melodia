@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "RecognitionRunner"
 
-// 识别页（麦克风）与后台内录服务共用：跑完一次识别，命中写历史，结局映射为界面状态
-internal suspend fun runRecognition(
+// Android 识别页、后台内录服务与桌面识曲弹窗共用：跑完一次识别，命中写历史，结局映射为界面状态
+suspend fun runRecognition(
     session: RecognitionSession,
     historyPreferences: RecognitionHistoryPreferences,
     onProgress: (RecognitionProgress) -> Unit

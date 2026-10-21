@@ -32,6 +32,7 @@ fun Koin.desktopAppDependencies(): DesktopAppDependencies {
         songActions = SongActionSources(likes = get(), collect = get()),
         localMusic = get(),
         cloudMusic = get(),
+        recognition = get(),
         pageViewModels = object : PageViewModelFactory {
             override fun <T : ViewModel> create(modelClass: KClass<T>): T = koin.get(modelClass)
         }

@@ -53,6 +53,7 @@ jaudiotagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jau
 # 桌面端 LX 插件脚本引擎（GraalJS）
 graal-polyglot = { group = "org.graalvm.polyglot", name = "polyglot", version.ref = "graalvm" }
 graal-js-community = { group = "org.graalvm.polyglot", name = "js-community", version.ref = "graalvm" }
+graal-wasm-community = { group = "org.graalvm.polyglot", name = "wasm-community", version.ref = "graalvm" }
 # LX 插件压缩包（7z）解析
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 xz = { group = "org.tukaani", name = "xz", version.ref = "xz" }

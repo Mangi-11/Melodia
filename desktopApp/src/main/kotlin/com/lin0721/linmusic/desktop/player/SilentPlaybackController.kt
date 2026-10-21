@@ -98,6 +98,15 @@ class SilentPlaybackController : DesktopPlaybackController {
         playQueue(listOf(QueueItem(songId, title, artist, coverUrl)), 0, playContext, null)
     }
 
+    override fun playNextNow(item: QueueItem, startPositionMs: Long) {
+        if (_queue.value.isEmpty()) {
+            playQueue(listOf(item), 0, null)
+            return
+        }
+        addToPlayNext(listOf(item))
+        playNext()
+    }
+
     override fun addToPlayNext(items: List<QueueItem>) {
         if (items.isEmpty()) return
         val current = _queue.value

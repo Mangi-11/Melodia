@@ -7,6 +7,7 @@ import com.lin0721.linmusic.feature.recognition.domain.RecognitionOutcome
 import com.lin0721.linmusic.feature.recognition.domain.RecognitionProgress
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.min
+
+// 采集源抽象，便于识别流程脱离真机单测
+fun interface AudioCapture {
+    // 持续发射 8 kHz 单声道 Float32 块，直到收集方取消
+    fun capture(): Flow<FloatArray>
+}
+
+fun interface FingerprintGenerator {
+    // 输入 8 kHz 单声道 PCM，返回网易 afp 指纹的 base64
+    suspend fun generate(pcm: FloatArray): String
+}
 
 fun interface AudioMatcher {
     // 空列表表示该窗口未命中；网络等失败以异常抛出
@@ -67,11 +79,16 @@ class RecognitionSession(
         }
 
         var silentWindows = 0
-        for (index in 0 until MAX_WINDOWS) {
+        var next = 0
+        while (next < MAX_WINDOWS) {
+            val required = next * STEP_SAMPLES + WINDOW_SAMPLES
+            val state = recording.first { it.samples >= required || it.finished }
+            if (state.samples < required) break
+            // 指纹慢于录音时直接取最新录满的窗口，不排队处理已过时的窗口
+            val index = maxOf(next, latestWindow(state.samples))
+            next = index + 1
             val start = index * STEP_SAMPLES
             val end = start + WINDOW_SAMPLES
-            val state = recording.first { it.samples >= end || it.finished }
-            if (state.samples < end) break
 
             setAttempt(index, AttemptStatus.MATCHING)
             val normalized = PcmMath.normalize(buffer.copyOfRange(start, end))
@@ -99,17 +116,22 @@ class RecognitionSession(
         }
     }
 
+    // 跳过的窗口不进列表，按起点秒定位已有条目
     private fun setAttempt(index: Int, status: AttemptStatus) {
         _progress.update { current ->
             val attempt = MatchAttempt(startSecond = index * STEP_SAMPLES / RECOGNITION_SAMPLE_RATE, status = status)
-            val attempts = if (index < current.attempts.size) {
-                current.attempts.toMutableList().also { it[index] = attempt }
+            val position = current.attempts.indexOfFirst { it.startSecond == attempt.startSecond }
+            val attempts = if (position >= 0) {
+                current.attempts.toMutableList().also { it[position] = attempt }
             } else {
                 current.attempts + attempt
             }
             current.copy(attempts = attempts)
         }
     }
+
+    private fun latestWindow(samples: Int): Int =
+        ((samples - WINDOW_SAMPLES) / STEP_SAMPLES).coerceIn(0, MAX_WINDOWS - 1)
 
     companion object {
         const val WINDOW_SECONDS = 3

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.FilterNone
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
@@ -145,6 +146,8 @@ fun WindowScope.TitleBar(
     searchFocusRequests: Flow<Unit>,
     isBrowseActive: Boolean,
     onBrowseClick: () -> Unit,
+    recognitionOpen: Boolean,
+    onRecognitionClick: () -> Unit,
     cloudMusic: CloudMusicActions,
     downloadTasks: List<DownloadTask>,
     downloadsOpen: Boolean,
@@ -202,6 +205,7 @@ fun WindowScope.TitleBar(
                 isBrowseActive = isBrowseActive,
                 onBrowseClick = onBrowseClick
             )
+            RecognitionButton(active = recognitionOpen, onClick = onRecognitionClick)
         }
         Row(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
             CloudUploadsButton(cloudMusic)
@@ -219,6 +223,32 @@ fun WindowScope.TitleBar(
 }
 
 // 首页圆形按钮，尺寸与搜索栏 48.dp 统一，具备悬停提亮与缩放动效
+// 与左侧首页按钮对称的圆形按钮，弹窗打开期间保持高亮底色
+@Composable
+private fun RecognitionButton(active: Boolean, onClick: () -> Unit) {
+    val hoverSource = remember { MutableInteractionSource() }
+    val isHovered by hoverSource.collectIsHoveredAsState()
+    val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, uiTween(150))
+    val bgColor by animateColorAsState(if (isHovered || active) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), uiTween(150))
+    DesktopTooltip("听歌识曲", side = TooltipSide.Bottom) {
+        Box(
+            Modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .size(48.dp)
+                .hoverable(hoverSource)
+                .clip(CircleShape)
+                .background(bgColor)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.GraphicEq, "听歌识曲", tint = DesktopColors.TextPrimary, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
 @Composable
 private fun HomeButton(
     isHomeAll: Boolean,

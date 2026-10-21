@@ -35,6 +35,7 @@ class DesktopAppState(
     var showNewWorks by mutableStateOf(false)
         private set
     var showLogin by mutableStateOf(false)
+    var showRecognition by mutableStateOf(false)
 
     // 打开设置页后要滚动到的分区（SettingsCategory.name），滚动完即清空
     var settingsFocus by mutableStateOf<String?>(null)

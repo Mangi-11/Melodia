@@ -353,7 +353,7 @@ private fun copySongLink(songId: Long): Boolean = runCatching {
 }.isSuccess
 
 @Composable
-private fun TrackMenu(
+internal fun TrackMenu(
     expanded: Boolean,
     offset: DpOffset,
     track: Track,

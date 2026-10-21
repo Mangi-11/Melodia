@@ -76,6 +76,8 @@ internal fun WindowScope.AppTitleBar(
         },
         isBrowseActive = state.backStack.current == DesktopRoute.Browse,
         onBrowseClick = { state.navigate(DesktopRoute.Browse) },
+        recognitionOpen = state.showRecognition,
+        onRecognitionClick = { state.showRecognition = true },
         cloudMusic = deps.cloudMusic,
         downloadTasks = downloadTasks,
         downloadsOpen = state.isOverlayOpen(DockOverlay.Downloads),

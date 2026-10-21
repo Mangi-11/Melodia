@@ -35,8 +35,16 @@ dependencies {
     implementation(libs.jaudiotagger)
     implementation(libs.graal.polyglot)
     runtimeOnly(libs.graal.js.community)
+    runtimeOnly(libs.graal.wasm.community)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// 听歌识曲的 afp 指纹库与 Android assets 共用一份
+tasks.processResources {
+    from(rootProject.file("app/src/main/assets")) {
+        include("afp/afp.js", "afp/afp.wasm.js")
+    }
 }
 
 // 与 Android 端共用发版参数，保证两端版本号一致

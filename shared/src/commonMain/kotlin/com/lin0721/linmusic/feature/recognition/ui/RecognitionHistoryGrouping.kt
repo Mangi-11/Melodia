@@ -16,7 +16,7 @@ private val dayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 private val yearDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 
 // 按"今天 / 昨天 / 更早"分组，保持输入顺序（最近优先）；今天昨天显示时刻，更早显示日期
-internal fun groupRecognitionHistory(
+fun groupRecognitionHistory(
     entries: List<RecognitionHistoryEntry>,
     nowMillis: Long,
     zone: ZoneId

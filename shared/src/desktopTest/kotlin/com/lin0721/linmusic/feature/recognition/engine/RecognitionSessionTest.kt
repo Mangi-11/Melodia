@@ -86,6 +86,20 @@ class RecognitionSessionTest {
     }
 
     @Test
+    fun `指纹慢于录音时跳到最新录满的窗口`() = runTest {
+        val slow = FingerprintGenerator {
+            delay(2_400)
+            "fp"
+        }
+        val session = RecognitionSession(FakeCapture(0.2f), slow) { _, _ -> emptyList() }
+
+        assertEquals(RecognitionOutcome.NotFound, session.run())
+        // 3 秒起算，之后在 5.4 / 7.8 / 10.2 秒取当时最新的窗口，录满后的最后一个窗口仍会尝试
+        assertEquals(listOf(0, 2, 4, 5), session.progress.value.attempts.map { it.startSecond })
+        assertTrue(session.progress.value.attempts.all { it.status == AttemptStatus.MISSED })
+    }
+
+    @Test
     fun `轮次写入进度并在结束后保留`() = runTest {
         val session = RecognitionSession(FakeCapture(0.2f), RecordingFingerprinter(), round = 2) { _, _ -> emptyList() }
         assertEquals(2, session.progress.value.round)
