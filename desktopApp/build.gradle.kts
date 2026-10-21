@@ -257,6 +257,8 @@ afterEvaluate {
 val packageReleaseZip by tasks.registering(Zip::class) {
     dependsOn("createReleaseDistributable")
     from(layout.buildDirectory.dir("compose/binaries/main-release/app"))
+    // 保留真实修改时间
+    isPreserveFileTimestamps = true
     archiveFileName.set("Melodia-v$desktopVersion-windows-x64.zip")
     destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release/zip"))
 }
