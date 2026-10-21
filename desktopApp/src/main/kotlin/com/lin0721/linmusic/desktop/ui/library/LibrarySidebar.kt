@@ -420,11 +420,25 @@ internal fun LibrarySearchInput(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun LibraryFilterChips(viewModel: LibraryViewModel, extras: LibraryExtrasEntry, onToggle: (LibraryFilter) -> Unit) {
     val selectedFilter by viewModel.selectedFilter.collectAsState()
-    // 窄栏放不下四个胶囊时可横向滚动
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val scrollState = rememberScrollState()
+    val wheelStepPx = with(LocalDensity.current) { CHIP_WHEEL_STEP.toPx() }
+    // 窄栏放不下全部胶囊时可横向滚动，竖向滚轮也换算成横向
+    Row(
+        Modifier
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                val delta = change.scrollDelta.let { if (it.x != 0f) it.x else it.y }
+                if (delta != 0f && scrollState.maxValue > 0 && scrollState.dispatchRawDelta(delta * wheelStepPx) != 0f) {
+                    change.consume()
+                }
+            }
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         LibraryFilters.forEach { (filter, label) ->
             LibraryFilterChip(label, selected = extras.selected == null && selectedFilter == filter) { onToggle(filter) }
         }
@@ -436,6 +450,8 @@ private fun LibraryFilterChips(viewModel: LibraryViewModel, extras: LibraryExtra
         }
     }
 }
+
+private val CHIP_WHEEL_STEP = 48.dp
 
 @Composable
 private fun LibraryFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
