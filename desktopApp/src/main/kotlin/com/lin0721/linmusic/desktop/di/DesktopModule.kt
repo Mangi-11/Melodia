@@ -35,6 +35,7 @@ import com.lin0721.linmusic.desktop.data.DesktopLibraryPreferences
 import com.lin0721.linmusic.desktop.data.DesktopOnlineStateProvider
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.DesktopResourceProvider
+import com.lin0721.linmusic.desktop.data.cloud.CloudLibrary
 import com.lin0721.linmusic.desktop.data.download.DesktopDownloadPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
 import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
@@ -46,6 +47,7 @@ import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.player.MpvPlaybackController
 import com.lin0721.linmusic.desktop.player.SilentPlaybackController
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
+import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
 import com.lin0721.linmusic.desktop.ui.local.LocalMusicActions
 import com.lin0721.linmusic.desktop.ui.settings.DesktopSettingsViewModel
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
@@ -183,6 +185,9 @@ val desktopPlatformModule = module {
         )
     }
     single { LocalMusicActions(get(), get<PlaybackController>(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+    // 启动即监听账号变化，退出登录时清空云盘数据与上传队列
+    single(createdAtStart = true) { CloudLibrary(get(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+    single { CloudMusicActions(get(), get(), get(), get(), get<PlaybackController>()) }
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()

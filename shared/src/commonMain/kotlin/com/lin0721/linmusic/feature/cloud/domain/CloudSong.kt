@@ -11,7 +11,9 @@ data class CloudSong(
     val addedAtText: String,
     // 未识别歌曲的封面字段是网易云通用占位图而非真实封面，coverUrl 已在映射时置空
     val coverUrl: String?,
-    val isUnmatched: Boolean
+    val isUnmatched: Boolean,
+    val durationMs: Long = 0,
+    val addedAtMs: Long = 0
 )
 
 data class CloudQuota(

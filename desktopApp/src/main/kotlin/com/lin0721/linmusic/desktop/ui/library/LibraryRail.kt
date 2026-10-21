@@ -41,11 +41,11 @@ fun LibraryRail(
     isLoggedIn: Boolean,
     onItemClick: (LibraryItem) -> Unit,
     onModeChange: (LibraryMode) -> Unit,
-    local: LocalLibraryEntry,
+    extras: LibraryExtrasEntry,
     modifier: Modifier = Modifier
 ) {
-    val displayItems = rememberLibraryDisplayItems(viewModel, local, isLoggedIn)
-    val handlers = rememberLibraryItemHandlers(viewModel, local)
+    val displayItems = rememberLibraryDisplayItems(viewModel, extras, isLoggedIn)
+    val handlers = rememberLibraryItemHandlers(viewModel, extras)
 
     Column(modifier.fillMaxSize().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         LibraryTitleToggle(
@@ -58,7 +58,7 @@ fun LibraryRail(
             onModeChange(LibraryMode.DEFAULT)
         }
         Spacer(Modifier.height(12.dp))
-        LibraryCreateButton(viewModel, local, isLoggedIn, pill = false)
+        LibraryCreateButton(viewModel, extras, isLoggedIn, pill = false)
         val items = displayItems ?: return@Column
         val listState = rememberAnchoredListState(items)
         val scrolled by remember { derivedStateOf { listState.isScrolled } }
@@ -76,10 +76,7 @@ fun LibraryRail(
                             DesktopTooltip(tooltipContent = { LibraryItemTooltipCard(item) }, side = TooltipSide.Right) {
                                 val shape = coverShape(item)
                                 Box(
-                                    Modifier.clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable {
-                                        val localId = item.localPlaylistId()
-                                        if (localId != null) local.onOpen(localId, item.title) else onItemClick(item)
-                                    }
+                                    Modifier.clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable { extras.open(item, onItemClick) }
                                 ) {
                                     Cover(item.coverUrl, RailCoverSize, modifier = Modifier.libraryCoverElement(item.id), shape = shape)
                                 }

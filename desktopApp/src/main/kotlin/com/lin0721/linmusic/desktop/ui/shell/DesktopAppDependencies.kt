@@ -10,6 +10,7 @@ import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
 import com.lin0721.linmusic.desktop.platform.BrowserLocator
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
+import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
 import com.lin0721.linmusic.desktop.ui.local.LocalMusicActions
 import com.lin0721.linmusic.desktop.ui.settings.DesktopSettingsViewModel
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
@@ -57,5 +58,6 @@ class DesktopAppDependencies(
     val updateChecker: UpdateChecker,
     val songActions: SongActionSources,
     val localMusic: LocalMusicActions,
+    val cloudMusic: CloudMusicActions,
     val pageViewModels: PageViewModelFactory
 )

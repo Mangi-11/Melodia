@@ -242,7 +242,7 @@ private fun ViewModeOption(mode: LibraryViewMode, selected: Boolean, modifier: M
 
 // 创建入口：“创建歌单”建云端歌单（需登录），“添加歌单”建本地歌单；创建成功后跳转新歌单页
 @Composable
-internal fun LibraryCreateButton(viewModel: LibraryViewModel, local: LocalLibraryEntry, isLoggedIn: Boolean, pill: Boolean) {
+internal fun LibraryCreateButton(viewModel: LibraryViewModel, extras: LibraryExtrasEntry, isLoggedIn: Boolean, pill: Boolean) {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
@@ -299,8 +299,8 @@ internal fun LibraryCreateButton(viewModel: LibraryViewModel, local: LocalLibrar
             onCreate = { name, folder ->
                 localDialogOpen = false
                 scope.launch {
-                    val id = local.actions.repository.createPlaylist(name, folder)
-                    local.onOpen(id, name.ifBlank { folder?.name.orEmpty() })
+                    val id = extras.local.repository.createPlaylist(name, folder)
+                    extras.onOpenLocal(id, name.ifBlank { folder?.name.orEmpty() })
                 }
             }
         )

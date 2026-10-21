@@ -83,7 +83,8 @@ data class CloudSongItem(
 @Serializable
 data class CloudSimpleSong(
     val ar: List<Artist> = emptyList(),
-    val al: Album = Album()
+    val al: Album = Album(),
+    val dt: Long = 0
 )
 
 // ======================= 写操作响应（删除/匹配共用） =======================

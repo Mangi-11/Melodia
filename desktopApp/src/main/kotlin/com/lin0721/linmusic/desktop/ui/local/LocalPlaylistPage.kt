@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Delete
@@ -77,6 +78,8 @@ import com.lin0721.linmusic.desktop.data.local.LocalPlaylistSummary
 import com.lin0721.linmusic.desktop.data.local.LocalScanState
 import com.lin0721.linmusic.desktop.data.local.LocalTrack
 import com.lin0721.linmusic.desktop.platform.revealInFileManager
+import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
+import com.lin0721.linmusic.desktop.ui.cloud.uploadFiles
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
@@ -135,6 +138,7 @@ private fun LocalTrack.toDisplayTrack(coverUri: String?): Track = Track(
 fun LocalPlaylistPage(
     playlistId: Long,
     actions: LocalMusicActions,
+    cloud: CloudMusicActions,
     controller: PlaybackController,
     songActions: SongActionSources,
     modifier: Modifier = Modifier
@@ -261,6 +265,7 @@ fun LocalPlaylistPage(
                                 actions.addToPlayNext(shown.map { it.track })
                                 navigator.showMessage(if (shown.isEmpty()) "歌单里还没有歌曲" else "已添加至下一首播放")
                             },
+                            onUploadAll = { uploadFiles(cloud, navigator, shown.map { File(it.track.path) }) },
                             onAddFolder = addFolder,
                             onAddFiles = addFiles,
                             onRemoveFolder = { repository.removeFolder(playlistId, it) },
@@ -329,6 +334,7 @@ fun LocalPlaylistPage(
                             },
                             onToggleLike = songId?.let { id -> { toggleLike(id) } },
                             onEditTags = { editingTrack = row.track },
+                            onUpload = { uploadFiles(cloud, navigator, listOf(File(row.track.path))) },
                             onMatch = if (repository.isDownloadedFile(row.track.path)) {
                                 null
                             } else {
@@ -431,6 +437,7 @@ private fun LocalPlaylistMoreMenu(
     summary: LocalPlaylistSummary,
     folders: List<String>,
     onPlayNextAll: () -> Unit,
+    onUploadAll: () -> Unit,
     onAddFolder: () -> Unit,
     onAddFiles: () -> Unit,
     onRemoveFolder: (String) -> Unit,
@@ -447,6 +454,10 @@ private fun LocalPlaylistMoreMenu(
             MenuItem("全部加入下一首播放", icon = Icons.AutoMirrored.Rounded.QueueMusic, onClick = {
                 expanded = false
                 onPlayNextAll()
+            })
+            MenuItem("全部上传到云盘", icon = Icons.Rounded.CloudUpload, onClick = {
+                expanded = false
+                onUploadAll()
             })
             if (isUserPlaylist) {
                 MenuItem("添加文件夹", icon = Icons.Rounded.CreateNewFolder, onClick = {
@@ -500,6 +511,7 @@ private fun MenuScope.LocalTrackMenuItems(
     onPlayNext: () -> Unit,
     onToggleLike: (() -> Unit)?,
     onEditTags: () -> Unit,
+    onUpload: () -> Unit,
     onMatch: (() -> Unit)?,
     onRemove: (() -> Unit)?
 ) {
@@ -533,6 +545,10 @@ private fun MenuScope.LocalTrackMenuItems(
             match()
         })
     }
+    MenuItem("上传到云盘", icon = Icons.Rounded.CloudUpload, onClick = {
+        dismiss()
+        onUpload()
+    })
     MenuItem("在文件夹中显示", icon = Icons.Rounded.FolderOpen, onClick = {
         dismiss()
         if (!revealInFileManager(File(track.path))) navigator.showMessage("文件不存在或无法打开")

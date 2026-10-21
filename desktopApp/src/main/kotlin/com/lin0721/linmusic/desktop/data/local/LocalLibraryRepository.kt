@@ -302,6 +302,11 @@ class LocalLibraryRepository(
     private fun LocalTrack.withDownload(record: DownloadRecord?): LocalTrack =
         if (record == null) this else copy(songId = record.songId, matchState = LocalMatchState.MANUAL)
 
+    // 按扫描设置的排除规则递归收集文件夹里的音频
+    suspend fun audioFilesIn(folder: File): List<File> = withContext(ioDispatcher) {
+        scanner.collectFiles(folder.path, _data.value.filter.excludedFolders).map(::File)
+    }
+
     // ─── 标签 ───
 
     fun readEditableTags(path: String): LocalTagEdit? = LocalTagIo.readEditable(File(path))

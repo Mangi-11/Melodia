@@ -67,44 +67,76 @@ internal fun LocalMatchDialog(
     repository: LocalLibraryRepository,
     onDismiss: () -> Unit
 ) {
+    SongMatchDialog(
+        key = track.path,
+        title = "匹配网易云歌曲",
+        subtitle = "${track.title} · ${track.artist}　${matchStateLabel(track)}",
+        initialKeyword = "${track.title} ${track.artist}".trim(),
+        currentSongId = track.songId,
+        search = repository::searchCandidates,
+        onPick = { candidate ->
+            repository.setManualMatch(track.path, candidate.id)
+            onDismiss()
+        },
+        onDetach = if (track.songId != null) {
+            {
+                repository.detachMatch(track.path)
+                onDismiss()
+            }
+        } else {
+            null
+        },
+        onDismiss = onDismiss
+    )
+}
+
+// 搜索网易云歌曲并选一首作为匹配结果，本地歌曲与云盘歌曲共用
+@Composable
+internal fun SongMatchDialog(
+    key: Any,
+    title: String,
+    subtitle: String,
+    initialKeyword: String,
+    currentSongId: Long?,
+    search: suspend (String) -> Result<List<Track>>,
+    onPick: (Track) -> Unit,
+    onDetach: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    busy: Boolean = false
+) {
     val scope = rememberCoroutineScope()
-    var keyword by remember(track.path) { mutableStateOf("${track.title} ${track.artist}".trim()) }
-    var state by remember(track.path) { mutableStateOf<CandidateState>(CandidateState.Idle) }
+    var keyword by remember(key) { mutableStateOf(initialKeyword) }
+    var state by remember(key) { mutableStateOf<CandidateState>(CandidateState.Idle) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val focusRequester = remember { FocusRequester() }
-    val search: () -> Unit = {
+    val runSearch: () -> Unit = {
         searchJob?.cancel()
         if (keyword.isNotBlank()) {
             state = CandidateState.Loading
             searchJob = scope.launch {
-                state = repository.searchCandidates(keyword).fold(
+                state = search(keyword).fold(
                     onSuccess = { CandidateState.Loaded(it) },
                     onFailure = { CandidateState.Failed }
                 )
             }
         }
     }
-    LaunchedEffect(track.path) {
+    LaunchedEffect(key) {
         runCatching { focusRequester.requestFocus() }
-        search()
+        runSearch()
     }
 
     DesktopDialog(
-        title = "匹配网易云歌曲",
+        title = title,
         onDismiss = onDismiss,
         width = 560.dp,
         actions = {
-            if (track.songId != null) {
-                DialogButton("解除匹配", {
-                    repository.detachMatch(track.path)
-                    onDismiss()
-                }, danger = true)
-            }
+            onDetach?.let { detach -> DialogButton("解除匹配", detach, danger = true) }
             DialogButton("关闭", onDismiss)
         }
     ) {
         Text(
-            "${track.title} · ${track.artist}　${matchStateLabel(track)}",
+            subtitle,
             color = DesktopColors.TextGray,
             fontSize = 12.sp,
             maxLines = 1,
@@ -117,32 +149,34 @@ internal fun LocalMatchDialog(
                 onValueChange = { keyword = it.take(100) },
                 placeholder = "输入歌名或歌手",
                 focusRequester = focusRequester,
-                onEnter = search,
+                onEnter = runSearch,
                 modifier = Modifier.weight(1f)
             )
-            DialogButton("搜索", search, primary = true, enabled = keyword.isNotBlank())
+            DialogButton("搜索", runSearch, primary = true, enabled = keyword.isNotBlank())
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp).padding(top = 10.dp)) {
             when (val current = state) {
                 CandidateState.Idle -> Unit
-                CandidateState.Loading -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = DesktopColors.Accent)
-                }
+                CandidateState.Loading -> LoadingHint()
                 CandidateState.Failed -> CenteredHint("搜索失败，请检查网络后重试")
-                is CandidateState.Loaded -> if (current.tracks.isEmpty()) {
-                    CenteredHint("没有找到相关歌曲，换个关键词试试")
-                } else {
-                    LazyColumn {
+                is CandidateState.Loaded -> when {
+                    busy -> LoadingHint()
+                    current.tracks.isEmpty() -> CenteredHint("没有找到相关歌曲，换个关键词试试")
+                    else -> LazyColumn {
                         items(current.tracks, key = { it.id }) { candidate ->
-                            CandidateRow(candidate, selected = candidate.id == track.songId) {
-                                repository.setManualMatch(track.path, candidate.id)
-                                onDismiss()
-                            }
+                            CandidateRow(candidate, selected = candidate.id == currentSongId) { onPick(candidate) }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LoadingHint() {
+    Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = DesktopColors.Accent)
     }
 }
 

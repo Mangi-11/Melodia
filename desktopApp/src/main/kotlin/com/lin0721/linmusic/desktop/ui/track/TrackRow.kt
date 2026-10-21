@@ -439,6 +439,7 @@ private fun TrackMenu(
                 remove(track)
             })
         }
+        actions.extraMenuItems?.invoke(this, track, onDismiss)
     }
 }
 

@@ -9,6 +9,7 @@ import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.comments.CommentsHost
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_ALL
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_MUSIC
+import com.lin0721.linmusic.desktop.ui.library.LibraryExtraFilter
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.BackStack
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
@@ -76,7 +77,7 @@ class DesktopAppState(
         libraryMode = pane.libraryMode,
         libraryViewMode = pane.libraryViewMode,
         libraryFilter = library.filter,
-        libraryLocal = library.localSelected,
+        libraryExtra = library.extra,
         librarySortOrder = library.sortOrder,
         dockOpen = dockOpen,
         dockOverlay = dockOverlay,
@@ -117,7 +118,7 @@ class DesktopAppState(
         applyLibraryMode(ui.libraryMode)
         pane.updateViewMode(ui.libraryViewMode)
         if (library.filter != ui.libraryFilter) library.selectFilter(ui.libraryFilter)
-        if (library.localSelected != ui.libraryLocal) library.selectLocal(ui.libraryLocal)
+        if (library.extra != ui.libraryExtra) library.selectExtra(ui.libraryExtra)
         if (library.sortOrder != ui.librarySortOrder) library.updateSortOrder(ui.librarySortOrder)
         applyDockOpen(ui.dockOpen)
         if (ui.dockOpen) {
@@ -189,11 +190,17 @@ class DesktopAppState(
 
     fun toggleLibraryFilter(filter: LibraryFilter) = record { library.toggleFilter(filter) }
 
-    val libraryLocalSelected: Boolean get() = library.localSelected
+    val libraryExtra: LibraryExtraFilter? get() = library.extra
 
-    fun toggleLibraryLocal() = record { library.selectLocal(!library.localSelected) }
+    fun toggleLibraryExtra(extra: LibraryExtraFilter) = record {
+        library.selectExtra(if (library.extra == extra) null else extra)
+    }
 
     fun openLocalPlaylist(id: Long, name: String) = record(DesktopRoute.LocalPlaylist(id, name)) {
+        if (pane.libraryMode == LibraryMode.EXPANDED) applyLibraryMode(LibraryMode.DEFAULT)
+    }
+
+    fun openCloud() = record(DesktopRoute.Cloud) {
         if (pane.libraryMode == LibraryMode.EXPANDED) applyLibraryMode(LibraryMode.DEFAULT)
     }
 

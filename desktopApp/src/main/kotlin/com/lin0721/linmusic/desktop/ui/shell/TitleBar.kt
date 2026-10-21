@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.FilterNone
@@ -92,6 +93,8 @@ import androidx.compose.ui.window.WindowScope
 import com.lin0721.linmusic.core.auth.UserProfile
 import com.lin0721.linmusic.desktop.data.download.DownloadTask
 import com.lin0721.linmusic.desktop.data.download.DownloadTaskStatus
+import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
+import com.lin0721.linmusic.desktop.ui.cloud.CloudUploadsButton
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
@@ -142,12 +145,14 @@ fun WindowScope.TitleBar(
     searchFocusRequests: Flow<Unit>,
     isBrowseActive: Boolean,
     onBrowseClick: () -> Unit,
+    cloudMusic: CloudMusicActions,
     downloadTasks: List<DownloadTask>,
     downloadsOpen: Boolean,
     onDownloadsClick: (() -> Unit)?,
     onLoginClick: () -> Unit,
     onProfileClick: () -> Unit,
     onRecentClick: () -> Unit,
+    onCloudClick: () -> Unit,
     onSettingsClick: () -> Unit,
     hasUpdate: Boolean,
     onLogoutClick: () -> Unit,
@@ -199,8 +204,9 @@ fun WindowScope.TitleBar(
             )
         }
         Row(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+            CloudUploadsButton(cloudMusic)
             if (onDownloadsClick != null) DownloadsButton(downloadTasks, downloadsOpen, onDownloadsClick)
-            AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onSettingsClick, hasUpdate, onLogoutClick)
+            AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onCloudClick, onSettingsClick, hasUpdate, onLogoutClick)
             WindowButton(Icons.Rounded.Remove, "最小化", onClick = onMinimize)
             WindowButton(
                 if (isMaximized) Icons.Rounded.FilterNone else Icons.Rounded.CropSquare,
@@ -324,6 +330,7 @@ private fun AvatarMenu(
     onLoginClick: () -> Unit,
     onProfileClick: () -> Unit,
     onRecentClick: () -> Unit,
+    onCloudClick: () -> Unit,
     onSettingsClick: () -> Unit,
     hasUpdate: Boolean,
     onLogoutClick: () -> Unit
@@ -366,6 +373,10 @@ private fun AvatarMenu(
                 AvatarMenuItem(Icons.Rounded.History, "最近播放") {
                     expanded = false
                     onRecentClick()
+                }
+                AvatarMenuItem(Icons.Rounded.Cloud, "我的云盘") {
+                    expanded = false
+                    onCloudClick()
                 }
             }
             MenuItem(

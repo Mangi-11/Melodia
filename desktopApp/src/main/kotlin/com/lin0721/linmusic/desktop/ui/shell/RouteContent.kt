@@ -3,6 +3,7 @@ package com.lin0721.linmusic.desktop.ui.shell
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import com.lin0721.linmusic.desktop.ui.artist.ArtistPage
+import com.lin0721.linmusic.desktop.ui.cloud.CloudPage
 import com.lin0721.linmusic.desktop.ui.home.HomePage
 import com.lin0721.linmusic.desktop.ui.home.StyleDetailPage
 import com.lin0721.linmusic.desktop.ui.local.LocalPlaylistPage
@@ -69,6 +70,12 @@ internal fun RouteContent(
         is DesktopRoute.LocalPlaylist -> LocalPlaylistPage(
             playlistId = route.id,
             actions = deps.localMusic,
+            cloud = deps.cloudMusic,
+            controller = controller,
+            songActions = deps.songActions
+        )
+        DesktopRoute.Cloud -> CloudPage(
+            actions = deps.cloudMusic,
             controller = controller,
             songActions = deps.songActions
         )
