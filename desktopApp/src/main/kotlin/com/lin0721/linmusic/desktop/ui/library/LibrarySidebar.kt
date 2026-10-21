@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -141,6 +140,8 @@ private val ShadowHeight = 8.dp
 // 网格单元内边距：越小封面越大
 private val LargeCardInset = 6.dp
 private val SmallTileInset = 2.dp
+private const val LargeGridMinColumns = 2
+private const val SmallGridMinColumns = 3
 // 网格封面随栏宽连续变化，固定请求尺寸，避免拖动时每帧换缩略图地址而反复加载
 private val GridCoverRequestSize = 320.dp
 
@@ -676,7 +677,7 @@ private fun LibraryGrid(
                 CompositionLocalProvider(LocalLibraryGridLookahead provides this) {
                     val reflow = isGridReflowEnabled()
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(cardMinWidth),
+                        columns = AdaptiveAtLeast(cardMinWidth, if (small) SmallGridMinColumns else LargeGridMinColumns),
                         state = gridState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = edgePadding - if (small) SmallTileInset else LargeCardInset, vertical = 8.dp),
