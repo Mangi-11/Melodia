@@ -80,8 +80,12 @@ class FloatingLyricService : Service() {
         FloatingLyricSession(
             controller = playerManager,
             lyricsResolver = lyricsResolver,
-            reloadSignal = combine(settingsPreferences.amllLyricsEnabled, settingsPreferences.qqLyricsEnabled) { amll, qq ->
-                amll to qq
+            reloadSignal = combine(
+                settingsPreferences.amllLyricsEnabled,
+                settingsPreferences.qqLyricsEnabled,
+                settingsPreferences.neteaseLyricsEnabled
+            ) { amll, qq, netease ->
+                Triple(amll, qq, netease)
             }.distinctUntilChanged()
         )
     }

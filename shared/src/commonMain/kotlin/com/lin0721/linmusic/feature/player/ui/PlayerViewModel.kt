@@ -390,8 +390,12 @@ class PlayerViewModel(
     }
 
     private suspend fun loadLyrics(songId: Long) {
-        combine(settingsPreferences.amllLyricsEnabled, settingsPreferences.qqLyricsEnabled) { amll, qq ->
-            amll to qq
+        combine(
+            settingsPreferences.amllLyricsEnabled,
+            settingsPreferences.qqLyricsEnabled,
+            settingsPreferences.neteaseLyricsEnabled
+        ) { amll, qq, netease ->
+            Triple(amll, qq, netease)
         }.distinctUntilChanged().collectLatest {
             reloadLyrics(songId)
         }

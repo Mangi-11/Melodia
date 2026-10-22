@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
@@ -39,7 +40,8 @@ class LyricsResolver(
     private val isAmllEnabled: suspend () -> Boolean = { true },
     private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val readQqLyrics: suspend (songId: Long) -> List<LyricLine> = { emptyList() },
-    private val isQqEnabled: suspend () -> Boolean = { true }
+    private val isQqEnabled: suspend () -> Boolean = { true },
+    private val isNeteaseEnabled: suspend () -> Boolean = { true }
 ) {
 
     private companion object {
@@ -104,11 +106,18 @@ class LyricsResolver(
         coroutineScope {
             val amllEnabled = isAmllEnabled()
             val qqEnabled = isQqEnabled()
-            val state = LyricsSourceState(amllEnabled, qqEnabled)
+            val neteaseEnabled = isNeteaseEnabled()
+            val state = LyricsSourceState(amllEnabled, qqEnabled, neteaseEnabled)
+            // 所有来源都关闭时没有可等待的查询，直接交出空结果
+            if (state.isFinished) {
+                emit(state.candidate())
+                return@coroutineScope
+            }
             val updates = Channel<SourceUpdate>(Channel.UNLIMITED)
-            val jobs = mutableListOf(
-                query(LyricsSource.NETEASE, updates) { SourceUpdate.Netease(fetchNeteaseResult(songId)) }
-            )
+            val jobs = mutableListOf<Job>()
+            if (neteaseEnabled) {
+                jobs += query(LyricsSource.NETEASE, updates) { SourceUpdate.Netease(fetchNeteaseResult(songId)) }
+            }
             val amllJob = if (amllEnabled) {
                 query(LyricsSource.AMLL, updates) { SourceUpdate.Amll(fetchAmllLines(songId)) }.also { jobs += it }
             } else null

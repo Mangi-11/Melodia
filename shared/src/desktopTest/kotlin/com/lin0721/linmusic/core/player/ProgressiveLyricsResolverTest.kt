@@ -179,6 +179,39 @@ class ProgressiveLyricsResolverTest {
         assertTrue(testScheduler.currentTime in 6000L..6250L)
     }
 
+    @Test fun disabledNeteaseIsNotQueriedAndOtherSourcesStillWork() = runTest {
+        var neteaseCalls = 0
+        val resolver = LyricsResolver(repo(Result.success(plain)) { neteaseCalls++ }, { null }, { null },
+            readAmllLyrics = { null }, readQqLyrics = { word },
+            isNeteaseEnabled = { false },
+            processingDispatcher = StandardTestDispatcher(testScheduler))
+        val results = resolver.lyricsWithSourceFor(1).toList()
+        assertEquals(0, neteaseCalls)
+        assertEquals(LyricsSource.QQ, results.last().getOrThrow().source)
+    }
+
+    @Test fun disabledNeteaseDoesNotCancelPendingAmll() = runTest {
+        val resolver = LyricsResolver(repo(Result.success(plain)), { null }, { null },
+            readAmllLyrics = { delay(1000); ttml }, readQqLyrics = { delay(100); emptyList() },
+            isNeteaseEnabled = { false },
+            processingDispatcher = StandardTestDispatcher(testScheduler))
+        assertEquals(LyricsSource.AMLL, resolver.lyricsWithSourceFor(1).toList().last().getOrThrow().source)
+        assertEquals(1000L, testScheduler.currentTime)
+    }
+
+    @Test fun allSourcesDisabledEmitsOneEmptyResultWithoutQueries() = runTest {
+        var reads = 0
+        val resolver = LyricsResolver(repo(Result.success(plain)) { reads++ }, { null }, { null },
+            readAmllLyrics = { reads++; ttml }, readQqLyrics = { reads++; word },
+            isAmllEnabled = { false }, isQqEnabled = { false }, isNeteaseEnabled = { false },
+            processingDispatcher = StandardTestDispatcher(testScheduler))
+        val results = resolver.lyricsWithSourceFor(1).toList().map { it.getOrThrow() }
+        assertEquals(1, results.size)
+        assertTrue(results.single().lines.isEmpty())
+        assertEquals(0, reads)
+        assertEquals(0L, testScheduler.currentTime)
+    }
+
     @Test fun neteaseFailureDoesNotCancelPendingAmll() = runTest {
         val resolver = LyricsResolver(repo(Result.failure(IllegalStateException("offline"))), { null }, { null },
             readAmllLyrics = { delay(1000); ttml }, readQqLyrics = { delay(100); emptyList() },

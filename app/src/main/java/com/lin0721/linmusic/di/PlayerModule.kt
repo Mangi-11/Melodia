@@ -51,6 +51,7 @@ val playerModule = module {
             readAmllLyrics = { songId -> amllLyricsClient.fetch(songId) },
             isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() },
             isQqEnabled = { settingsPreferences.qqLyricsEnabled.first() },
+            isNeteaseEnabled = { settingsPreferences.neteaseLyricsEnabled.first() },
             readQqLyrics = qqLyricsSource::fetch
         )
     }

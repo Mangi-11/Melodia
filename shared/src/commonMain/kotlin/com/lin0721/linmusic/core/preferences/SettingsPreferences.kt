@@ -127,6 +127,7 @@ class SettingsPreferences(
         private val KEY_FULL_SCREEN_KARAOKE_GLOW_EFFECT = booleanPreferencesKey("full_screen_karaoke_glow_effect")
         private val KEY_AMLL_LYRICS_ENABLED = booleanPreferencesKey("amll_lyrics_enabled")
         private val KEY_QQ_LYRICS_ENABLED = booleanPreferencesKey("qq_lyrics_enabled")
+        private val KEY_NETEASE_LYRICS_ENABLED = booleanPreferencesKey("netease_lyrics_enabled")
         // 全屏歌词行与行间距 (dp)，默认 24
         private val KEY_FULL_SCREEN_LYRIC_LINE_SPACING = intPreferencesKey("full_screen_lyric_line_spacing")
         // 全屏歌词原文与翻译/罗马音间距 (dp)，默认 6
@@ -638,6 +639,15 @@ class SettingsPreferences(
             prefs[KEY_FULL_SCREEN_LYRIC_SECONDARY_MODE] = mode
             prefs[KEY_FULL_SCREEN_LYRIC_SHOW_TRANSLATION] = mode != "none"
         }
+    }
+
+    // 网易歌词源开关，默认启用。
+    val neteaseLyricsEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_NETEASE_LYRICS_ENABLED] ?: true
+    }
+
+    suspend fun saveNeteaseLyricsEnabled(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_NETEASE_LYRICS_ENABLED] = enabled }
     }
 
     // QQ 歌词源开关，默认启用。

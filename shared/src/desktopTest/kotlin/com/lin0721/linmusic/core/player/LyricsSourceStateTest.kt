@@ -30,6 +30,21 @@ class LyricsSourceStateTest {
         assertFalse(state.shouldCancelAmll())
     }
 
+    @Test fun disabledNeteaseDoesNotBlockFinishOrCancelAmll() {
+        val state = LyricsSourceState(amllEnabled = true, qqEnabled = true, neteaseEnabled = false)
+        state.onQq(emptyList())
+        assertFalse(state.shouldCancelAmll())
+        assertFalse(state.isFinished)
+        state.onAmll(emptyList())
+        assertTrue(state.isFinished)
+    }
+
+    @Test fun allSourcesDisabledIsFinishedFromTheStart() {
+        val state = LyricsSourceState(amllEnabled = false, qqEnabled = false, neteaseEnabled = false)
+        assertTrue(state.isFinished)
+        assertTrue(state.candidate().getOrThrow().lines.isEmpty())
+    }
+
     @Test fun qqLyricsKeepAmllPending() {
         val state = LyricsSourceState(amllEnabled = true, qqEnabled = true)
         state.onNetease(Result.success(emptyList()))

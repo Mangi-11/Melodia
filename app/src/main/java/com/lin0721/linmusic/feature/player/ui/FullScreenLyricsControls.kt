@@ -378,6 +378,8 @@ fun FullScreenLyricsSettingsSheet(
     onAdvancedKaraokeEffectChange: (Boolean) -> Unit = {},
     karaokeGlowEffect: Boolean = false,
     onKaraokeGlowEffectChange: (Boolean) -> Unit = {},
+    neteaseLyricsEnabled: Boolean = true,
+    onNeteaseLyricsEnabledChange: (Boolean) -> Unit = {},
     qqLyricsEnabled: Boolean = true,
     onQqLyricsEnabledChange: (Boolean) -> Unit = {},
     amllLyricsEnabled: Boolean = true,
@@ -601,6 +603,13 @@ fun FullScreenLyricsSettingsSheet(
                         }
                         }
                         1 -> {
+                            LyricCompactSwitchRow(
+                                title = "启用网易云歌词源",
+                                subtitle = "提供歌词、翻译与逐字歌词",
+                                checked = neteaseLyricsEnabled,
+                                onCheckedChange = onNeteaseLyricsEnabledChange
+                            )
+
                             LyricCompactSwitchRow(
                                 title = "启用QQ音乐歌词源",
                                 subtitle = "提供更多逐字歌词",

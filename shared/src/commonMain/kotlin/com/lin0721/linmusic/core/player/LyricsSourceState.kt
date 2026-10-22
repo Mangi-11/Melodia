@@ -4,11 +4,11 @@ import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.player.domain.LyricTimeline
 
 // 三源择优的状态与判定，只含同步逻辑，协程收发由 LyricsResolver 负责。
-internal class LyricsSourceState(amllEnabled: Boolean, private val qqEnabled: Boolean) {
+internal class LyricsSourceState(amllEnabled: Boolean, private val qqEnabled: Boolean, neteaseEnabled: Boolean = true) {
     private var netease: Result<List<LyricLine>>? = null
     private var amll = emptyList<LyricLine>()
     private var qq = emptyList<LyricLine>()
-    private var neteasePending = true
+    private var neteasePending = neteaseEnabled
     private var amllPending = amllEnabled
     private var qqPending = qqEnabled
     private var amllCancelled = false
@@ -39,7 +39,7 @@ internal class LyricsSourceState(amllEnabled: Boolean, private val qqEnabled: Bo
         dirty = true
     }
 
-    // 网易成功但无歌词、且已启用的 QQ 也无歌词时，不再等待 AMLL；网易失败不触发，AMLL 与网易相互独立。
+    // 网易成功但无歌词、且已启用的 QQ 也无歌词时，不再等待 AMLL；网易失败或关闭不触发，AMLL 与网易相互独立。
     fun shouldCancelAmll(): Boolean {
         if (!amllPending || !qqEnabled || qqPending) return false
         val result = netease ?: return false
