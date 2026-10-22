@@ -101,8 +101,21 @@ fun FullScreenLyricsList(
     val defaultHalfViewportDp = remember(configuration.screenHeightDp) { (configuration.screenHeightDp / 2).dp }
     val halfViewportPadding = if (viewportHeightPx > 0f) with(density) { (viewportHeightPx / 2f).toDp() } else defaultHalfViewportDp
 
-    LaunchedEffect(currentIndex, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
-        if (isUserScrolling || currentIndex !in lyrics.indices || viewportHeightPx <= 0f) return@LaunchedEffect
+    LaunchedEffect(currentIndex, lyrics, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
+        if (isUserScrolling || viewportHeightPx <= 0f) return@LaunchedEffect
+
+        // 新歌前奏或歌词重载时当前行尚未开始：回到顶部，否则列表停在上一首的滚动位置
+        if (currentIndex < 0) {
+            if (lyrics.isNotEmpty()) {
+                lazyListState.springScrollToCentreClassic(
+                    targetIndex = 0,
+                    desiredOffsetPx = 0,
+                    fallbackScrollOffsetPx = 0
+                )
+            }
+            return@LaunchedEffect
+        }
+        if (currentIndex !in lyrics.indices) return@LaunchedEffect
 
         if (centerFirstLine) {
             lazyListState.springScrollToCentre(
