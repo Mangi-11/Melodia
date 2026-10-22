@@ -64,10 +64,9 @@ import dev.chrisbanes.haze.hazeChild
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.content.Intent
-import androidx.compose.ui.platform.LocalContext
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
+import com.lin0721.linmusic.feature.player.share.LyricShareSheet
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import org.koin.compose.koinInject
@@ -84,6 +83,8 @@ fun FullScreenLyricsView(
     isLoading: Boolean,
     title: String,
     artist: String,
+    coverUrl: String = "",
+    songLink: String? = null,
     base: Color,
     highlightColor: Color,
     onSeek: (Long) -> Unit,
@@ -115,8 +116,8 @@ fun FullScreenLyricsView(
     val fullScreenLyricSecondaryMode by settingsPreferences.fullScreenLyricSecondaryMode.collectAsStateWithLifecycle(initialValue = "translation")
     val fullScreenKaraokeAdvancedEffect by settingsPreferences.fullScreenKaraokeAdvancedEffect.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenKaraokeGlowEffect by settingsPreferences.fullScreenKaraokeGlowEffect.collectAsStateWithLifecycle(initialValue = false)
-    val qqLyricsEnabled by settingsPreferences.qqLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val neteaseLyricsEnabled by settingsPreferences.neteaseLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val qqLyricsEnabled by settingsPreferences.qqLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val amllLyricsEnabled by settingsPreferences.amllLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenLyricLineSpacing by settingsPreferences.fullScreenLyricLineSpacing.collectAsStateWithLifecycle(initialValue = 24)
     val fullScreenLyricSecondarySpacing by settingsPreferences.fullScreenLyricSecondarySpacing.collectAsStateWithLifecycle(initialValue = 6)
@@ -131,6 +132,7 @@ fun FullScreenLyricsView(
     val hasTranslation = remember(lyrics) { lyrics.any { it.translation != null } }
     val hasRoma = remember(lyrics) { lyrics.any { it.roma != null } }
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
     val scheduleAutoHide: () -> Unit = {
         autoHideJob?.cancel()
@@ -176,21 +178,7 @@ fun FullScreenLyricsView(
             onControlsVisibilityChange(true)
         }
     }
-    val context = LocalContext.current
-
-    val handleShareLyrics: () -> Unit = {
-        val currentLyricText = lyrics.getOrNull(currentIndex)?.text?.takeIf { it.isNotBlank() }
-        val shareText = if (currentLyricText != null) {
-            "「$currentLyricText」\n——《$title》$artist"
-        } else {
-            "《$title》- $artist"
-        }
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, shareText)
-        }
-        context.startActivity(Intent.createChooser(intent, "分享歌词"))
-    }
+    val handleShareLyrics: () -> Unit = { showShareSheet = true }
 
     val handleToggleSecondaryMode: () -> Unit = {
         val nextMode = when {
@@ -722,10 +710,6 @@ fun FullScreenLyricsView(
                 },
                 secondaryMode = fullScreenLyricSecondaryMode,
                 onSecondaryModeChange = { mode ->
-                neteaseLyricsEnabled = neteaseLyricsEnabled,
-                onNeteaseLyricsEnabledChange = { enabled ->
-                    scope.launch { settingsPreferences.saveNeteaseLyricsEnabled(enabled) }
-                },
                     scope.launch { settingsPreferences.saveFullScreenLyricSecondaryMode(mode) }
                 },
                 hasTranslation = hasTranslation,
@@ -737,6 +721,10 @@ fun FullScreenLyricsView(
                 karaokeGlowEffect = fullScreenKaraokeGlowEffect,
                 onKaraokeGlowEffectChange = { enabled ->
                     scope.launch { settingsPreferences.saveFullScreenKaraokeGlowEffect(enabled) }
+                },
+                neteaseLyricsEnabled = neteaseLyricsEnabled,
+                onNeteaseLyricsEnabledChange = { enabled ->
+                    scope.launch { settingsPreferences.saveNeteaseLyricsEnabled(enabled) }
                 },
                 qqLyricsEnabled = qqLyricsEnabled,
                 onQqLyricsEnabledChange = { enabled ->
@@ -759,6 +747,19 @@ fun FullScreenLyricsView(
                     scope.launch { settingsPreferences.saveFullScreenLyricEdgeFade(enabled) }
                 },
                 onDismiss = { showSettingsSheet = false }
+            )
+        }
+
+        if (showShareSheet) {
+            LyricShareSheet(
+                lyrics = lyrics,
+                currentIndex = currentIndex,
+                title = title,
+                artist = artist,
+                coverUrl = coverUrl,
+                durationMs = duration,
+                songLink = songLink,
+                onDismiss = { showShareSheet = false }
             )
         }
     }

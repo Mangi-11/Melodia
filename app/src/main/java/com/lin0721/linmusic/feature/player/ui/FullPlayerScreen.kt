@@ -1,6 +1,5 @@
 package com.lin0721.linmusic.feature.player.ui
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -50,7 +49,9 @@ import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.components.ArtistPickerEntry
 import com.lin0721.linmusic.core.ui.components.ArtistPickerSheet
 import com.lin0721.linmusic.core.ui.components.SwipeToSkipCover
+import com.lin0721.linmusic.core.share.ShareCardKind
 import com.lin0721.linmusic.core.ui.components.ToastManager
+import com.lin0721.linmusic.feature.player.share.LyricShareSheet
 import com.lin0721.linmusic.core.ui.theme.FallbackBackdropPalette
 import com.lin0721.linmusic.core.ui.theme.MelodiaOrientationClass
 import com.lin0721.linmusic.core.ui.theme.PaletteMemoryCache
@@ -160,6 +161,7 @@ fun FullPlayerScreen(
         }
     }
     var showMoreOptionsSheet by remember { mutableStateOf(false) }
+    var showShareCard by remember { mutableStateOf(false) }
     var showTimerSheet by remember { mutableStateOf(false) }
     var showCommentsSheet by remember { mutableStateOf(false) }
     var showCommentFloor by remember { mutableStateOf(false) }
@@ -264,9 +266,9 @@ fun FullPlayerScreen(
     val fullScreenLyricSecondaryMode by settingsPreferences.fullScreenLyricSecondaryMode.collectAsStateWithLifecycle(initialValue = "translation")
     val fullScreenKaraokeAdvancedEffect by settingsPreferences.fullScreenKaraokeAdvancedEffect.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenKaraokeGlowEffect by settingsPreferences.fullScreenKaraokeGlowEffect.collectAsStateWithLifecycle(initialValue = false)
+    val neteaseLyricsEnabled by settingsPreferences.neteaseLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val qqLyricsEnabled by settingsPreferences.qqLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val amllLyricsEnabled by settingsPreferences.amllLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
-    val neteaseLyricsEnabled by settingsPreferences.neteaseLyricsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val fullScreenLyricLineSpacing by settingsPreferences.fullScreenLyricLineSpacing.collectAsStateWithLifecycle(initialValue = 24)
     val fullScreenLyricSecondarySpacing by settingsPreferences.fullScreenLyricSecondarySpacing.collectAsStateWithLifecycle(initialValue = 6)
 
@@ -365,18 +367,15 @@ fun FullPlayerScreen(
         displayedArtist = artist
     }
 
+    // 未匹配云端的本地歌曲只有负数占位 id，没有可复制的链接
+    val songLink = currentTrack.mediaId.toLongOrNull()
+        ?.takeIf { it > 0 && !songDetailState.isLocalOnly && !podcast.isPodcast }
+        ?.let { "https://music.163.com/song?id=$it" }
+
+    // 分享卡片不依赖云端 id，本地歌曲同样可用
     fun shareCurrentSong() {
-        // 未匹配云端的本地歌曲只有负数占位 id，拼出的链接无效
-        if (songDetailState.isLocalOnly) {
-            ToastManager.showToast("本地歌曲未匹配到云端信息，暂不支持分享")
-            return
-        }
-        val shareText = "《$title》- $artist https://music.163.com/song?id=${currentTrack.mediaId}"
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, shareText)
-        }
-        context.startActivity(Intent.createChooser(intent, "分享歌曲"))
+        showMoreOptionsSheet = false
+        showShareCard = true
     }
 
     val listState = rememberLazyListState()
@@ -809,6 +808,8 @@ fun FullPlayerScreen(
             activeLyricIndices = activeLyricIndices,
             title = title,
             artist = artist,
+            coverUrl = coverUrl,
+            songLink = songLink,
             hazeState = hazeState,
             isPlaying = isPlaying,
             currentPositionProvider = currentPositionProvider,
@@ -827,6 +828,20 @@ fun FullPlayerScreen(
             onToggleRepeat = viewModel.playerManager::toggleRepeat,
             onMoreClick = { showMoreOptionsSheet = true }
         )
+
+        if (showShareCard) {
+            LyricShareSheet(
+                lyrics = songDetailState.lyrics,
+                currentIndex = currentLyricIndex,
+                title = title,
+                artist = artist,
+                coverUrl = coverUrl,
+                durationMs = duration,
+                songLink = songLink,
+                initialKind = ShareCardKind.SONG,
+                onDismiss = { showShareCard = false }
+            )
+        }
 
         if (artistPickerEntries.isNotEmpty()) {
             ArtistPickerSheet(
@@ -1033,6 +1048,10 @@ fun FullPlayerScreen(
                 onKaraokeGlowEffectChange = { enabled ->
                     coroutineScope.launch { settingsPreferences.saveFullScreenKaraokeGlowEffect(enabled) }
                 },
+                neteaseLyricsEnabled = neteaseLyricsEnabled,
+                onNeteaseLyricsEnabledChange = { enabled ->
+                    coroutineScope.launch { settingsPreferences.saveNeteaseLyricsEnabled(enabled) }
+                },
                 qqLyricsEnabled = qqLyricsEnabled,
                 onQqLyricsEnabledChange = { enabled ->
                     coroutineScope.launch { settingsPreferences.saveQqLyricsEnabled(enabled) }
@@ -1046,7 +1065,3 @@ fun FullPlayerScreen(
         }
     }
 }
-                neteaseLyricsEnabled = neteaseLyricsEnabled,
-                onNeteaseLyricsEnabledChange = { enabled ->
-                    coroutineScope.launch { settingsPreferences.saveNeteaseLyricsEnabled(enabled) }
-                },
