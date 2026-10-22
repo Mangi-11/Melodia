@@ -50,6 +50,7 @@ import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 import com.lin0721.linmusic.desktop.ui.recognition.RecognitionDialog
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
+import com.lin0721.linmusic.desktop.ui.share.ShareCardDialog
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdownState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.update.UpdateDialog
@@ -205,6 +206,14 @@ fun WindowScope.MelodiaDesktopApp(
                 controller = deps.playbackController,
                 songActions = deps.songActions,
                 onDismiss = { state.showRecognition = false }
+            )
+        }
+        state.shareCardKind?.let { kind ->
+            ShareCardDialog(
+                initialKind = kind,
+                controller = deps.playbackController,
+                playerViewModel = deps.playerViewModel,
+                onDismiss = { state.shareCardKind = null }
             )
         }
     }

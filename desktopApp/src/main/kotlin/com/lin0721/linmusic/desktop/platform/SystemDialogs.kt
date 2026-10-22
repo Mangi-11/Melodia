@@ -73,3 +73,15 @@ suspend fun chooseFiles(title: String, filter: String): List<File> = onEventThre
     }
     dialog.files?.toList().orEmpty()
 }
+
+// 另存为；未带扩展名时补上 extension；取消返回 null
+suspend fun chooseSaveFile(title: String, defaultName: String, extension: String): File? = onEventThread {
+    val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE).apply {
+        file = defaultName
+        isVisible = true
+    }
+    dialog.file?.let { name ->
+        val withExt = if (name.endsWith(".$extension", ignoreCase = true)) name else "$name.$extension"
+        File(dialog.directory.orEmpty(), withExt)
+    }
+}

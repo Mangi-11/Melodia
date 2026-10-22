@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.lin0721.linmusic.core.share.ShareCardKind
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.comments.CommentsHost
@@ -35,6 +36,9 @@ class DesktopAppState(
     var showNewWorks by mutableStateOf(false)
         private set
     var showLogin by mutableStateOf(false)
+
+    // 非空时显示分享卡片对话框，值为初始类型
+    var shareCardKind by mutableStateOf<ShareCardKind?>(null)
     var showRecognition by mutableStateOf(false)
 
     // 打开设置页后要滚动到的分区（SettingsCategory.name），滚动完即清空

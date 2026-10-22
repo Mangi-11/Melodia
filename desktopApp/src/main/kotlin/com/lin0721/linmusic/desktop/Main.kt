@@ -464,7 +464,7 @@ fun main() {
 }
 
 // 窗口与托盘共用的应用图标；资源缺失时退回空白图标而不中断启动
-private fun loadAppIcon(): Painter {
+internal fun loadAppIcon(): Painter {
     val bytes = Thread.currentThread().contextClassLoader?.getResourceAsStream("melodia.png")?.use { it.readBytes() }
         ?: return BitmapPainter(ImageBitmap(32, 32))
     return BitmapPainter(Image.makeFromEncoded(bytes).toComposeImageBitmap())
