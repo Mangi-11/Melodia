@@ -199,8 +199,13 @@ fun LyricsPreview(
     val lazyListState = rememberLazyListState()
     var cardHeightPx by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(currentIndex) {
-        if (currentIndex < 0 || currentIndex >= lyrics.size) return@LaunchedEffect
+    LaunchedEffect(currentIndex, lyrics) {
+        // 新歌前奏或歌词重载时当前行尚未开始：回到顶部，否则停在上一首的位置
+        if (currentIndex < 0) {
+            if (lyrics.isNotEmpty()) lazyListState.animateScrollToItem(index = 0, scrollOffset = 0)
+            return@LaunchedEffect
+        }
+        if (currentIndex >= lyrics.size) return@LaunchedEffect
 
         val cardHeightDp = with(density) { cardHeightPx.toDp() }
         val linesAboveCentre = (cardHeightDp / 2 / itemStrideDp).toInt()

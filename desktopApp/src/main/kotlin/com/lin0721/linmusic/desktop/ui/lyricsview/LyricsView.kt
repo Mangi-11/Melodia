@@ -428,7 +428,13 @@ private fun LyricsList(
         }
         // 内容区顶部留出锚点高度，滚到某行即让它落在锚点处
         LaunchedEffect(primaryIndex, following, lines) {
-            if (following && primaryIndex in lines.indices) listState.animateScrollToItem(primaryIndex)
+            if (!following) return@LaunchedEffect
+            // 新歌前奏或歌词重载时当前行尚未开始：回到顶部，否则停在上一首的位置
+            if (primaryIndex < 0) {
+                if (lines.isNotEmpty()) listState.animateScrollToItem(0)
+            } else if (primaryIndex in lines.indices) {
+                listState.animateScrollToItem(primaryIndex)
+            }
         }
 
         LazyColumn(
