@@ -805,7 +805,7 @@ fun MelodiaApp() {
 
 // 订阅全局 Toast 事件，展示 2 秒后自动清空
 @Composable
-private fun rememberGlobalToastMessage(): String? {
+internal fun rememberGlobalToastMessage(): String? {
     var message by remember { mutableStateOf<String?>(null) }
     var trigger by remember { mutableStateOf(0) }
 
