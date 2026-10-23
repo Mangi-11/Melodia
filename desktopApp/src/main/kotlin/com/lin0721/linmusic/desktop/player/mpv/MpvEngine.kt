@@ -39,6 +39,9 @@ class MpvEngine(private val listener: Listener, extraOptions: Map<String, String
         setOption("idle", "yes")
         setOption("audio-display", "no")
         setOption("keep-open", "no")
+        // 在线播放的读取缓存默认前向 150MiB、后向 50MiB，两个实例并存时占用可观；单曲文件通常远小于此
+        setOption("demuxer-max-bytes", "32MiB")
+        setOption("demuxer-max-back-bytes", "16MiB")
         extraOptions.forEach { (name, value) -> setOption(name, value) }
         check(mpv.mpv_initialize(ctx) >= 0) { "mpv_initialize 失败" }
         mpv.mpv_observe_property(ctx, OBSERVE_TIME_POS, "time-pos", MpvConst.FORMAT_DOUBLE)

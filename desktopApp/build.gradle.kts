@@ -217,6 +217,8 @@ compose.desktop {
         jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "--enable-native-access=ALL-UNNAMED")
         // 实测堆不足 200MB，上限只作兜底；空闲时 G1 定期回收并把空闲堆还给系统
         jvmArgs("-Xmx1g", "-XX:G1PeriodicGCInterval=60000")
+        // 主窗口销毁后需反射清理 AWT 残留的焦点窗口引用
+        jvmArgs("--add-opens=java.desktop/java.awt=ALL-UNNAMED")
         // 发布版打包时用 ProGuard 裁掉未使用的类（图标库等体积大头）
         buildTypes.release.proguard {
             configurationFiles.from(project.file("proguard-rules.pro"))
@@ -231,7 +233,8 @@ compose.desktop {
             description = "Melodia 音乐播放器"
             appResourcesRootDir.set(layout.buildDirectory.dir("appResources"))
             // jdeps 建议列表 + TLS 椭圆曲线套件所需的 jdk.crypto.ec（jdeps 无法静态分析出）
-            modules("java.instrument", "java.naming", "java.prefs", "java.sql", "jdk.unsupported", "jdk.crypto.ec")
+            // jdk.management 用于后台运行时调整堆空闲比例
+            modules("java.instrument", "java.naming", "java.prefs", "java.sql", "jdk.unsupported", "jdk.crypto.ec", "jdk.management")
             windows {
                 iconFile.set(layout.projectDirectory.file("icons/melodia.ico"))
                 // 固定值，覆盖安装时据此识别为同一应用并升级

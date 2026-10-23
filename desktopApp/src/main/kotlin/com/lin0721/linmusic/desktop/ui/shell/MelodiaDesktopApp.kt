@@ -20,8 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -46,7 +44,6 @@ import com.lin0721.linmusic.desktop.ui.components.uiExit
 import com.lin0721.linmusic.desktop.ui.login.LoginDialog
 import com.lin0721.linmusic.desktop.ui.lyricsview.CHROME_ANIM_MS
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
-import com.lin0721.linmusic.desktop.ui.navigation.DesktopFrameHost
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 import com.lin0721.linmusic.desktop.ui.recognition.RecognitionDialog
 import com.lin0721.linmusic.desktop.ui.search.SearchDropdown
@@ -56,7 +53,6 @@ import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.update.UpdateDialog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.launch
 
 private val ChromeEnter = fadeIn(tween(CHROME_ANIM_MS)) + expandVertically(tween(CHROME_ANIM_MS))
 private val ChromeExit = fadeOut(tween(CHROME_ANIM_MS)) + shrinkVertically(tween(CHROME_ANIM_MS))
@@ -69,6 +65,7 @@ private const val MOUSE_BUTTON_FORWARD = 5
 @Composable
 fun WindowScope.MelodiaDesktopApp(
     deps: DesktopAppDependencies,
+    session: DesktopShellSession,
     windowState: WindowState,
     fullscreen: FullscreenState,
     lyricsView: LyricsViewState,
@@ -78,17 +75,11 @@ fun WindowScope.MelodiaDesktopApp(
     onEnterMiniPlayer: () -> Unit,
     onClose: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val controller = deps.playbackController
     // 占位播放器没有音量与输出设备能力，界面隐藏对应入口
     val audioOutput: AudioOutputControl? = controller.takeIf { it.unavailableReason == null }
-    val pane = rememberPaneLayoutState(deps.desktopPreferences, scope)
-    val state = remember(lyricsView, pane) {
-        DesktopAppState(lyricsView, pane, deps.libraryViewModel.asViewControl()) { open ->
-            scope.launch { deps.desktopPreferences.saveNowPlayingPanelOpen(open) }
-        }
-    }
+    val state = session.state
 
     val userProfile by deps.homeViewModel.userProfile.collectAsState()
     val downloadLevel by deps.settingsPreferences.wifiQuality.collectAsState(initial = "standard")
@@ -135,15 +126,7 @@ fun WindowScope.MelodiaDesktopApp(
     LaunchedEffect(state) { appMessages(deps, state).collect { snackbarHostState.showSnackbar(it) } }
 
     val navigator = desktopNavigator(state, deps, userProfile != null, downloadLevel, defaultPlaylistPrivate)
-    val saveableStateHolder = rememberSaveableStateHolder()
-    val frameHost = remember(saveableStateHolder) {
-        DesktopFrameHost(
-            saveableStateHolder = saveableStateHolder,
-            liveEntryIds = { state.backStack.liveEntryIds },
-            scope = scope,
-            onToast = state::showMessage
-        )
-    }
+    val frameHost = session.frameHost
     val liveEntryIds = state.backStack.liveEntryIds
     LaunchedEffect(liveEntryIds) { frameHost.reconcile() }
 

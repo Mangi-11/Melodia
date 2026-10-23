@@ -41,6 +41,7 @@ import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
 import com.lin0721.linmusic.desktop.app.DesktopCacheRoot
 import com.lin0721.linmusic.desktop.app.DesktopLogging
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.app.HeapTrim
 import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.app.applyRenderBackend
 import com.lin0721.linmusic.desktop.app.scaledMinWindowSize
@@ -77,6 +78,7 @@ import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
 import com.lin0721.linmusic.desktop.ui.shell.MelodiaDesktopApp
 import com.lin0721.linmusic.desktop.ui.shell.TaskbarThumbnailEffect
 import com.lin0721.linmusic.desktop.ui.shell.WindowChromeEffect
+import com.lin0721.linmusic.desktop.ui.shell.rememberDesktopShellSession
 import com.lin0721.linmusic.desktop.ui.shell.rememberFullscreenState
 import com.lin0721.linmusic.desktop.ui.theme.MelodiaDesktopTheme
 import com.lin0721.linmusic.desktop.ui.tray.TrayHost
@@ -104,7 +106,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.koin.core.context.startKoin
+import java.awt.Component
 import java.awt.Dimension
+import java.awt.KeyboardFocusManager
 import kotlin.system.exitProcess
 
 private const val VOLUME_STEP = 5
@@ -112,6 +116,8 @@ private const val SEEK_STEP_MS = 5_000L
 private const val EXIT_ANIMATION_MS = 250L
 private const val WINDOW_SAVE_DEBOUNCE_MS = 400L
 private const val BACKGROUND_RELEASE_DELAY_MS = 120_000L
+private const val MAIN_WINDOW_DISPOSE_DELAY_MS = 600_000L
+private const val WINDOW_DISPOSE_SETTLE_MS = 1_000L
 
 // 判断桌面歌词上次位置是否仍在屏幕内时假定的窗口高度
 private const val LYRIC_REACH_HEIGHT = 100
@@ -209,7 +215,10 @@ fun main() {
         var isMiniMode by remember { mutableStateOf(false) }
         // 已可见但被遮挡或最小化时，靠计数触发再次置前
         var bringToFrontRequest by remember { mutableStateOf(0) }
+        // 在托盘里放久了会销毁主窗口，任何唤起入口都先重建
+        var isMainAlive by remember { mutableStateOf(true) }
         val showMainWindow: () -> Unit = {
+            isMainAlive = true
             isMiniMode = false
             isMainVisible = true
             bringToFrontRequest++
@@ -355,14 +364,32 @@ fun main() {
         LaunchedEffect(windowState) {
             snapshotFlow { (!isMainVisible && !isMiniMode) || (isMainVisible && windowState.isMinimized) }
                 .collectLatest { inBackground ->
-                    if (!inBackground) return@collectLatest
+                    if (!inBackground) {
+                        HeapTrim.restore()
+                        return@collectLatest
+                    }
                     delay(BACKGROUND_RELEASE_DELAY_MS)
+                    HeapTrim.shrink()
                     withContext(Dispatchers.Default) { DesktopImageLoader.releaseMemory() }
                 }
         }
         val fullscreen = rememberFullscreenState(windowState)
         val lyricsView = rememberLyricsViewState(fullscreen)
-        Window(
+        val shellSession = rememberDesktopShellSession(appDependencies, lyricsView)
+        // 关到托盘久了销毁主窗口，连同 GPU 上下文与整棵界面树一起释放；页面现场留在 shellSession，重建后原样接回
+        LaunchedEffect(Unit) {
+            snapshotFlow { !isMainVisible && !isMiniMode }
+                .collectLatest { inTray ->
+                    if (!inTray) return@collectLatest
+                    delay(MAIN_WINDOW_DISPOSE_DELAY_MS)
+                    isMainAlive = false
+                    // 等窗口真正销毁后再清引用并回收
+                    delay(WINDOW_DISPOSE_SETTLE_MS)
+                    clearStaleFocusedWindow()
+                    withContext(Dispatchers.Default) { DesktopImageLoader.releaseMemory() }
+                }
+        }
+        if (isMainAlive) Window(
             onCloseRequest = closeMainWindow,
             visible = isMainVisible,
             state = windowState,
@@ -425,17 +452,20 @@ fun main() {
             TaskbarThumbnailEffect(taskbarThumbnail, controller)
             CompositionLocalProvider(LocalUiMotion provides uiMotion) {
                 MelodiaDesktopTheme(uiScale = uiScaleFactor) {
-                    MelodiaDesktopApp(
-                        deps = appDependencies,
-                        windowState = windowState,
-                        fullscreen = fullscreen,
-                        lyricsView = lyricsView,
-                        searchFocusRequests = searchFocusRequests.receiveAsFlow(),
-                        settingsRequests = settingsRequests.receiveAsFlow(),
-                        loginRequests = loginRequests.receiveAsFlow(),
-                        onEnterMiniPlayer = enterMiniPlayer,
-                        onClose = closeMainWindow
-                    )
+                    shellSession.Provide {
+                        MelodiaDesktopApp(
+                            deps = appDependencies,
+                            session = shellSession,
+                            windowState = windowState,
+                            fullscreen = fullscreen,
+                            lyricsView = lyricsView,
+                            searchFocusRequests = searchFocusRequests.receiveAsFlow(),
+                            settingsRequests = settingsRequests.receiveAsFlow(),
+                            loginRequests = loginRequests.receiveAsFlow(),
+                            onEnterMiniPlayer = enterMiniPlayer,
+                            onClose = closeMainWindow
+                        )
+                    }
                 }
             }
         }
@@ -481,6 +511,28 @@ fun main() {
                     loginRequests.trySend(Unit)
                 }
             )
+        }
+    }
+}
+
+// AWT 在窗口销毁后仍把它记作焦点/激活窗口，连带引住整棵界面树；托盘期间没有新窗口接替，只能手动清掉
+// 这些设置方法受保护，依赖启动参数 --add-opens java.desktop/java.awt
+private val StaleFocusSetters = listOf(
+    "setGlobalFocusOwner" to Component::class.java,
+    "setGlobalPermanentFocusOwner" to Component::class.java,
+    "setGlobalFocusedWindow" to java.awt.Window::class.java,
+    "setGlobalActiveWindow" to java.awt.Window::class.java
+)
+
+private fun clearStaleFocusedWindow() {
+    val manager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+    for ((name, type) in StaleFocusSetters) {
+        try {
+            KeyboardFocusManager::class.java.getDeclaredMethod(name, type).apply { isAccessible = true }.invoke(manager, null)
+        } catch (e: ReflectiveOperationException) {
+            AppLogger.w("Main", "清理过期焦点引用失败：$name", e)
+        } catch (e: RuntimeException) {
+            AppLogger.w("Main", "清理过期焦点引用失败：$name", e)
         }
     }
 }

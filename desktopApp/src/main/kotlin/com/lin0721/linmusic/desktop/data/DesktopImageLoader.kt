@@ -15,7 +15,7 @@ import java.io.File
 private const val TAG = "DesktopImageLoader"
 
 // 位图像素在 Skia 原生内存里，按堆比例会随最大堆放大，改为固定上限
-private const val MEMORY_CACHE_MAX_BYTES = 128L * 1024 * 1024
+private const val MEMORY_CACHE_MAX_BYTES = 64L * 1024 * 1024
 private const val DECODER_PARALLELISM = 4
 private const val FETCHER_PARALLELISM = 8
 
