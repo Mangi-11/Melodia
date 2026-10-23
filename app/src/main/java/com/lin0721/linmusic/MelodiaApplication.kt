@@ -29,9 +29,7 @@ import com.lin0721.linmusic.di.playerModule
 import com.lin0721.linmusic.di.recognitionModule
 import com.lin0721.linmusic.di.repositoryModule
 import com.lin0721.linmusic.di.sourceModule
-import com.lin0721.linmusic.core.source.SourcePreferences
-import com.lin0721.linmusic.feature.source.plugin.LxPluginEngine
-import kotlinx.coroutines.flow.first
+import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.di.updateModule
 import com.lin0721.linmusic.di.viewModelModule
 import kotlinx.coroutines.CoroutineScope
@@ -89,13 +87,9 @@ class MelodiaApplication : Application() {
         }
 
         // 异步预加载已保存启用的 LX 音源插件
-        val sourcePreferences: SourcePreferences by inject()
-        val lxPluginEngine: LxPluginEngine by inject()
+        val lxPluginManager: LxPluginManager by inject()
         CoroutineScope(Dispatchers.IO).launch {
-            val script = sourcePreferences.lxScriptContent.first()
-            if (script.isNotBlank() && sourcePreferences.lxPluginEnabled.first()) {
-                lxPluginEngine.loadScript(script)
-            }
+            lxPluginManager.warmUp()
         }
 
         // 初始化 WorkManager 并注入自定义 WorkerFactory

@@ -34,6 +34,8 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
     // 活跃插件沙盒池 (pluginId -> PluginSandbox)
     private val activeSandboxes = ConcurrentHashMap<String, PluginSandbox>()
+    // 正在初始化的插件沙盒任务，供并发调用复用，避免单个失效插件拖慢已就绪插件的直链解析
+    private val activatingJobs = ConcurrentHashMap<String, Deferred<Boolean>>()
     private val nextCallId = AtomicInteger(0)
 
     // 内部沙盒实体
@@ -102,12 +104,15 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
     // 激活并注册插件
     override suspend fun activatePlugin(item: LxPluginItem): Boolean = withContext(Dispatchers.Main) {
-        try {
-            // 若已存在相同 ID 沙盒，先进行销毁
-            deactivatePlugin(item.id)
+        deactivatePlugin(item.id)
+        activateInternal(item)
+    }
 
+    private suspend fun activateInternal(item: LxPluginItem): Boolean {
+        var sandbox: PluginSandbox? = null
+        return try {
             val initDeferred = CompletableDeferred<List<String>>()
-            val sandbox = createSandboxInstance(
+            sandbox = createSandboxInstance(
                 pluginId = item.id,
                 onInited = { sources -> initDeferred.complete(sources) }
             )
@@ -125,14 +130,25 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
             val sources = withTimeoutOrNull(LxScriptSupport.INIT_TIMEOUT_MS) {
                 initDeferred.await()
             }
-            if (sources != null && sources.isNotEmpty()) {
-                sandbox.supportedSources = sources
+            if (sources != null) {
+                if (sources.isNotEmpty()) {
+                    sandbox.supportedSources = sources
+                }
+            } else if (sandbox.supportedSources.isEmpty()) {
+                // 未能按时触发 inited 且无预置平台列表，视为激活失败并释放沙盒
+                destroySandbox(sandbox)
+                AppLogger.w(TAG, "插件 [${item.name}] 初始化超时且无支持平台, ID=${item.id}")
+                return false
             }
 
             activeSandboxes[item.id] = sandbox
             AppLogger.i(TAG, "插件 [${item.name}] 沙盒激活成功, ID=${item.id}, sources=${sandbox.supportedSources}")
             true
+        } catch (e: CancellationException) {
+            sandbox?.let { destroySandbox(it) }
+            throw e
         } catch (e: Exception) {
+            sandbox?.let { destroySandbox(it) }
             AppLogger.e(TAG, "激活插件失败: ${item.name}", e)
             false
         }
@@ -140,6 +156,7 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
     // 注销并销毁指定插件沙盒
     override fun deactivatePlugin(pluginId: String) {
+        activatingJobs.remove(pluginId)?.cancel()
         activeSandboxes.remove(pluginId)?.let { sandbox ->
             scope.launch(Dispatchers.Main) {
                 destroySandbox(sandbox)
@@ -148,20 +165,34 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
     }
 
     // 批量同步活跃插件沙盒状态
-    override suspend fun syncActivePlugins(items: List<LxPluginItem>) = withContext(Dispatchers.Main) {
+    override suspend fun syncActivePlugins(items: List<LxPluginItem>): Unit = withContext(Dispatchers.Main) {
         val enabledItems = items.filter { it.isEnabled }
         val enabledIds = enabledItems.map { it.id }.toSet()
 
         // 卸载未启用或已被删除的沙盒
-        val toRemove = activeSandboxes.keys.filter { it !in enabledIds }
+        val toRemove = (activeSandboxes.keys + activatingJobs.keys).filter { it !in enabledIds }
         toRemove.forEach { deactivatePlugin(it) }
 
-        // 激活新增或尚未运行的沙盒
+        // 并行启动尚未就绪的沙盒，已就绪的插件无需等待其他失效插件超时
         for (item in enabledItems) {
             if (!activeSandboxes.containsKey(item.id)) {
-                activatePlugin(item)
+                ensureActivating(item)
             }
         }
+    }
+
+    private fun ensureActivating(item: LxPluginItem): Deferred<Boolean> {
+        activatingJobs[item.id]?.takeIf { it.isActive }?.let { return it }
+        lateinit var job: Deferred<Boolean>
+        job = scope.async(Dispatchers.Main) {
+            try {
+                activateInternal(item)
+            } finally {
+                activatingJobs.remove(item.id, job)
+            }
+        }
+        activatingJobs[item.id] = job
+        return job
     }
 
     // 获取特定插件当前支持的平台列表
@@ -180,6 +211,9 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
         durationMs: Long,
         quality: String
     ): String? = withContext(Dispatchers.IO) {
+        if (!activeSandboxes.containsKey(pluginId)) {
+            activatingJobs[pluginId]?.await()
+        }
         val sandbox = activeSandboxes[pluginId] ?: return@withContext null
         val callId = nextCallId.incrementAndGet()
         val deferred = CompletableDeferred<String?>()
@@ -213,6 +247,8 @@ class LxPluginEngine(private val context: Context) : LxPluginRuntime {
 
     // 重置并销毁全部沙盒
     override fun reset() {
+        activatingJobs.values.forEach { it.cancel() }
+        activatingJobs.clear()
         val sandboxes = activeSandboxes.values.toList()
         activeSandboxes.clear()
         scope.launch(Dispatchers.Main) {

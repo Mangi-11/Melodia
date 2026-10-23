@@ -1,15 +1,20 @@
 package com.lin0721.linmusic.core.player
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import androidx.media3.common.AudioAttributes
@@ -58,8 +63,36 @@ private const val NOTIFICATION_ID = 1001
 private const val PLAYBACK_CHANNEL_ID = "melodia_playback_channel"
 private const val PLAYBACK_CHANNEL_NAME = "正在播放"
 private const val ACTION_UNLOCK_FLOATING_LYRIC = "ACTION_UNLOCK_FLOATING_LYRIC"
+private const val ACTION_PREPARE_FOREGROUND = "com.lin0721.linmusic.action.PREPARE_FOREGROUND"
+private const val ACTION_STOP_PENDING_FOREGROUND = "com.lin0721.linmusic.action.STOP_PENDING_FOREGROUND"
+private const val EXTRA_PENDING_TITLE = "extra_pending_title"
+private const val EXTRA_PENDING_ARTIST = "extra_pending_artist"
 
 class MelodiaPlaybackService : MediaSessionService() {
+
+    companion object {
+        // 拉取在线播放链接前趁应用仍具前台资格先行提升前台服务，避免切后台后网络受限或 FGS 被拒
+        fun startForPendingPlay(context: Context, title: String, artist: String) {
+            val intent = Intent(context, MelodiaPlaybackService::class.java).apply {
+                action = ACTION_PREPARE_FOREGROUND
+                putExtra(EXTRA_PENDING_TITLE, title)
+                putExtra(EXTRA_PENDING_ARTIST, artist)
+            }
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "预启动播放前台服务失败", e)
+            }
+        }
+
+        // 待播拉链被取消或彻底失败且底层未在播放时，移除预启动的前台状态
+        fun stopPendingForeground(context: Context) {
+            val intent = Intent(context, MelodiaPlaybackService::class.java).apply {
+                action = ACTION_STOP_PENDING_FOREGROUND
+            }
+            runCatching { context.startService(intent) }
+        }
+    }
 
     private val playerManager: PlayerManager by inject()
     private val settingsPreferences: SettingsPreferences by inject()
@@ -281,6 +314,66 @@ class MelodiaPlaybackService : MediaSessionService() {
                 }
             }
         })
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_PREPARE_FOREGROUND -> {
+                val title = intent.getStringExtra(EXTRA_PENDING_TITLE)
+                val artist = intent.getStringExtra(EXTRA_PENDING_ARTIST)
+                promoteToForegroundForPendingPlay(title, artist)
+            }
+            ACTION_STOP_PENDING_FOREGROUND -> {
+                val currentPlayer = player
+                if (currentPlayer == null || (currentPlayer.playbackState == Player.STATE_IDLE && !currentPlayer.isPlaying)) {
+                    runCatching { ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE) }
+                }
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun promoteToForegroundForPendingPlay(pendingTitle: String?, pendingArtist: String?) {
+        ensureNotificationChannel()
+        val title = pendingTitle?.takeIf { it.isNotBlank() }
+            ?: player?.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.app_name)
+        val artist = pendingArtist?.takeIf { it.isNotBlank() }
+            ?: player?.currentMediaItem?.mediaMetadata?.artist?.toString().orEmpty()
+        val notification = buildPendingForegroundNotification(title, artist)
+        val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        } else {
+            0
+        }
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, fgsType)
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "进入待播前台服务失败", e)
+        }
+    }
+
+    private fun buildPendingForegroundNotification(title: String, artist: String): Notification {
+        val builder = NotificationCompat.Builder(this, PLAYBACK_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(artist)
+            .setContentIntent(sessionActivityPendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
+            .setShowWhen(false)
+        currentCoverBitmap?.let { builder.setLargeIcon(it) }
+        mediaSession?.let { session ->
+            val mediaStyle = MediaNotificationCompat.MediaStyle()
+                .setMediaSession(
+                    android.support.v4.media.session.MediaSessionCompat.Token.fromToken(
+                        session.platformToken
+                    )
+                )
+            builder.setStyle(mediaStyle)
+        }
+        return builder.build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
