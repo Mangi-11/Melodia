@@ -282,6 +282,7 @@ fun FullScreenLyricsView(
     PlayerBackdrop(
         base = base,
         mode = BackdropMode.Immersive,
+        animateMesh = isPlaying,
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { dragState.onScreenHeightChange(it.height.toFloat()) }

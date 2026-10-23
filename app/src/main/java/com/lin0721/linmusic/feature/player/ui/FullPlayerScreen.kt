@@ -639,6 +639,8 @@ fun FullPlayerScreen(
                         colors = colors,
                         commentsState = commentsState,
                         currentLyricIndex = currentLyricIndex,
+                        // 全屏歌词盖住播放页时歌词卡不可见，光斑无需游走
+                        animateLyricsMesh = isPlaying && !isLyricsFullScreen,
                         cardLayout = cardLayout,
                         onOpenFullScreenLyrics = { isLyricsFullScreen = true },
                         onCommentsClick = { showCommentsSheet = true },

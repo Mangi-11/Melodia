@@ -57,40 +57,13 @@ fun LyricsCard(
     currentIndex: Int,
     isLoading: Boolean,
     base: Color,
+    // 播放中且未被全屏歌词遮住时光斑才游走
+    animateMesh: Boolean,
     isAmll: Boolean = false,
     isQrc: Boolean = false,
     onOpenFullScreen: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "fluid_mesh")
-
-    // 右下角光斑动画
-    val darkCenterX by infiniteTransition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(15000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_x"
-    )
-    val darkCenterY by infiniteTransition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(13000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_y"
-    )
-    val darkRadiusScale by infiniteTransition.animateFloat(
-        initialValue = 0.40f,
-        targetValue = 0.50f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(10000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_radius"
-    )
+    val meshPhaseMs = rememberMeshPhaseMs(animateMesh)
 
     val vividBase = remember(base) { base.saturateIfChromatic(0.6f) }
     val fillColor = remember(vividBase) { vividBase.darken(0.35f) }
@@ -125,6 +98,11 @@ fun LyricsCard(
                 .blur(LYRICS_CARD_BLUR_RADIUS)
                 .drawBehind {
                     val baseSize = size.minDimension
+                    // 右下角光斑游走
+                    val phaseMs = meshPhaseMs.longValue
+                    val darkCenterX = meshPingPong(phaseMs, 15000L, 1.20f, 1.35f)
+                    val darkCenterY = meshPingPong(phaseMs, 13000L, 1.20f, 1.35f)
+                    val darkRadiusScale = meshPingPong(phaseMs, 10000L, 0.40f, 0.50f)
                     drawSingleHueMesh(
                         fill = fillColor,
                         darkBlob = darkBlob,
