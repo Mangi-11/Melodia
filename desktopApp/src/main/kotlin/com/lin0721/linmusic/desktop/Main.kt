@@ -92,12 +92,14 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.koin.core.context.startKoin
 import java.awt.Dimension
@@ -107,6 +109,7 @@ private const val VOLUME_STEP = 5
 private const val SEEK_STEP_MS = 5_000L
 private const val EXIT_ANIMATION_MS = 250L
 private const val WINDOW_SAVE_DEBOUNCE_MS = 400L
+private const val BACKGROUND_RELEASE_DELAY_MS = 120_000L
 
 // 判断桌面歌词上次位置是否仍在屏幕内时假定的窗口高度
 private const val LYRIC_REACH_HEIGHT = 100
@@ -341,6 +344,15 @@ fun main() {
             size = restoredBounds?.let { DpSize(it.width.dp, it.height.dp) } ?: DEFAULT_WINDOW_SIZE,
             position = restoredPosition?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition(Alignment.Center)
         )
+        // 主窗口在托盘或最小化持续一段时间后释放图片内存；迷你窗仍在显示封面，不算后台
+        LaunchedEffect(windowState) {
+            snapshotFlow { (!isMainVisible && !isMiniMode) || (isMainVisible && windowState.isMinimized) }
+                .collectLatest { inBackground ->
+                    if (!inBackground) return@collectLatest
+                    delay(BACKGROUND_RELEASE_DELAY_MS)
+                    withContext(Dispatchers.Default) { DesktopImageLoader.releaseMemory() }
+                }
+        }
         val fullscreen = rememberFullscreenState(windowState)
         val lyricsView = rememberLyricsViewState(fullscreen)
         Window(

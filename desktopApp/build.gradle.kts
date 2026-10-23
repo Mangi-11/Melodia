@@ -215,6 +215,8 @@ compose.desktop {
         javaHome = packagingJavaHome.get()
         // 中文系统默认 GBK，统一日志输出编码
         jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8", "--enable-native-access=ALL-UNNAMED")
+        // 实测堆不足 200MB，上限只作兜底；空闲时 G1 定期回收并把空闲堆还给系统
+        jvmArgs("-Xmx1g", "-XX:G1PeriodicGCInterval=60000")
         // 发布版打包时用 ProGuard 裁掉未使用的类（图标库等体积大头）
         buildTypes.release.proguard {
             configurationFiles.from(project.file("proguard-rules.pro"))
