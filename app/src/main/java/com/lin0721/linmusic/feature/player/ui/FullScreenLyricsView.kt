@@ -102,7 +102,9 @@ fun FullScreenLyricsView(
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onMoreClick: () -> Unit,
-    onControlsVisibilityChange: (Boolean) -> Unit = {}
+    onControlsVisibilityChange: (Boolean) -> Unit = {},
+    coverage: LyricsOverlayCoverage? = null,
+    isFullyEntered: () -> Boolean = { true }
 ) {
     val lazyListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -222,6 +224,15 @@ fun FullScreenLyricsView(
     DisposableEffect(Unit) {
         onDispose {
             dragState.reset()
+        }
+    }
+
+    // 下拉时下层播放页会从顶部露出，此时不算完整盖住
+    val isFullyEnteredState = rememberUpdatedState(isFullyEntered)
+    if (coverage != null) {
+        DisposableEffect(coverage, dragState) {
+            coverage.coveringProvider = { isFullyEnteredState.value() && dragState.offsetY == 0f }
+            onDispose { coverage.coveringProvider = { false } }
         }
     }
 

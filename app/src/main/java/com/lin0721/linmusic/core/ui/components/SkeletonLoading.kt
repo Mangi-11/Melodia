@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
-import coil3.request.allowHardware
 import coil3.toBitmap
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.SurfaceLight
@@ -90,6 +89,7 @@ fun CoverPlaceholder(modifier: Modifier = Modifier) {
 
 // 无占位闪烁的封面异步加载：占位图常驻底层，图片直接叠在顶层覆盖，不走 loading/success 插槽整体切换，
 // 避免 SubcomposeAsyncImage 那种切片方式在命中内存缓存时仍会闪现一帧占位图。外层 modifier 负责尺寸/裁剪
+// 允许硬件位图：软件位图在 GPU 贴图缓存紧张时会被逐帧重新上传；onImageLoaded 拿到的可能是硬件位图，不能直接读像素
 @Composable
 fun AntiFlickerCoverImage(
     url: String,
@@ -111,7 +111,6 @@ fun AntiFlickerCoverImage(
                 model = remember(url) {
                     ImageRequest.Builder(context)
                         .data(url)
-                        .allowHardware(false)
                         .build()
                 },
                 contentDescription = null,

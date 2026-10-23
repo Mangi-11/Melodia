@@ -31,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -380,6 +381,7 @@ fun FullPlayerScreen(
 
     val listState = rememberLazyListState()
     val hazeState = remember { HazeState() }
+    val lyricsCoverage = remember { LyricsOverlayCoverage() }
     val scrollMetrics = rememberFullPlayerScrollMetrics(listState)
     val density = LocalDensity.current
     val navigationBarBottomPadding = melodiaNavigationBarBottomPadding()
@@ -574,7 +576,9 @@ fun FullPlayerScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .haze(hazeState),
+                        .haze(hazeState)
+                        // 全屏歌词完整盖住时整页不可见，跳过绘制，避免随进度刷新反复重绘并上传封面贴图
+                        .drawWithContent { if (!lyricsCoverage.isCovering) drawContent() },
                     contentPadding = PaddingValues(
                         start = startInset,
                         end = endInset,
@@ -804,6 +808,7 @@ fun FullPlayerScreen(
 
         FullPlayerLyricsOverlay(
             visible = isLyricsFullScreen,
+            coverage = lyricsCoverage,
             songState = songDetailState,
             colors = colors,
             currentLyricIndex = currentLyricIndex,

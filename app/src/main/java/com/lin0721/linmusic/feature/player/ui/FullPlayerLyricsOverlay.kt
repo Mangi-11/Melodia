@@ -1,6 +1,7 @@
 package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.slideInVertically
@@ -8,6 +9,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,10 +20,18 @@ import com.lin0721.linmusic.core.ui.theme.PlayerBackdropPalette
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 import dev.chrisbanes.haze.HazeState
 
+// 全屏歌词是否完整盖住下层播放页：进场动画结束且未下拉。只应在绘制阶段读取，下层据此跳过整页绘制
+@Stable
+class LyricsOverlayCoverage {
+    internal var coveringProvider by mutableStateOf<() -> Boolean>({ false })
+    val isCovering: Boolean get() = coveringProvider()
+}
+
 // 全屏歌词覆盖层，从底部滑入滑出
 @Composable
 fun FullPlayerLyricsOverlay(
     visible: Boolean,
+    coverage: LyricsOverlayCoverage,
     songState: PlayerSongDetailState,
     colors: PlayerBackdropPalette,
     currentLyricIndex: Int,
@@ -76,7 +86,13 @@ fun FullPlayerLyricsOverlay(
         },
         modifier = Modifier.fillMaxSize()
     ) {
+        val visibilityTransition = transition
         FullScreenLyricsView(
+            coverage = coverage,
+            isFullyEntered = {
+                visibilityTransition.currentState == EnterExitState.Visible &&
+                    visibilityTransition.targetState == EnterExitState.Visible
+            },
             lyrics = songState.lyrics,
             currentIndex = currentLyricIndex,
             activeIndices = activeLyricIndices,
