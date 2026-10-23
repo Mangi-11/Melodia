@@ -207,8 +207,9 @@ private fun ArtistContent(
     val density = LocalDensity.current
     val barHeightPx = with(density) { StickyBarHeight.roundToPx() }
     val playButtonBottomPx = with(density) { (ActionBarVerticalPadding + PlayButtonSize).roundToPx() }
-    var backdropHeightPx by remember(state.artist.id) { mutableIntStateOf(0) }
-    var headerHeightPx by remember(state.artist.id) { mutableIntStateOf(0) }
+    // 恢复页面现场时列表直接停在中间，大标题不会再测一次，高度要随现场保存
+    var backdropHeightPx by rememberSaveable(state.artist.id) { mutableIntStateOf(0) }
+    var headerHeightPx by rememberSaveable(state.artist.id) { mutableIntStateOf(0) }
 
     val showTitleBar by remember(barHeightPx) {
         derivedStateOf { backdropHeightPx > 0 && listState.scrolledPast(backdropHeightPx - barHeightPx) }

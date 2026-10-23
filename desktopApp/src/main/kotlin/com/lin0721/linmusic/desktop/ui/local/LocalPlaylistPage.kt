@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -227,8 +228,9 @@ fun LocalPlaylistPage(
     val density = LocalDensity.current
     val barHeightPx = with(density) { StickyBarHeight.roundToPx() }
     val playButtonBottomPx = with(density) { (ActionBarVerticalPadding + PlayButtonSize).roundToPx() }
-    var heroHeightPx by remember(playlistId) { mutableIntStateOf(0) }
-    var headerHeightPx by remember(playlistId) { mutableIntStateOf(0) }
+    // 恢复页面现场时列表直接停在中间，大标题不会再测一次，高度要随现场保存
+    var heroHeightPx by rememberSaveable(playlistId) { mutableIntStateOf(0) }
+    var headerHeightPx by rememberSaveable(playlistId) { mutableIntStateOf(0) }
     val showTitleBar by remember(barHeightPx) {
         derivedStateOf { heroHeightPx > 0 && listState.scrolledPast(heroHeightPx - barHeightPx) }
     }
