@@ -54,6 +54,8 @@ class SettingsPreferences(
         private val KEY_AUTO_PLAY_NEXT = booleanPreferencesKey("auto_play_next")
         // 与其他应用同时播放，默认 false
         private val KEY_PLAY_WITH_OTHER_APPS = booleanPreferencesKey("play_with_other_apps")
+        // 硬件音频解码（音频卸载），默认 false
+        private val KEY_AUDIO_OFFLOAD = booleanPreferencesKey("audio_offload")
         // 外部音视频停止后自动恢复，默认 true
         private val KEY_RESUME_AFTER_EXTERNAL_INTERRUPTION = booleanPreferencesKey("resume_after_external_interruption")
         // 切歌交叉淡化，默认 false
@@ -293,6 +295,19 @@ class SettingsPreferences(
         }
     }
 
+    // 硬件音频解码 Flow
+    val audioOffload: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_AUDIO_OFFLOAD] ?: false
+    }
+
+    // 与切歌交叉淡化互斥
+    suspend fun saveAudioOffload(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_AUDIO_OFFLOAD] = enabled
+            if (enabled) prefs[KEY_CROSSFADE_ENABLED] = false
+        }
+    }
+
     // 外部音视频停止后自动恢复 Flow
     val resumeAfterExternalInterruption: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_RESUME_AFTER_EXTERNAL_INTERRUPTION] ?: true
@@ -309,9 +324,11 @@ class SettingsPreferences(
         prefs[KEY_CROSSFADE_ENABLED] ?: false
     }
 
+    // 与硬件音频解码互斥：淡化时两台播放器同时出声，会争用唯一的卸载通道
     suspend fun saveCrossfadeEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_CROSSFADE_ENABLED] = enabled
+            if (enabled) prefs[KEY_AUDIO_OFFLOAD] = false
         }
     }
 

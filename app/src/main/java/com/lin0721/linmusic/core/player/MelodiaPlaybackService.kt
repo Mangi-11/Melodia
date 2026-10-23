@@ -15,6 +15,7 @@ import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -183,15 +184,17 @@ class MelodiaPlaybackService : MediaSessionService() {
             .build()
         // 耳机拔出 / 蓝牙耳机断开（如收回耳机盒）时系统发出 AUDIO_BECOMING_NOISY，需自动暂停，避免外放；
         // 两台都开启：交叉淡化期间淡出方和缓冲中的新歌也要一起停
+        val primaryPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+        val secondaryPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
         val sessionPlayer = CrossfadePlayer(
-            primary = ExoPlayer.Builder(this)
-                .setMediaSourceFactory(mediaSourceFactory)
-                .setHandleAudioBecomingNoisy(true)
-                .build(),
-            secondary = ExoPlayer.Builder(this)
-                .setMediaSourceFactory(mediaSourceFactory)
-                .setHandleAudioBecomingNoisy(true)
-                .build(),
+            primary = primaryPlayer,
+            secondary = secondaryPlayer,
             audioAttributes = audioAttributes
         )
         sessionPlayer.setMetadataTransformer { base ->
@@ -203,6 +206,15 @@ class MelodiaPlaybackService : MediaSessionService() {
         serviceScope.launch {
             settingsPreferences.playWithOtherApps.collect { playWithOtherApps ->
                 sessionPlayer.setHandleAudioFocus(!playWithOtherApps)
+            }
+        }
+        // 设置页已保证两者互斥，这里再兜底一次，避免淡化时两台播放器争用卸载通道
+        serviceScope.launch {
+            combine(settingsPreferences.audioOffload, settingsPreferences.crossfadeEnabled) { offload, crossfade ->
+                offload && !crossfade
+            }.distinctUntilChanged().collect { enabled ->
+                primaryPlayer.setAudioOffloadEnabled(enabled)
+                secondaryPlayer.setAudioOffloadEnabled(enabled)
             }
         }
 
@@ -599,6 +611,19 @@ class MelodiaPlaybackService : MediaSessionService() {
         override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
             MediaNotification.Provider.NotificationChannelInfo(PLAYBACK_CHANNEL_ID, PLAYBACK_CHANNEL_NAME)
     }
+}
+
+// 音频卸载交给 DSP 解码；格式或设备不支持时 ExoPlayer 自动回退软件解码，播放中切换会重配音频输出
+@OptIn(UnstableApi::class)
+private fun ExoPlayer.setAudioOffloadEnabled(enabled: Boolean) {
+    val mode = if (enabled) {
+        AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+    } else {
+        AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+    }
+    trackSelectionParameters = trackSelectionParameters.buildUpon()
+        .setAudioOffloadPreferences(AudioOffloadPreferences.Builder().setAudioOffloadMode(mode).build())
+        .build()
 }
 
 

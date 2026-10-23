@@ -74,6 +74,7 @@ fun PlaybackDownloadSettingsView(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val autoPlayNext by viewModel.autoPlayNext.collectAsStateWithLifecycle()
     val playWithOtherApps by viewModel.playWithOtherApps.collectAsStateWithLifecycle()
+    val audioOffload by viewModel.audioOffload.collectAsStateWithLifecycle()
     val resumeAfterExternalInterruption by viewModel.resumeAfterExternalInterruption.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDurationMs by viewModel.crossfadeDurationMs.collectAsStateWithLifecycle()
@@ -117,6 +118,13 @@ fun PlaybackDownloadSettingsView(viewModel: SettingsViewModel) {
                     subtitle = "开启后不被其他应用打断播放",
                     checked = playWithOtherApps,
                     onCheckedChange = { viewModel.updatePlayWithOtherApps(it) }
+                )
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                SettingsSwitchRow(
+                    title = "硬件音频解码",
+                    subtitle = "交给音频芯片解码，后台播放更省电；与切歌淡入淡出不能同时开启",
+                    checked = audioOffload,
+                    onCheckedChange = { viewModel.updateAudioOffload(it) }
                 )
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                 SettingsSwitchRow(
