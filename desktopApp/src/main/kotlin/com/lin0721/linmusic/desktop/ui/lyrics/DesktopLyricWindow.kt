@@ -1,6 +1,7 @@
 package com.lin0721.linmusic.desktop.ui.lyrics
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -9,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -18,6 +20,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricFrames
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.core.player.floatinglyric.LyricResize
 import com.lin0721.linmusic.core.player.floatinglyric.LyricResizeHandle
 import com.lin0721.linmusic.core.player.floatinglyric.LyricResizeLimits
@@ -28,6 +31,7 @@ import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricClock
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
@@ -45,13 +49,14 @@ private val InitialHeight = 140.dp
 @OptIn(FlowPreview::class)
 @Composable
 fun DesktopLyricWindow(
-    visible: Boolean,
     locked: Boolean,
     initialBounds: DesktopLyricBounds?,
+    initialStyle: FloatingLyricStyle,
     playerViewModel: PlayerViewModel,
     controller: PlaybackController,
     desktopPreferences: DesktopPreferences,
     windowEffects: WindowEffects,
+    persistScope: CoroutineScope,
     onLockedChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onHide: () -> Unit
@@ -61,9 +66,16 @@ fun DesktopLyricWindow(
         size = DpSize(initialWidth, InitialHeight),
         position = remember { initialBounds?.let { WindowPosition(it.x.dp, it.y.dp) } ?: defaultPosition(initialWidth) }
     )
+    // 关窗会取消防抖中的写盘，补写一次最终位置；窗口自身的协程此时已取消，借外层作用域
+    DisposableEffect(windowState) {
+        onDispose {
+            boundsOf(windowState.position, windowState.size.width)?.let { bounds ->
+                persistScope.launch { saveBounds(desktopPreferences, bounds) }
+            }
+        }
+    }
     Window(
         onCloseRequest = onHide,
-        visible = visible,
         state = windowState,
         title = "Melodia 桌面歌词",
         undecorated = true,
@@ -72,32 +84,21 @@ fun DesktopLyricWindow(
         focusable = false,
         resizable = false
     ) {
-        // 锁定后鼠标事件穿透到下层窗口
-        LaunchedEffect(locked, visible) { if (visible) windowEffects.setClickThrough(window, locked) }
+        // 锁定后鼠标事件穿透到下层窗口；等首帧后原生窗口才就绪
+        LaunchedEffect(locked) {
+            withFrameNanos { }
+            windowEffects.setClickThrough(window, locked)
+        }
 
         // 拖动、调宽停下后再写盘
         LaunchedEffect(windowState) {
             snapshotFlow { windowState.position to windowState.size.width }
                 .drop(1)
                 .debounce(BOUNDS_SAVE_DEBOUNCE_MS)
-                .collect { (position, width) ->
-                    if (!position.isSpecified) return@collect
-                    val bounds = DesktopLyricBounds(
-                        position.x.value.roundToInt(),
-                        position.y.value.roundToInt(),
-                        width.value.roundToInt()
-                    )
-                    try {
-                        desktopPreferences.saveDesktopLyricBounds(bounds)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        AppLogger.w(TAG, "保存桌面歌词位置失败", e)
-                    }
-                }
+                .collect { (position, width) -> boundsOf(position, width)?.let { saveBounds(desktopPreferences, it) } }
         }
 
-        val savedStyle by desktopPreferences.desktopLyricStyle.collectAsState(DesktopPreferences.DEFAULT_DESKTOP_LYRIC_STYLE)
+        val savedStyle by desktopPreferences.desktopLyricStyle.collectAsState(initialStyle)
         // 右下角缩放过程中先用预览字号，松手写盘后等存储值追上再清掉，避免回跳一帧
         var previewFontSize by remember { mutableStateOf<Int?>(null) }
         LaunchedEffect(savedStyle.fontSizeSp) { if (previewFontSize == savedStyle.fontSizeSp) previewFontSize = null }
@@ -164,6 +165,23 @@ private val ResizeLimits = LyricResizeLimits(
     minFontSp = 16,
     maxFontSp = 72
 )
+
+private fun boundsOf(position: WindowPosition, width: Dp): DesktopLyricBounds? =
+    if (position.isSpecified) {
+        DesktopLyricBounds(position.x.value.roundToInt(), position.y.value.roundToInt(), width.value.roundToInt())
+    } else {
+        null
+    }
+
+private suspend fun saveBounds(preferences: DesktopPreferences, bounds: DesktopLyricBounds) {
+    try {
+        preferences.saveDesktopLyricBounds(bounds)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLogger.w(TAG, "保存桌面歌词位置失败", e)
+    }
+}
 
 private suspend fun saveFontSize(preferences: DesktopPreferences, fontSize: Int) {
     try {

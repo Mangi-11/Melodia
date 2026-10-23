@@ -53,6 +53,7 @@ import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopImageLoader
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.MiniLyricSettings
 import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.di.desktopAppDependencies
 import com.lin0721.linmusic.desktop.di.desktopPlatformModule
@@ -69,6 +70,7 @@ import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricsViewState
+import com.lin0721.linmusic.desktop.ui.miniplayer.MiniPlayerInit
 import com.lin0721.linmusic.desktop.ui.miniplayer.MiniPlayerWindow
 import com.lin0721.linmusic.desktop.ui.settings.SettingsCategory
 import com.lin0721.linmusic.desktop.ui.shell.CanvasClearColorEffect
@@ -185,15 +187,20 @@ fun main() {
     }.getOrDefault(true)
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
-    val restoredLyricBounds = runCatching { runBlocking { desktopPreferences.loadDesktopLyricBounds() } }.getOrNull()
+    // 附属窗口每次打开都取最新保存的状态；显示器布局变化后够不着的位置交给默认值
+    fun loadLyricBounds() = runCatching { runBlocking { desktopPreferences.loadDesktopLyricBounds() } }.getOrNull()
         ?.takeIf { WindowBounds(it.x, it.y, it.width, LYRIC_REACH_HEIGHT).isReachableOn(currentScreenBounds()) }
-    val restoredMiniPlayerPosition = runCatching { runBlocking { desktopPreferences.loadMiniPlayerPosition() } }.getOrNull()
-        ?.takeIf { WindowBounds(it.x, it.y, MINI_PLAYER_REACH_WIDTH, 0).isReachableOn(currentScreenBounds()) }
-    val initialMiniPlayerStyle = runCatching { runBlocking { desktopPreferences.miniPlayerStyle.first() } }
-        .getOrDefault(MiniPlayerStyle.DEFAULT)
-    val initialMiniPlayerSizes = runCatching { runBlocking { desktopPreferences.miniPlayerSizes.first() } }
-        .getOrDefault(MiniPlayerStyle.entries.associateWith { it.defaultSize })
-    val initialMiniPlayerOnTop = runCatching { runBlocking { desktopPreferences.miniPlayerAlwaysOnTop.first() } }.getOrDefault(true)
+    fun loadLyricStyle() = runCatching { runBlocking { desktopPreferences.desktopLyricStyle.first() } }
+        .getOrDefault(DesktopPreferences.DEFAULT_DESKTOP_LYRIC_STYLE)
+    fun loadMiniPlayerInit() = MiniPlayerInit(
+        position = runCatching { runBlocking { desktopPreferences.loadMiniPlayerPosition() } }.getOrNull()
+            ?.takeIf { WindowBounds(it.x, it.y, MINI_PLAYER_REACH_WIDTH, 0).isReachableOn(currentScreenBounds()) },
+        style = runCatching { runBlocking { desktopPreferences.miniPlayerStyle.first() } }.getOrDefault(MiniPlayerStyle.DEFAULT),
+        sizes = runCatching { runBlocking { desktopPreferences.miniPlayerSizes.first() } }
+            .getOrDefault(MiniPlayerStyle.entries.associateWith { it.defaultSize }),
+        alwaysOnTop = runCatching { runBlocking { desktopPreferences.miniPlayerAlwaysOnTop.first() } }.getOrDefault(true),
+        lyricSettings = runCatching { runBlocking { desktopPreferences.miniLyricSettings.first() } }.getOrDefault(MiniLyricSettings())
+    )
 
     application {
         val scope = rememberCoroutineScope()
@@ -433,45 +440,48 @@ fun main() {
             }
         }
 
-        DesktopLyricWindow(
-            visible = showDesktopLyric && !isExiting,
-            locked = isLyricLocked,
-            initialBounds = restoredLyricBounds,
-            playerViewModel = playerViewModel,
-            controller = controller,
-            desktopPreferences = desktopPreferences,
-            windowEffects = windowEffects,
-            onLockedChange = setLyricLocked,
-            onOpenSettings = {
-                showMainWindow()
-                settingsRequests.trySend(SettingsCategory.Interface.name)
-            },
-            onHide = { setDesktopLyric(false) }
-        )
+        // 隐藏的窗口不出帧，其 Recomposer 会一直攒着全局状态变更、连带引住主窗口已离开的页面，所以不显示就不创建
+        if (showDesktopLyric && !isExiting) {
+            DesktopLyricWindow(
+                locked = isLyricLocked,
+                initialBounds = remember { loadLyricBounds() },
+                initialStyle = remember { loadLyricStyle() },
+                playerViewModel = playerViewModel,
+                controller = controller,
+                desktopPreferences = desktopPreferences,
+                windowEffects = windowEffects,
+                persistScope = scope,
+                onLockedChange = setLyricLocked,
+                onOpenSettings = {
+                    showMainWindow()
+                    settingsRequests.trySend(SettingsCategory.Interface.name)
+                },
+                onHide = { setDesktopLyric(false) }
+            )
+        }
 
-        MiniPlayerWindow(
-            visible = isMiniMode && !isExiting,
-            initialPosition = restoredMiniPlayerPosition,
-            initialStyle = initialMiniPlayerStyle,
-            initialSizes = initialMiniPlayerSizes,
-            initialAlwaysOnTop = initialMiniPlayerOnTop,
-            uiScale = uiScaleFactor,
-            uiMotion = uiMotion,
-            icon = appIcon,
-            isLoggedIn = userProfile != null,
-            playerViewModel = playerViewModel,
-            controller = controller,
-            desktopPreferences = desktopPreferences,
-            onRestore = showMainWindow,
-            onOpenLyricSettings = {
-                showMainWindow()
-                settingsRequests.trySend(SettingsCategory.Interface.name)
-            },
-            onRequireLogin = {
-                showMainWindow()
-                loginRequests.trySend(Unit)
-            }
-        )
+        if (isMiniMode && !isExiting) {
+            MiniPlayerWindow(
+                init = remember { loadMiniPlayerInit() },
+                uiScale = uiScaleFactor,
+                uiMotion = uiMotion,
+                icon = appIcon,
+                isLoggedIn = userProfile != null,
+                playerViewModel = playerViewModel,
+                controller = controller,
+                desktopPreferences = desktopPreferences,
+                persistScope = scope,
+                onRestore = showMainWindow,
+                onOpenLyricSettings = {
+                    showMainWindow()
+                    settingsRequests.trySend(SettingsCategory.Interface.name)
+                },
+                onRequireLogin = {
+                    showMainWindow()
+                    loginRequests.trySend(Unit)
+                }
+            )
+        }
     }
 }
 

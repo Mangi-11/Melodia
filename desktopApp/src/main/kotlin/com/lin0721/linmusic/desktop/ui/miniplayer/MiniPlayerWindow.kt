@@ -2,6 +2,7 @@ package com.lin0721.linmusic.desktop.ui.miniplayer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +33,7 @@ import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.theme.MelodiaDesktopTheme
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
@@ -46,14 +48,19 @@ private const val TAG = "MiniPlayer"
 private const val POSITION_SAVE_DEBOUNCE_MS = 500L
 private const val SCREEN_MARGIN = 24
 
+// 打开迷你窗时读取的已存状态，首帧即按它绘制
+data class MiniPlayerInit(
+    val position: MiniPlayerPosition?,
+    val style: MiniPlayerStyle,
+    val sizes: Map<MiniPlayerStyle, MiniPlayerSize>,
+    val alwaysOnTop: Boolean,
+    val lyricSettings: MiniLyricSettings
+)
+
 @OptIn(FlowPreview::class)
 @Composable
 fun MiniPlayerWindow(
-    visible: Boolean,
-    initialPosition: MiniPlayerPosition?,
-    initialStyle: MiniPlayerStyle,
-    initialSizes: Map<MiniPlayerStyle, MiniPlayerSize>,
-    initialAlwaysOnTop: Boolean,
+    init: MiniPlayerInit,
     uiScale: Float,
     uiMotion: UiMotion,
     icon: Painter,
@@ -61,15 +68,16 @@ fun MiniPlayerWindow(
     playerViewModel: PlayerViewModel,
     controller: PlaybackController,
     desktopPreferences: DesktopPreferences,
+    persistScope: CoroutineScope,
     onRestore: () -> Unit,
     onOpenLyricSettings: () -> Unit,
     onRequireLogin: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val style by desktopPreferences.miniPlayerStyle.collectAsState(initialStyle)
-    val alwaysOnTop by desktopPreferences.miniPlayerAlwaysOnTop.collectAsState(initialAlwaysOnTop)
-    val lyricSettings by desktopPreferences.miniLyricSettings.collectAsState(MiniLyricSettings())
-    val savedSizes by desktopPreferences.miniPlayerSizes.collectAsState(initialSizes)
+    val style by desktopPreferences.miniPlayerStyle.collectAsState(init.style)
+    val alwaysOnTop by desktopPreferences.miniPlayerAlwaysOnTop.collectAsState(init.alwaysOnTop)
+    val lyricSettings by desktopPreferences.miniLyricSettings.collectAsState(init.lyricSettings)
+    val savedSizes by desktopPreferences.miniPlayerSizes.collectAsState(init.sizes)
     val savedSize = savedSizes[style] ?: style.defaultSize
     // 拖动中用临时尺寸，松手写盘后等存储值追上再清掉，避免回跳一帧
     var dragSize by remember { mutableStateOf<MiniPlayerSize?>(null) }
@@ -81,13 +89,20 @@ fun MiniPlayerWindow(
     val windowState = rememberWindowState(
         size = size,
         position = remember {
-            initialPosition?.let { WindowPosition(it.x.dp, it.y.dp) } ?: defaultPosition(size)
+            init.position?.let { WindowPosition(it.x.dp, it.y.dp) } ?: defaultPosition(size)
         }
     )
+    // 关窗会取消防抖中的写盘，补写一次最终位置；窗口自身的协程此时已取消，借外层作用域
+    DisposableEffect(windowState) {
+        onDispose {
+            positionOf(windowState.position)?.let { position ->
+                persistScope.launch { savePosition(desktopPreferences, position) }
+            }
+        }
+    }
 
     Window(
         onCloseRequest = onRestore,
-        visible = visible,
         state = windowState,
         title = "Melodia 迷你播放器",
         icon = icon,
@@ -111,18 +126,7 @@ fun MiniPlayerWindow(
             snapshotFlow { windowState.position }
                 .drop(1)
                 .debounce(POSITION_SAVE_DEBOUNCE_MS)
-                .collect { position ->
-                    if (!position.isSpecified) return@collect
-                    try {
-                        desktopPreferences.saveMiniPlayerPosition(
-                            MiniPlayerPosition(position.x.value.roundToInt(), position.y.value.roundToInt())
-                        )
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        AppLogger.w(TAG, "保存迷你播放器位置失败", e)
-                    }
-                }
+                .collect { position -> positionOf(position)?.let { savePosition(desktopPreferences, it) } }
         }
 
         val actions = remember(controller, playerViewModel, isLoggedIn, style) {
@@ -196,6 +200,19 @@ fun MiniPlayerWindow(
                 MiniPlayerContent(style, lyricSettings, controller, playerViewModel, actions, resize, resizeDensity)
             }
         }
+    }
+}
+
+private fun positionOf(position: WindowPosition): MiniPlayerPosition? =
+    if (position.isSpecified) MiniPlayerPosition(position.x.value.roundToInt(), position.y.value.roundToInt()) else null
+
+private suspend fun savePosition(preferences: DesktopPreferences, position: MiniPlayerPosition) {
+    try {
+        preferences.saveMiniPlayerPosition(position)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLogger.w(TAG, "保存迷你播放器位置失败", e)
     }
 }
 
