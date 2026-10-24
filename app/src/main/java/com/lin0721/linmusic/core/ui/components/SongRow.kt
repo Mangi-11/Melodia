@@ -40,10 +40,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,9 +64,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.lin0721.linmusic.core.download.DownloadPreferences
 import com.lin0721.linmusic.core.ui.interaction.copyOnLongClick
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
@@ -184,23 +185,9 @@ fun SongRow(
             )
         }
 
-        val context = LocalContext.current
-        val imageRequest = remember(data.coverUrl) {
-            if (!data.coverUrl.isNullOrBlank()) {
-                ImageRequest.Builder(context)
-                    .data("${data.coverUrl}?param=100y100")
-                    .crossfade(true)
-                    .build()
-            } else {
-                null
-            }
-        }
-        SubcomposeAsyncImage(
-            model = imageRequest,
+        SongRowCover(
+            coverUrl = data.coverUrl,
             contentDescription = data.title,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            loading = { CoverPlaceholder() },
-            error = { CoverPlaceholder() },
             modifier = Modifier.size(coverSize).clip(coverShape)
         )
         Spacer(Modifier.width(coverSpacing))
@@ -282,9 +269,15 @@ fun SongRow(
 
         if (showDownloadBadge) {
             val downloadPreferences: DownloadPreferences = koinInject()
-            val isDownloaded by produceState(initialValue = false, data.id) {
-                downloadPreferences.downloadedQualityFor(data.id).collect { quality ->
-                    value = quality != null
+            val record by remember(downloadPreferences, data.id) {
+                derivedStateOf { downloadPreferences.recordsByIdSnapshot[data.id] }
+            }
+            var isDownloaded by remember(data.id, record?.mediaStoreUri) {
+                mutableStateOf(record != null && downloadPreferences.isUriVerifiedCached(record!!.mediaStoreUri))
+            }
+            if (record != null && !isDownloaded) {
+                LaunchedEffect(data.id, record?.mediaStoreUri) {
+                    isDownloaded = downloadPreferences.findVerifiedRecord(data.id) != null
                 }
             }
             if (isDownloaded) {
@@ -300,6 +293,49 @@ fun SongRow(
         }
 
         trailingSlot()
+    }
+}
+
+private fun normalizeRowCoverUrl(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return url
+    if ("param=" in url) return url
+    val separator = if ('?' in url) '&' else '?'
+    return "${url}${separator}param=100y100"
+}
+
+// 列表行轻量封面：避免 SubcomposeAsyncImage 在快速滚动时产生子组合与二次测量
+@Composable
+private fun SongRowCover(
+    coverUrl: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val normalizedUrl = remember(coverUrl) { normalizeRowCoverUrl(coverUrl) }
+    var isLoaded by remember(normalizedUrl) { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        if (normalizedUrl == null || !isLoaded) {
+            CoverPlaceholder()
+        }
+        if (normalizedUrl != null) {
+            val imageRequest = remember(normalizedUrl, context) {
+                ImageRequest.Builder(context)
+                    .data(normalizedUrl)
+                    .size(144, 144)
+                    .build()
+            }
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                onState = { state ->
+                    isLoaded = state is AsyncImagePainter.State.Success
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -405,23 +441,9 @@ fun DraggableSongRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.size(44.dp)) {
-            val context = LocalContext.current
-            val imageRequest = remember(data.coverUrl) {
-                if (!data.coverUrl.isNullOrBlank()) {
-                    ImageRequest.Builder(context)
-                        .data("${data.coverUrl}?param=100y100")
-                        .crossfade(true)
-                        .build()
-                } else {
-                    null
-                }
-            }
-            SubcomposeAsyncImage(
-                model = imageRequest,
+            SongRowCover(
+                coverUrl = data.coverUrl,
                 contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                loading = { CoverPlaceholder() },
-                error = { CoverPlaceholder() },
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(RadiusCompact))
             )
             if (isCurrent) {

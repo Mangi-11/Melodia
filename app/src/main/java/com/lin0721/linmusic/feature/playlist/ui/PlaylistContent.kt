@@ -146,10 +146,12 @@ fun PlaylistContent(
 
     // ── 定位当前播放歌曲：目标不在已加载/未过滤出的范围内时展示悬浮按钮
     val targetTrackId = currentTrackId?.toLongOrNull()
-    val belongsToPlaylist = targetTrackId != null && if (playlist.trackIds.isNotEmpty()) {
-        playlist.trackIds.any { it.id == targetTrackId }
-    } else {
-        playlist.tracks.any { it.id == targetTrackId }
+    val belongsToPlaylist = remember(playlist.trackIds, playlist.tracks, targetTrackId) {
+        targetTrackId != null && if (playlist.trackIds.isNotEmpty()) {
+            playlist.trackIds.any { it.id == targetTrackId }
+        } else {
+            playlist.tracks.any { it.id == targetTrackId }
+        }
     }
     // 曲目行在 LazyColumn 里的起始下标：header + 视条件出现的胶囊行/日期行
     val trackListStartIndex = 1 +
@@ -157,7 +159,9 @@ fun PlaylistContent(
         (if (playlist.id == -1L && showHistoryDatePicker) 1 else 0) +
         (if (playlist.id == -2L) 1 else 0)
 
-    val targetIndexInFiltered = if (targetTrackId == null) -1 else filteredTracks.indexOfFirst { it.id == targetTrackId }
+    val targetIndexInFiltered = remember(filteredTracks, targetTrackId) {
+        if (targetTrackId == null) -1 else filteredTracks.indexOfFirst { it.id == targetTrackId }
+    }
     val isTargetVisibleOnScreen by remember(targetIndexInFiltered, trackListStartIndex, historySongsLoading) {
         derivedStateOf {
             if (targetIndexInFiltered < 0 || historySongsLoading) return@derivedStateOf false
@@ -210,8 +214,6 @@ fun PlaylistContent(
     }
 
     val coverSize: Dp     = COVER_MAX_SIZE
-    // 封面透明度：滚动一开始就同步淡出，65% 处完全消失
-    val coverAlpha        = 1f - (progress / 0.65f).coerceIn(0f, 1f)
 
     // 播放按钮停靠位：按钮中心正好卡在顶栏下边缘
     val dockedYPx = with(density) { (overlayHeight - 28.dp).toPx() }
@@ -259,8 +261,7 @@ fun PlaylistContent(
                         PlaylistHeaderItem(
                             playlist            = playlist,
                             coverSize           = coverSize,
-                            coverAlpha          = coverAlpha,
-                            progress            = progress,
+                            progressProvider    = { progress },
                             statusBarHeight     = statusBarHeight,
                             dominantColor       = dominantColor,
                             onColorCalculated   = { dominantColor = it },
@@ -407,27 +408,29 @@ fun PlaylistContent(
 
         // ── 3. 固定 Overlay ───────────────────────────────────────────────
         PlaylistTopBar(
-            title           = playlist.name,
-            progress        = if (searchFullyRevealed) 1f else progress,
-            overlayHeight   = overlayHeight,
-            statusBarHeight = statusBarHeight,
-            dominantColor   = dominantColor,
+            title            = playlist.name,
+            progressProvider = { if (searchFullyRevealed) 1f else progress },
+            overlayHeight    = overlayHeight,
+            statusBarHeight  = statusBarHeight,
+            dominantColor    = dominantColor,
             // 搜索展开中：返回箭头先关搜索，不直接退出歌单页
-            onBack          = {
+            onBack           = {
                 if (searchBarRevealState.isOpen) searchBarRevealState.close() else onBack()
             },
-            onScrollToTop   = {
+            onScrollToTop    = {
                 coroutineScope.launch {
                     motion.scrollToItem(listState, 0)
                 }
             }
         )
 
+        val visibleTrackIds = remember(filteredTracks) { filteredTracks.map { it.id } }
+        val selectionHeaderColor = remember(dominantColor) { dominantColor.darken(0.35f) }
         TrackSelectionOverlay(
             selectionUi = selectionUi,
             actions = selectionActions,
-            visibleIds = filteredTracks.map { it.id },
-            headerColor = dominantColor.darken(0.35f),
+            visibleIds = visibleTrackIds,
+            headerColor = selectionHeaderColor,
             onToggleSelectAll = onToggleSelectAll,
             onExit = onExitSelection
         )

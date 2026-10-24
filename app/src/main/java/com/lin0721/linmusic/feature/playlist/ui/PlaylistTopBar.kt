@@ -11,20 +11,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
@@ -43,14 +44,16 @@ import kotlin.math.roundToInt
 @Composable
 fun PlaylistTopBar(
     title: String,
-    progress: Float,
+    progressProvider: () -> Float,
     overlayHeight: Dp,
     statusBarHeight: Dp,
     dominantColor: Color,
     onBack: () -> Unit,
     onScrollToTop: () -> Unit = {}
 ) {
-    val isScrolled = progress > 0f
+    val isScrolled by remember(progressProvider) {
+        derivedStateOf { progressProvider() > 0f }
+    }
     // 取色完成时颜色平滑过渡，不直接跳变；跟顶栏同样的后处理，压暗一档再用
     val animatedDominant by animateColorAsState(
         targetValue = dominantColor,
@@ -62,7 +65,12 @@ fun PlaylistTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(overlayHeight)
-            .background(fillColor.copy(alpha = progress))
+            .drawBehind {
+                val a = progressProvider().coerceIn(0f, 1f)
+                if (a > 0f) {
+                    drawRect(fillColor.copy(alpha = a))
+                }
+            }
             .zIndex(8f)
             // 页面滚动显色后拦截空白点击，触发返回顶部并防止手势穿透到下方歌曲
             .then(
@@ -89,8 +97,6 @@ fun PlaylistTopBar(
                 tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(32.dp))
         }
         // 歌单名称：随着滚动淡入及向上微移
-        val titleAlpha = ((progress - 0.6f) / 0.4f).coerceIn(0f, 1f)
-        val titleOffsetY = lerp(8.dp, 0.dp, titleAlpha)
         Text(
             text       = title,
             color      = MaterialTheme.colorScheme.onSurface,
@@ -101,8 +107,11 @@ fun PlaylistTopBar(
             modifier   = Modifier
                 .align(Alignment.Center)
                 .padding(horizontal = 60.dp)
-                .offset(y = titleOffsetY)
-                .alpha(titleAlpha)
+                .graphicsLayer {
+                    val a = ((progressProvider() - 0.6f) / 0.4f).coerceIn(0f, 1f)
+                    alpha = a
+                    translationY = (1f - a) * 8.dp.toPx()
+                }
         )
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -42,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
-import coil3.request.allowHardware
 import coil3.request.crossfade
 import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
@@ -62,8 +62,7 @@ import com.lin0721.linmusic.core.ui.theme.uiTween
 fun PlaylistHeaderItem(
     playlist: PlaylistDetail,
     coverSize: Dp,
-    coverAlpha: Float,
-    progress: Float,
+    progressProvider: () -> Float,
     statusBarHeight: Dp,
     dominantColor: Color,
     onColorCalculated: (Color) -> Unit,
@@ -108,7 +107,6 @@ fun PlaylistHeaderItem(
     // 只有标题随折叠渐隐（40%-80%），跟顶栏小标题的淡入
     // 区间（60%-100%）有重叠形成交错过渡；创建者/简介/歌曲数/操作按钮不做特殊处理，
     // 当作普通内容随手指滚动划走即可
-    val titleAlpha = 1f - ((progress - 0.4f) / 0.4f).coerceIn(0f, 1f)
     val animatedDominant by animateColorAsState(
         targetValue = dominantColor,
         animationSpec = uiTween(800),
@@ -133,7 +131,6 @@ fun PlaylistHeaderItem(
             val coverRequest = remember(playlist.coverImgUrl) {
                 ImageRequest.Builder(context)
                     .data("${playlist.coverImgUrl}?param=400y400")
-                    .allowHardware(false)
                     .crossfade(true)
                     .build()
             }
@@ -151,9 +148,11 @@ fun PlaylistHeaderItem(
                 error              = { CoverPlaceholder() },
                 modifier           = Modifier
                     .size(coverSize)
+                    .graphicsLayer {
+                        alpha = 1f - (progressProvider() / 0.65f).coerceIn(0f, 1f)
+                    }
                     .shadow(elevation = 16.dp, shape = RoundedCornerShape(RadiusCompact), clip = false)
                     .clip(RoundedCornerShape(RadiusCompact))
-                    .then(if (coverAlpha < 1f) Modifier.alpha(coverAlpha) else Modifier)
             )
         }
 
@@ -161,7 +160,9 @@ fun PlaylistHeaderItem(
         Column(modifier = Modifier.padding(horizontal = MelodiaSpacing.md)) {
                     Text(playlist.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold,
                         fontSize = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.alpha(titleAlpha))
+                        modifier = Modifier.graphicsLayer {
+                            alpha = 1f - ((progressProvider() - 0.4f) / 0.4f).coerceIn(0f, 1f)
+                        })
                     Spacer(Modifier.height(6.dp))
                     if (playlist.id == -1L) {
                         Text(displayDateStr, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
