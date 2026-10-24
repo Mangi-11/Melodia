@@ -39,6 +39,10 @@ taglib = "1.0.5"
 orgJson = "20230227"
 room = "2.8.5"
 ksp = "2.3.12"
+profileinstaller = "1.4.1"
+baselineprofile = "1.5.0"
+benchmarkMacroJunit4 = "1.5.0"
+uiautomator = "2.3.0"
 
 [libraries]
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
@@ -125,8 +129,15 @@ android-image-cropper = { group = "com.vanniktech", name = "android-image-croppe
 # 二维码生成（登录二维码）
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
+# Baseline Profile
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmarkMacroJunit4" }
+androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-test = { id = "com.android.test", version.ref = "agp" }
+baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
