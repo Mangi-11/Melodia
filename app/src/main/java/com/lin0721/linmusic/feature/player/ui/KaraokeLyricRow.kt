@@ -303,10 +303,15 @@ fun KaraokeLyricRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer {
+                    val ready = lyricLayoutInfo != null && isActive
                     // 走逐字裁剪时，排版结果出来之前先不显示，避免闪一帧整行高亮
-                    alpha = if (lyricLayoutInfo != null && isActive) 1f else 0f
-                    // DstIn 只混合本层文字像素，不擦除底层灰色歌词与背景。
-                    compositingStrategy = CompositingStrategy.Offscreen
+                    alpha = if (ready) 1f else 0f
+                    // 仅在激活且启用 DstIn 柔边遮罩时开启离屏合成，避免非激活行或纯硬裁剪分配离屏层
+                    compositingStrategy = if (ready && advancedEffect && featherWidth > 0.dp) {
+                        CompositingStrategy.Offscreen
+                    } else {
+                        CompositingStrategy.Auto
+                    }
                 }
                 .drawWithContent {
                     val info = lyricLayoutInfo
