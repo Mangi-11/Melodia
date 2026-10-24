@@ -2,6 +2,7 @@ package com.lin0721.linmusic
 
 import android.app.Application
 import android.app.NotificationManager
+import android.content.ComponentCallbacks2
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import coil3.ImageLoader
@@ -32,6 +33,7 @@ import com.lin0721.linmusic.di.sourceModule
 import com.lin0721.linmusic.core.source.LxPluginManager
 import com.lin0721.linmusic.di.updateModule
 import com.lin0721.linmusic.di.viewModelModule
+import com.lin0721.linmusic.feature.source.plugin.LxPluginEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -49,6 +51,7 @@ class MelodiaApplication : Application() {
     private val downloadWorkerFactory: DownloadWorkerFactory by inject()
     private val playbackController = inject<PlaybackController>()
     private val settingsPreferences: SettingsPreferences by inject()
+    private val lxPluginEngine: LxPluginEngine by inject()
 
     override fun onCreate() {
         super.onCreate()
@@ -60,7 +63,7 @@ class MelodiaApplication : Application() {
         val imageLoader = ImageLoader.Builder(this)
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(this, 0.15)
+                    .maxSizePercent(this, 0.10)
                     .build()
             }
             .diskCache {
@@ -113,6 +116,15 @@ class MelodiaApplication : Application() {
         }
         // 旧版内置下载遗留的更新通知渠道
         getSystemService(NotificationManager::class.java)?.deleteNotificationChannel(LEGACY_UPDATE_CHANNEL_ID)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN || level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            runCatching { SingletonImageLoader.get(this).memoryCache?.clear() }
+            runCatching { lxPluginEngine.trimIdleSandboxes() }
+        }
     }
 
     private companion object {

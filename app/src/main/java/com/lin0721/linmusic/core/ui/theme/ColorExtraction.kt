@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import coil3.imageLoader
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
@@ -55,6 +56,7 @@ suspend fun extractBackdropPaletteFromUrl(context: Context, url: String): Player
         val request = ImageRequest.Builder(context)
             .data(canonicalUrl)
             .size(DECODE_MAX_DIMENSION, DECODE_MAX_DIMENSION)
+            .memoryCachePolicy(CachePolicy.DISABLED)
             .allowHardware(false)
             .build()
         val bitmap = context.imageLoader.execute(request).image?.toBitmap() ?: return FallbackBackdropPalette
@@ -74,6 +76,7 @@ suspend fun extractShareColorsFromUrl(context: Context, url: String): List<Color
         val request = ImageRequest.Builder(context)
             .data(canonicalUrl)
             .size(DECODE_MAX_DIMENSION, DECODE_MAX_DIMENSION)
+            .memoryCachePolicy(CachePolicy.DISABLED)
             .allowHardware(false)
             .build()
         val bitmap = context.imageLoader.execute(request).image?.toBitmap() ?: return fallback

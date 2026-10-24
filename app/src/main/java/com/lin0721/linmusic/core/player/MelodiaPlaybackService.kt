@@ -35,6 +35,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import coil3.SingletonImageLoader
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
@@ -138,8 +139,16 @@ class MelodiaPlaybackService : MediaSessionService() {
         }
         serviceScope.launch(Dispatchers.IO) {
             try {
+                val raw = coverUri.toString()
+                val dataModel: Any = if ((raw.startsWith("http://") || raw.startsWith("https://")) && !raw.contains('?')) {
+                    "$raw?param=300y300"
+                } else {
+                    coverUri
+                }
                 val request = ImageRequest.Builder(this@MelodiaPlaybackService)
-                    .data(coverUri)
+                    .data(dataModel)
+                    .size(256, 256)
+                    .memoryCachePolicy(CachePolicy.DISABLED)
                     .allowHardware(false)
                     .build()
                 val result = SingletonImageLoader.get(this@MelodiaPlaybackService).execute(request)

@@ -46,6 +46,7 @@ import androidx.media3.common.MediaItem
 import com.lin0721.linmusic.core.download.ui.DownloadQualityPickerSheet
 import com.lin0721.linmusic.core.model.getQualityBadgeLabel
 import com.lin0721.linmusic.core.player.PlayerManager
+import com.lin0721.linmusic.core.player.normalizeFullPlayerCoverUrl
 import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.components.ArtistPickerEntry
 import com.lin0721.linmusic.core.ui.components.ArtistPickerSheet
@@ -330,23 +331,27 @@ fun FullPlayerScreen(
             ?.takeIf { it.songId.toString() == currentTrack.mediaId }
             ?.let { getQualityBadgeLabel(it.level) }
     } else null
-    val rawCoverUrl = currentTrack.mediaMetadata.artworkUri?.toString()
-        ?.replace("?param=300y300", "").orEmpty()
+    val rawCoverUrl = normalizeFullPlayerCoverUrl(
+        currentTrack.mediaMetadata.artworkUri?.toString().orEmpty()
+    )
     val fallbackCoverUrl = currentQueueItem?.let {
-        rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri).replace("?param=300y300", "")
+        normalizeFullPlayerCoverUrl(rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri))
     }.orEmpty()
     val coverUrl = rawCoverUrl.ifBlank { fallbackCoverUrl }
     // 预览封面解析
     val previousCoverUrl = previousQueueItem?.let {
-        rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri).replace("?param=300y300", "")
+        normalizeFullPlayerCoverUrl(rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri))
     }
     val nextCoverUrl = nextQueueItem?.let {
-        rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri).replace("?param=300y300", "")
+        normalizeFullPlayerCoverUrl(rememberQueueItemCoverUrl(it.coverUrl, it.songId, it.localUri))
     }
 
     // 取色跟封面显示解码完全脱钩，单独发一次固定尺寸的请求；放在宿主里，竖排与宽屏两栏排版共用一份结果
-    LaunchedEffect(coverUrl) {
-        if (coverUrl.isNotEmpty()) {
+    LaunchedEffect(currentTrack.mediaId, coverUrl) {
+        val cached = PaletteMemoryCache.get(currentTrack.mediaId)
+        if (cached != null) {
+            colorPalette = cached
+        } else if (coverUrl.isNotEmpty()) {
             val palette = extractBackdropPaletteFromUrl(context, coverUrl)
             colorPalette = palette
             PaletteMemoryCache.put(currentTrack.mediaId, palette)

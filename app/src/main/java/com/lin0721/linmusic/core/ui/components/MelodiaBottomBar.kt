@@ -325,20 +325,23 @@ private fun MiniPlayerSlidingContent(
             .clipToBounds()
             .onSizeChanged { state.containerWidthPx = it.width.toFloat() }
     ) {
+        val shouldShowNeighbors = state.isDragActive || state.isTransitioning || state.offsetX != 0f
         val layers = buildList {
-            previousQueueItem?.let { item ->
-                add(
-                    MiniPlayerSlideLayer(
-                        // QueueItem.songId 是 Long，currentKey（mediaId）是 String，
-                        // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
-                        key = item.songId.toString(),
-                        title = item.title,
-                        artist = item.artist,
-                        coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
-                        connectedDevice = null,
-                        translationXProvider = { state.offsetX - state.containerWidthPx }
+            if (shouldShowNeighbors) {
+                previousQueueItem?.let { item ->
+                    add(
+                        MiniPlayerSlideLayer(
+                            // QueueItem.songId 是 Long，currentKey（mediaId）是 String，
+                            // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
+                            key = item.songId.toString(),
+                            title = item.title,
+                            artist = item.artist,
+                            coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
+                            connectedDevice = null,
+                            translationXProvider = { state.offsetX - state.containerWidthPx }
+                        )
                     )
-                )
+                }
             }
             add(
                 MiniPlayerSlideLayer(
@@ -350,19 +353,21 @@ private fun MiniPlayerSlidingContent(
                     translationXProvider = { state.offsetX }
                 )
             )
-            nextQueueItem?.let { item ->
-                add(
-                    MiniPlayerSlideLayer(
-                        // 队列只有两首歌时上一首/下一首指向同一首曲目，key 会撞上前面那层，加个后缀区分开；
-                        // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
-                        key = if (item.songId == previousQueueItem?.songId) "${item.songId}-next" else item.songId.toString(),
-                        title = item.title,
-                        artist = item.artist,
-                        coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
-                        connectedDevice = null,
-                        translationXProvider = { state.offsetX + state.containerWidthPx }
+            if (shouldShowNeighbors) {
+                nextQueueItem?.let { item ->
+                    add(
+                        MiniPlayerSlideLayer(
+                            // 队列只有两首歌时上一首/下一首指向同一首曲目，key 会撞上前面那层，加个后缀区分开；
+                            // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
+                            key = if (item.songId == previousQueueItem?.songId) "${item.songId}-next" else item.songId.toString(),
+                            title = item.title,
+                            artist = item.artist,
+                            coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
+                            connectedDevice = null,
+                            translationXProvider = { state.offsetX + state.containerWidthPx }
+                        )
                     )
-                )
+                }
             }
         }
         layers.forEach { layer ->
@@ -388,6 +393,13 @@ private fun MiniPlayerContentRow(
     connectedDevice: AudioDeviceInfo?,
     translationXProvider: () -> Float
 ) {
+    val thumbUrl = remember(coverUrl) {
+        if ((coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) && !coverUrl.contains('?')) {
+            "$coverUrl?param=150y150"
+        } else {
+            coverUrl
+        }
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -395,7 +407,7 @@ private fun MiniPlayerContentRow(
             .graphicsLayer { translationX = translationXProvider() }
     ) {
         AntiFlickerCoverImage(
-            url = coverUrl,
+            url = thumbUrl,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(44.dp)
