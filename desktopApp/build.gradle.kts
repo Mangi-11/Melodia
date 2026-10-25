@@ -50,14 +50,14 @@ tasks.processResources {
 // 与 Android 端共用发版参数，保证两端版本号一致
 val desktopVersion = (findProperty("releaseVersionName") as String?) ?: "1.0.0"
 
-// jpackage 只接受纯数字版本：预发布版 1.2.3-beta.1 取 1.2.3（预发布不出 MSI，只出免安装版）
+// jpackage 只接受纯数字版本：预发布版 1.2.3-beta.1 取 1.2.3
 val desktopPackageVersion = desktopVersion.substringBefore('-').also {
     require(Regex("""\d+\.\d+\.\d+""").matches(it)) { "版本号需形如 1.2.3：$desktopVersion" }
 }
 
 // 调用本机 cmake 编译原生桥接 DLL；缺少 cmake 或 MSVC 时默认只告警跳过（运行时由代码回退），
 // required 为真（CI 发版）时直接失败，避免打出缺少系统媒体控制的安装包
-abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperations) : DefaultTask() {
+abstract class CmakeBinaryTask @Inject constructor(private val execOps: ExecOperations) : DefaultTask() {
     @get:InputDirectory
     abstract val sourceDir: DirectoryProperty
 
@@ -65,13 +65,13 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
     abstract val cmakeBuildDir: DirectoryProperty
 
     @get:Input
-    abstract val dllName: Property<String>
+    abstract val binaryName: Property<String>
 
     @get:Input
     abstract val required: Property<Boolean>
 
     @get:OutputFile
-    abstract val outputDll: RegularFileProperty
+    abstract val outputBinary: RegularFileProperty
 
     private fun skip(reason: String) {
         if (required.get()) throw GradleException(reason)
@@ -84,7 +84,7 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
             .map { File(it, "cmake.exe") }
             .firstOrNull { it.isFile }
         if (cmake == null) {
-            skip("未找到 cmake，无法编译 ${dllName.get()}")
+            skip("未找到 cmake，无法编译 ${binaryName.get()}")
             return
         }
         val buildDir = cmakeBuildDir.get().asFile
@@ -101,21 +101,30 @@ abstract class CmakeDllTask @Inject constructor(private val execOps: ExecOperati
                 isIgnoreExitValue = true
             }
             if (result.exitValue != 0) {
-                skip("${dllName.get()} 编译失败：\n$log")
+                skip("${binaryName.get()} 编译失败：\n$log")
                 return
             }
         }
-        File(buildDir, "Release/${dllName.get()}").copyTo(outputDll.get().asFile, overwrite = true)
+        File(buildDir, "Release/${binaryName.get()}").copyTo(outputBinary.get().asFile, overwrite = true)
     }
 }
 
-val buildSmtc by tasks.registering(CmakeDllTask::class) {
+val buildSmtc by tasks.registering(CmakeBinaryTask::class) {
     onlyIf { System.getProperty("os.name").startsWith("Windows") }
     sourceDir.set(layout.projectDirectory.dir("native-src/smtc"))
     cmakeBuildDir.set(layout.buildDirectory.dir("smtc"))
-    dllName.set("melodia_smtc.dll")
+    binaryName.set("melodia_smtc.dll")
     required.set(providers.gradleProperty("requireSmtc").map { it.toBoolean() }.orElse(false))
-    outputDll.set(layout.projectDirectory.file("native/melodia_smtc.dll"))
+    outputBinary.set(layout.projectDirectory.file("native/melodia_smtc.dll"))
+}
+
+val buildUninstaller by tasks.registering(CmakeBinaryTask::class) {
+    onlyIf { System.getProperty("os.name").startsWith("Windows") }
+    sourceDir.set(layout.projectDirectory.dir("native-src/uninstaller"))
+    cmakeBuildDir.set(layout.buildDirectory.dir("uninstaller"))
+    binaryName.set("uninstall.exe")
+    required.set(providers.gradleProperty("requireUninstaller").map { it.toBoolean() }.orElse(false))
+    outputBinary.set(layout.projectDirectory.file("native/uninstall.exe"))
 }
 
 // 按 gradle.properties 固定的 Release 下载定制 libmpv 并校验 SHA256；本地已有且校验一致时不重复下载
@@ -256,6 +265,42 @@ afterEvaluate {
             task.name.startsWith("createDistributable") || task.name.startsWith("createReleaseDistributable") ||
             (task.name.startsWith("package") && task.name != "packageReleaseZip")
     }.configureEach { dependsOn(prepareNativeResources) }
+    // 应用目录分发产物包含独立卸载程序
+    tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }.configureEach {
+        dependsOn(buildUninstaller)
+        doLast {
+            val uninstallerSrc = layout.projectDirectory.file("native/uninstall.exe").asFile
+            if (uninstallerSrc.isFile) {
+                listOf("main", "main-release").forEach { variant ->
+                    val melodiaDir = layout.buildDirectory.dir("compose/binaries/$variant/app/Melodia").get().asFile
+                    if (melodiaDir.isDirectory) {
+                        uninstallerSrc.copyTo(File(melodiaDir, "uninstall.exe"), overwrite = true)
+                    }
+                }
+            }
+        }
+    }
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (targetFormat == org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi) {
+        dependsOn(buildUninstaller)
+        val customWxs = layout.projectDirectory.file("packaging/windows/main.wxs")
+        val uninstallerExe = layout.projectDirectory.file("native/uninstall.exe")
+        val targetDir = layout.buildDirectory.dir("compose/tmp/resources").get()
+        val customProvider = project.provider {
+            val dir = targetDir.asFile
+            dir.mkdirs()
+            if (customWxs.asFile.isFile && uninstallerExe.asFile.isFile) {
+                val content = customWxs.asFile.readText()
+                    .replace("@MELODIA_UNINSTALL_EXE@", uninstallerExe.asFile.absolutePath)
+                File(dir, "main.wxs").writeText(content)
+            }
+            targetDir
+        }
+        val field = org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask::class.java.getDeclaredField("jpackageResources")
+        field.isAccessible = true
+        field.set(this, customProvider)
+    }
+}
     // gradle run 视为调试环境
     tasks.named<JavaExec>("run") {
         jvmArgs("-Dmelodia.debug=true")

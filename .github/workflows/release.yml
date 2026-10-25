@@ -185,14 +185,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       # libmpv 按 gradle.properties 固定的 Release 下载并校验 SHA256；SMTC 编不出来直接失败
-      # 预发布版只出免安装版：MSI 升级只比较三段数字版本，beta 与正式版同号时装了 beta 升不到正式版
       - name: 桌面端打包
         run: |
-          TASKS=":desktopApp:packageReleaseZip"
-          if [ "${{ needs.version.outputs.prerelease }}" = "false" ]; then
-            TASKS="$TASKS :desktopApp:packageReleaseMsi"
-          fi
-          ./gradlew $TASKS \
+          ./gradlew :desktopApp:packageReleaseZip :desktopApp:packageReleaseMsi \
             -PreleaseVersionName=${{ needs.version.outputs.name }} \
             -PrequireSmtc=true \
             --no-daemon
@@ -202,9 +197,7 @@ jobs:
           OUT=desktopApp/build/compose/binaries/main-release
           mkdir -p dist
           cp "$OUT/zip/Melodia-v${{ needs.version.outputs.name }}-windows-x64.zip" dist/
-          if [ "${{ needs.version.outputs.prerelease }}" = "false" ]; then
-            cp "$OUT"/msi/*.msi "dist/Melodia-v${{ needs.version.outputs.name }}-windows-x64.msi"
-          fi
+          cp "$OUT"/msi/*.msi "dist/Melodia-v${{ needs.version.outputs.name }}-windows-x64.msi"
           ls -l dist
 
       - name: 上传桌面端安装包
@@ -271,7 +264,7 @@ jobs:
               echo ""
             fi
             echo "### 💻 桌面端安装说明"
-            echo "- Windows 10 及以上 64 位系统，正式版提供 MSI 安装包与免安装 zip，预发布版只提供免安装 zip"
+            echo "- Windows 10 及以上 64 位系统，提供 MSI 安装包与免安装 zip"
             echo "- 安装包暂未做代码签名，首次运行若出现 SmartScreen 提示，点击「更多信息」→「仍要运行」即可"
             echo ""
             if [ -n "$PREV_TAG" ]; then

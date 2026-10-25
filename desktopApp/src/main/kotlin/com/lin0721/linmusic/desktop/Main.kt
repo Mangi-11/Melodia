@@ -140,7 +140,13 @@ fun main() {
     DesktopImageLoader.install()
     // 已有实例则唤起它并退出
     val activationRequests = Channel<Unit>(Channel.CONFLATED)
-    if (!SingleInstance(DesktopPaths.dataDir).acquire { activationRequests.trySend(Unit) }) {
+    val quitRequests = Channel<Unit>(Channel.CONFLATED)
+    val singleInstance = SingleInstance(DesktopPaths.dataDir)
+    if (!singleInstance.acquire(
+            onActivate = { activationRequests.trySend(Unit) },
+            onQuit = { quitRequests.trySend(Unit) }
+        )
+    ) {
         exitProcess(0)
     }
     // 须先于任何缓存目录的读取与缓存对象创建
@@ -252,16 +258,20 @@ fun main() {
         }
         // 先隐藏窗口等消失动画播完，再补报当前曲目播放时长、销毁 mpv 句柄并退出
         var isExiting by remember { mutableStateOf(false) }
+        val shutdownAndExit = {
+            mediaSession.shutdown()
+            controller.release()
+            singleInstance.close()
+            // 正常退出才算渲染后端验证通过，清掉标记，下次不会自动降级
+            RenderSessionGuard.end()
+        }
         val exit: () -> Unit = {
             if (!isExiting) {
                 isExiting = true
                 isMainVisible = false
                 scope.launch {
                     delay(EXIT_ANIMATION_MS)
-                    mediaSession.shutdown()
-                    controller.release()
-                    // 正常退出才算渲染后端验证通过，清掉标记，下次不会自动降级
-                    RenderSessionGuard.end()
+                    shutdownAndExit()
                     exitApplication()
                 }
             }
@@ -274,6 +284,16 @@ fun main() {
 
         LaunchedEffect(Unit) {
             for (request in activationRequests) showMainWindow()
+        }
+        LaunchedEffect(Unit) {
+            for (request in quitRequests) {
+                if (!isExiting) {
+                    isExiting = true
+                    isMainVisible = false
+                    shutdownAndExit()
+                    exitProcess(0)
+                }
+            }
         }
 
         // 占位播放器没有音量，返回 false 让方向键留给页面
