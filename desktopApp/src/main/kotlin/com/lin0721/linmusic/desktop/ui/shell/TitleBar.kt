@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -178,46 +179,56 @@ fun WindowScope.TitleBar(
             }
         }
         Row(
-            Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
+            Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NavArrow(Icons.AutoMirrored.Rounded.ArrowBackIos, "后退", canGoBack, onBack)
-            NavArrow(Icons.AutoMirrored.Rounded.ArrowForwardIos, "前进", canGoForward, onForward)
-        }
-        Row(
-            Modifier.align(Alignment.Center),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            HomeButton(
-                isHomeAll = isHomeAll,
-                onClick = onHomeClick
-            )
-            SearchBox(
-                query = searchQuery,
-                placeholder = searchPlaceholder,
-                onQueryChange = onSearchQueryChange,
-                onFocusChange = onSearchFocusChange,
-                onBoundsChange = onSearchBoundsChange,
-                onMove = onSearchMove,
-                onSubmit = onSearchSubmit,
-                focusRequests = searchFocusRequests,
-                isBrowseActive = isBrowseActive,
-                onBrowseClick = onBrowseClick
-            )
-            RecognitionButton(active = recognitionOpen, onClick = onRecognitionClick)
-        }
-        Row(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-            CloudUploadsButton(cloudMusic)
-            if (onDownloadsClick != null) DownloadsButton(downloadTasks, downloadsOpen, onDownloadsClick)
-            AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onCloudClick, onSettingsClick, hasUpdate, onLogoutClick)
-            WindowButton(Icons.Rounded.Remove, "最小化", onClick = onMinimize)
-            WindowButton(
-                if (isMaximized) Icons.Rounded.FilterNone else Icons.Rounded.CropSquare,
-                if (isMaximized) "还原" else "最大化",
-                onClick = onToggleMaximize
-            )
-            WindowButton(Icons.Rounded.Close, "关闭", hoverColor = CloseHover, onClick = onClose)
+            Row(
+                Modifier.padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavArrow(Icons.AutoMirrored.Rounded.ArrowBackIos, "后退", canGoBack, onBack)
+                NavArrow(Icons.AutoMirrored.Rounded.ArrowForwardIos, "前进", canGoForward, onForward)
+            }
+            Box(
+                Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    HomeButton(
+                        isHomeAll = isHomeAll,
+                        onClick = onHomeClick
+                    )
+                    SearchBox(
+                        query = searchQuery,
+                        placeholder = searchPlaceholder,
+                        onQueryChange = onSearchQueryChange,
+                        onFocusChange = onSearchFocusChange,
+                        onBoundsChange = onSearchBoundsChange,
+                        onMove = onSearchMove,
+                        onSubmit = onSearchSubmit,
+                        focusRequests = searchFocusRequests,
+                        isBrowseActive = isBrowseActive,
+                        onBrowseClick = onBrowseClick,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    RecognitionButton(active = recognitionOpen, onClick = onRecognitionClick)
+                }
+            }
+            Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                CloudUploadsButton(cloudMusic)
+                if (onDownloadsClick != null) DownloadsButton(downloadTasks, downloadsOpen, onDownloadsClick)
+                AvatarMenu(userProfile, onLoginClick, onProfileClick, onRecentClick, onCloudClick, onSettingsClick, hasUpdate, onLogoutClick)
+                WindowButton(Icons.Rounded.Remove, "最小化", onClick = onMinimize)
+                WindowButton(
+                    if (isMaximized) Icons.Rounded.FilterNone else Icons.Rounded.CropSquare,
+                    if (isMaximized) "还原" else "最大化",
+                    onClick = onToggleMaximize
+                )
+                WindowButton(Icons.Rounded.Close, "关闭", hoverColor = CloseHover, onClick = onClose)
+            }
         }
     }
 }
@@ -449,7 +460,8 @@ private fun SearchBox(
     onSubmit: () -> Unit,
     focusRequests: Flow<Unit>,
     isBrowseActive: Boolean,
-    onBrowseClick: () -> Unit
+    onBrowseClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -480,12 +492,12 @@ private fun SearchBox(
     )
 
     Row(
-        Modifier
+        modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .width(490.dp)
+            .widthIn(min = 200.dp, max = 490.dp)
             .height(48.dp)
             .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
             .hoverable(hoverInteraction)
