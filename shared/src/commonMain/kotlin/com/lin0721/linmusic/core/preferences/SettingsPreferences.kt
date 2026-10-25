@@ -137,7 +137,6 @@ class SettingsPreferences(
         // 全屏歌词自动隐藏控制组件，默认 false
         private val KEY_FULL_SCREEN_LYRIC_AUTO_HIDE_CONTROLS = booleanPreferencesKey("full_screen_lyric_auto_hide_controls")
         private val KEY_FULL_SCREEN_LYRIC_CENTER_FIRST_LINE = booleanPreferencesKey("full_screen_lyric_center_first_line")
-        private val KEY_FULL_SCREEN_LYRIC_EDGE_FADE = booleanPreferencesKey("full_screen_lyric_edge_fade")
         // 全屏播放页信息卡片顺序与显隐，格式见 FullPlayerCardLayout
         private val KEY_FULL_PLAYER_CARD_LAYOUT = stringPreferencesKey("full_player_card_layout")
         // 底栏项目排序与显隐，格式见 BottomBarLayout
@@ -748,17 +747,6 @@ class SettingsPreferences(
     suspend fun saveFullScreenLyricCenterFirstLine(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_FULL_SCREEN_LYRIC_CENTER_FIRST_LINE] = enabled
-        }
-    }
-
-    // 全屏歌词边缘渐隐与悬浮控件 Flow（默认关闭，沿用原样式）
-    val fullScreenLyricEdgeFade: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_FULL_SCREEN_LYRIC_EDGE_FADE] ?: false
-    }
-
-    suspend fun saveFullScreenLyricEdgeFade(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[KEY_FULL_SCREEN_LYRIC_EDGE_FADE] = enabled
         }
     }
 

@@ -388,8 +388,6 @@ fun FullScreenLyricsSettingsSheet(
     onAutoHideControlsChange: (Boolean) -> Unit = {},
     centerFirstLine: Boolean = false,
     onCenterFirstLineChange: (Boolean) -> Unit = {},
-    edgeFade: Boolean = false,
-    onEdgeFadeChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val motion = LocalUiMotion.current
@@ -653,12 +651,6 @@ fun FullScreenLyricsSettingsSheet(
                                 onCheckedChange = onCenterFirstLineChange
                             )
 
-                            LyricCompactSwitchRow(
-                                title = "歌词边缘渐隐",
-                                subtitle = "上下边缘渐隐，顶栏与播控悬浮于歌词之上",
-                                checked = edgeFade,
-                                onCheckedChange = onEdgeFadeChange
-                            )
                         }
                     }
                   }

@@ -45,6 +45,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -100,6 +106,8 @@ fun FullScreenLyricsList(
     val configuration = LocalConfiguration.current
     val defaultHalfViewportDp = remember(configuration.screenHeightDp) { (configuration.screenHeightDp / 2).dp }
     val halfViewportPadding = if (viewportHeightPx > 0f) with(density) { (viewportHeightPx / 2f).toDp() } else defaultHalfViewportDp
+    val effectiveTopInsetPx = if (topInsetPx > 0f) topInsetPx else with(density) { EdgeFadeHeight.toPx() }
+    val effectiveTopInsetDp = with(density) { effectiveTopInsetPx.toDp() }
 
     LaunchedEffect(currentIndex, lyrics, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
         if (isUserScrolling || viewportHeightPx <= 0f) return@LaunchedEffect
@@ -109,7 +117,7 @@ fun FullScreenLyricsList(
             if (lyrics.isNotEmpty()) {
                 lazyListState.springScrollToCentreClassic(
                     targetIndex = 0,
-                    desiredOffsetPx = 0,
+                    desiredOffsetPx = effectiveTopInsetPx.toInt(),
                     fallbackScrollOffsetPx = 0
                 )
             }
@@ -132,7 +140,7 @@ fun FullScreenLyricsList(
         if (currentIndex < linesAboveCentre) {
             lazyListState.springScrollToCentreClassic(
                 targetIndex = 0,
-                desiredOffsetPx = 0,
+                desiredOffsetPx = effectiveTopInsetPx.toInt(),
                 fallbackScrollOffsetPx = 0
             )
             return@LaunchedEffect
@@ -147,7 +155,7 @@ fun FullScreenLyricsList(
         val itemHeightPx = with(density) {
             (if (hasSecondary) 96 + secondarySpacing - 6 else 54).coerceAtLeast(1).dp.toPx()
         }
-        val desiredOffsetPx = ((viewportHeightPx - itemHeightPx) / 2f - topInsetPx).toInt()
+        val desiredOffsetPx = ((viewportHeightPx - itemHeightPx) / 2f).toInt()
         lazyListState.springScrollToCentreClassic(
             targetIndex = currentIndex,
             desiredOffsetPx = desiredOffsetPx,
@@ -212,11 +220,12 @@ fun FullScreenLyricsList(
                 userScrollEnabled = userScrollEnabled,
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalEdgeFade(top = EdgeFadeHeight, bottom = EdgeFadeHeight)
                     .then(gestureModifier)
                     .onSizeChanged { onViewportHeightChange(it.height.toFloat()) },
                 verticalArrangement = Arrangement.spacedBy(lineSpacing.coerceAtLeast(0).dp),
                 contentPadding = PaddingValues(
-                    top = if (centerFirstLine) halfViewportPadding else with(density) { topInsetPx.toDp() },
+                    top = if (centerFirstLine) halfViewportPadding else effectiveTopInsetDp,
                     bottom = if (centerFirstLine) halfViewportPadding else with(density) { (viewportHeightPx / 2f).toDp() }
                 ),
                 horizontalAlignment = when (alignment) {
@@ -422,3 +431,23 @@ private suspend fun LazyListState.springScrollToCentreClassic(
 
     this.animateScrollToItem(index = targetIndex, scrollOffset = fallbackScrollOffsetPx)
 }
+
+// 默认歌词视口边缘羽化高度
+private val EdgeFadeHeight = 32.dp
+
+// 视口上下边缘渐隐：用 DstIn 把内容按渐变蒙版擦淡
+internal fun Modifier.verticalEdgeFade(top: Dp = EdgeFadeHeight, bottom: Dp = EdgeFadeHeight): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+        drawContent()
+        val height = size.height
+        if (height <= 0f) return@drawWithContent
+        val topFraction = (top.toPx() / height).coerceIn(0f, 0.5f)
+        val bottomFraction = (bottom.toPx() / height).coerceIn(0f, 0.5f)
+        val stops = buildList {
+            add(0f to if (topFraction > 0f) Color.Transparent else Color.Black)
+            if (topFraction > 0f) add(topFraction to Color.Black)
+            add(1f - bottomFraction to Color.Black)
+            add(1f to if (bottomFraction > 0f) Color.Transparent else Color.Black)
+        }
+        drawRect(Brush.verticalGradient(colorStops = stops.toTypedArray()), blendMode = BlendMode.DstIn)
+    }
