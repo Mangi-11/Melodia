@@ -70,8 +70,22 @@ abstract class CmakeBinaryTask @Inject constructor(private val execOps: ExecOper
     @get:Input
     abstract val required: Property<Boolean>
 
+    @get:Input
+    @get:Optional
+    abstract val buildTarget: Property<String>
+
+    @get:Input
+    abstract val cmakeArgs: ListProperty<String>
+
+    @get:InputFiles
+    abstract val extraInputs: ConfigurableFileCollection
+
     @get:OutputFile
     abstract val outputBinary: RegularFileProperty
+
+    init {
+        cmakeArgs.convention(emptyList())
+    }
 
     private fun skip(reason: String) {
         if (required.get()) throw GradleException(reason)
@@ -88,9 +102,10 @@ abstract class CmakeBinaryTask @Inject constructor(private val execOps: ExecOper
             return
         }
         val buildDir = cmakeBuildDir.get().asFile
+        val target = buildTarget.orNull?.let { listOf("--target", it) }.orEmpty()
         val steps = listOf(
-            listOf(cmake.absolutePath, "-S", sourceDir.get().asFile.absolutePath, "-B", buildDir.absolutePath),
-            listOf(cmake.absolutePath, "--build", buildDir.absolutePath, "--config", "Release")
+            listOf(cmake.absolutePath, "-S", sourceDir.get().asFile.absolutePath, "-B", buildDir.absolutePath) + cmakeArgs.get(),
+            listOf(cmake.absolutePath, "--build", buildDir.absolutePath, "--config", "Release") + target
         )
         for (command in steps) {
             val log = ByteArrayOutputStream()
@@ -105,7 +120,9 @@ abstract class CmakeBinaryTask @Inject constructor(private val execOps: ExecOper
                 return
             }
         }
-        File(buildDir, "Release/${binaryName.get()}").copyTo(outputBinary.get().asFile, overwrite = true)
+        val output = outputBinary.get().asFile
+        output.parentFile.mkdirs()
+        File(buildDir, "Release/${binaryName.get()}").copyTo(output, overwrite = true)
     }
 }
 
@@ -118,13 +135,27 @@ val buildSmtc by tasks.registering(CmakeBinaryTask::class) {
     outputBinary.set(layout.projectDirectory.file("native/melodia_smtc.dll"))
 }
 
+val installerSourceDir = layout.projectDirectory.dir("native-src/installer")
+
 val buildUninstaller by tasks.registering(CmakeBinaryTask::class) {
     onlyIf { System.getProperty("os.name").startsWith("Windows") }
-    sourceDir.set(layout.projectDirectory.dir("native-src/uninstaller"))
-    cmakeBuildDir.set(layout.buildDirectory.dir("uninstaller"))
+    sourceDir.set(installerSourceDir)
+    cmakeBuildDir.set(layout.buildDirectory.dir("installer"))
+    buildTarget.set("uninstall")
     binaryName.set("uninstall.exe")
     required.set(providers.gradleProperty("requireUninstaller").map { it.toBoolean() }.orElse(false))
     outputBinary.set(layout.projectDirectory.file("native/uninstall.exe"))
+}
+
+val buildMsiPatch by tasks.registering(CmakeBinaryTask::class) {
+    onlyIf { System.getProperty("os.name").startsWith("Windows") }
+    mustRunAfter(buildUninstaller)
+    sourceDir.set(installerSourceDir)
+    cmakeBuildDir.set(layout.buildDirectory.dir("installer"))
+    buildTarget.set("msipatch")
+    binaryName.set("msipatch.exe")
+    required.set(true)
+    outputBinary.set(layout.buildDirectory.file("installer-tools/msipatch.exe"))
 }
 
 // 按 gradle.properties 固定的 Release 下载定制 libmpv 并校验 SHA256；本地已有且校验一致时不重复下载
@@ -252,6 +283,7 @@ compose.desktop {
                 menu = true
                 menuGroup = "Melodia"
                 shortcut = true
+                // 目录与安装范围由 setup.exe 选择
                 dirChooser = false
             }
         }
@@ -285,15 +317,20 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
         dependsOn(buildUninstaller)
         val customWxs = layout.projectDirectory.file("packaging/windows/main.wxs")
         val uninstallerExe = layout.projectDirectory.file("native/uninstall.exe")
+        val uninstallerIco = layout.projectDirectory.file("icons/uninstall.ico")
         val targetDir = layout.buildDirectory.dir("compose/tmp/resources").get()
         val customProvider = project.provider {
+            // 缺任何一项都会打出不带卸载程序的 MSI，直接失败
+            val missing = listOf(customWxs, uninstallerExe, uninstallerIco).map { it.asFile }.filterNot { it.isFile }
+            if (missing.isNotEmpty()) {
+                throw GradleException("打包 MSI 缺少文件：${missing.joinToString { it.absolutePath }}")
+            }
             val dir = targetDir.asFile
             dir.mkdirs()
-            if (customWxs.asFile.isFile && uninstallerExe.asFile.isFile) {
-                val content = customWxs.asFile.readText()
-                    .replace("@MELODIA_UNINSTALL_EXE@", uninstallerExe.asFile.absolutePath)
-                File(dir, "main.wxs").writeText(content)
-            }
+            val content = customWxs.asFile.readText()
+                .replace("@MELODIA_UNINSTALL_EXE@", uninstallerExe.asFile.absolutePath)
+                .replace("@MELODIA_UNINSTALL_ICO@", uninstallerIco.asFile.absolutePath)
+            File(dir, "main.wxs").writeText(content)
             targetDir
         }
         val field = org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask::class.java.getDeclaredField("jpackageResources")
@@ -319,4 +356,40 @@ val packageReleaseZip by tasks.registering(Zip::class) {
     isPreserveFileTimestamps = true
     archiveFileName.set("Melodia-v$desktopVersion-windows-x64.zip")
     destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release/zip"))
+}
+
+// 安装程序：jpackage 的按用户 MSI 改成双用途包后内嵌进 setup.exe，MSI 本身不单独发布
+val patchedMsi = layout.buildDirectory.file("installer-setup/Melodia.msi")
+
+val patchMsiDualScope by tasks.registering(Exec::class) {
+    onlyIf { System.getProperty("os.name").startsWith("Windows") }
+    dependsOn("packageReleaseMsi", buildMsiPatch)
+    val sourceMsi = layout.buildDirectory.file("compose/binaries/main-release/msi/Melodia-$desktopPackageVersion.msi")
+    val patcher = layout.buildDirectory.file("installer-tools/msipatch.exe")
+    inputs.file(sourceMsi)
+    inputs.file(patcher)
+    outputs.file(patchedMsi)
+    doFirst {
+        patchedMsi.get().asFile.parentFile.mkdirs()
+        commandLine(patcher.get().asFile.absolutePath, sourceMsi.get().asFile.absolutePath, patchedMsi.get().asFile.absolutePath)
+    }
+}
+
+val packageReleaseSetup by tasks.registering(CmakeBinaryTask::class) {
+    onlyIf { System.getProperty("os.name").startsWith("Windows") }
+    dependsOn(patchMsiDualScope)
+    sourceDir.set(installerSourceDir)
+    cmakeBuildDir.set(layout.buildDirectory.dir("installer-setup/cmake"))
+    buildTarget.set("setup")
+    binaryName.set("setup.exe")
+    required.set(true)
+    cmakeArgs.set(
+        listOf(
+            "-DMELODIA_SETUP_MSI=${patchedMsi.get().asFile.absolutePath}",
+            "-DMELODIA_VERSION=$desktopPackageVersion",
+            "-DMELODIA_DISPLAY_VERSION=$desktopVersion",
+        )
+    )
+    extraInputs.from(patchedMsi, rootProject.file("LICENSE"))
+    outputBinary.set(layout.buildDirectory.file("compose/binaries/main-release/setup/Melodia-v$desktopVersion-windows-x64-setup.exe"))
 }

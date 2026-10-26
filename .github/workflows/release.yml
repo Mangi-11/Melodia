@@ -164,7 +164,7 @@ jobs:
           path: app/build/outputs/apk/release/Melodia-v${{ needs.version.outputs.name }}-release.apk
           retention-days: 7
 
-  # windows-latest 自带 CMake、VS 2022（编 SMTC 桥接 DLL）与 WiX 3（打 MSI）
+  # windows-latest 自带 CMake、VS 2022（编 SMTC 桥接 DLL 与安装/卸载程序）与 WiX 3（打内嵌的 MSI）
   desktop:
     needs: version
     runs-on: windows-latest
@@ -187,9 +187,10 @@ jobs:
       # libmpv 按 gradle.properties 固定的 Release 下载并校验 SHA256；SMTC 编不出来直接失败
       - name: 桌面端打包
         run: |
-          ./gradlew :desktopApp:packageReleaseZip :desktopApp:packageReleaseMsi \
+          ./gradlew :desktopApp:packageReleaseZip :desktopApp:packageReleaseSetup \
             -PreleaseVersionName=${{ needs.version.outputs.name }} \
             -PrequireSmtc=true \
+            -PrequireUninstaller=true \
             --no-daemon
 
       - name: 整理安装包
@@ -197,7 +198,7 @@ jobs:
           OUT=desktopApp/build/compose/binaries/main-release
           mkdir -p dist
           cp "$OUT/zip/Melodia-v${{ needs.version.outputs.name }}-windows-x64.zip" dist/
-          cp "$OUT"/msi/*.msi "dist/Melodia-v${{ needs.version.outputs.name }}-windows-x64.msi"
+          cp "$OUT/setup/Melodia-v${{ needs.version.outputs.name }}-windows-x64-setup.exe" dist/
           ls -l dist
 
       - name: 上传桌面端安装包
@@ -264,7 +265,8 @@ jobs:
               echo ""
             fi
             echo "### 💻 桌面端安装说明"
-            echo "- Windows 10 及以上 64 位系统，提供 MSI 安装包与免安装 zip"
+            echo "- Windows 10 及以上 64 位系统，提供安装程序（setup.exe）与免安装 zip"
+            echo "- 安装程序支持静默安装：\`setup.exe /S [/allusers] [/nodesktop] [/autostart] [/run] [/D=安装目录]\`"
             echo "- 安装包暂未做代码签名，首次运行若出现 SmartScreen 提示，点击「更多信息」→「仍要运行」即可"
             echo ""
             if [ -n "$PREV_TAG" ]; then

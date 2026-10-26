@@ -83,7 +83,7 @@
                   Description="卸载 Melodia 音乐播放器"
                   Target="[INSTALLDIR]uninstall.exe"
                   WorkingDirectory="INSTALLDIR"
-                  Icon="JpARPPRODUCTICON" />
+                  Icon="UninstallProductIcon" />
         <RegistryValue Root="HKCU"
                        Key="Software\Lin0721\Melodia"
                        Name="UninstallShortcut"
@@ -93,7 +93,7 @@
       </Component>
     </DirectoryRef>
 
-    <!-- 安装独立卸载程序与注册表卸载入口到应用根目录 -->
+    <!-- 安装独立卸载程序与注册表卸载入口到应用根目录；HKCU 在构建后由 msipatch 统一改为 HKMU，直接写 HKMU 过不了 ICE 校验 -->
     <DirectoryRef Id="INSTALLDIR">
       <Component Win64="yes" Id="UninstallExeComponent" Guid="{d4e8b31a-6f29-4b15-9c88-e21b774fa191}">
         <RegistryKey Root="HKCU" Key="Software\Melodia\Melodia\$(var.JpAppVersion)">
@@ -148,7 +148,9 @@
     <Property Id="ARPPRODUCTICON" Value="JpARPPRODUCTICON"/>
     <Icon Id="JpARPPRODUCTICON" SourceFile="$(var.JpIcon)"/>
     <?endif?>
+    <Icon Id="UninstallProductIcon" SourceFile="@MELODIA_UNINSTALL_ICO@"/>
 
+    <!-- 不单独发布，只由 setup.exe 静默安装，目录与范围在 setup.exe 中选择 -->
     <UIRef Id="JpUI"/>
 
     <InstallExecuteSequence>

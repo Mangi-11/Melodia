@@ -135,7 +135,7 @@ Repository 边界统一产出 Kotlin `Result<T>`，异常类型抽象为领域�
   - 64 位 Windows 10 及以上
   - `libmpv-2.dll`：使用定制的精简音频版（[mpv-winbuild-cmake](https://github.com/rinchao0721/mpv-winbuild-cmake) 的 `AUDIO_ONLY` 构建），运行或打包前由 Gradle 按 `gradle.properties` 中固定的 Release 自动下载到 `desktopApp/native/` 并校验 SHA256（不入库）；也可单独执行 `./gradlew :desktopApp:downloadLibmpv`
   - SMTC 桥接 DLL 由 Gradle 在运行与打包前自动调用 CMake 编译，需安装 CMake 与 Visual Studio（含“使用 C++ 的桌面开发”工作负载及 Windows 10/11 SDK）；本地缺少时跳过编译，运行时退回全局媒体键（发版构建传 `-PrequireSmtc=true`，编不出来直接失败）
-  - 打包 MSI 需安装 [WiX Toolset 3.14](https://github.com/wixtoolset/wix3/releases) 并将其 `bin` 目录加入 `PATH`；打包所用 JDK 21 由 Gradle 工具链自动下载
+  - 打包安装程序需安装 [WiX Toolset 3.14](https://github.com/wixtoolset/wix3/releases) 并将其 `bin` 目录加入 `PATH`（用于生成内嵌在 `setup.exe` 中的 MSI），安装与卸载程序同样由 CMake 编译；打包所用 JDK 21 由 Gradle 工具链自动下载
 
 ### 常用命令
 
@@ -157,7 +157,7 @@ Repository 边界统一产出 Kotlin `Result<T>`，异常类型抽象为领域�
   ```
 - **打包桌面端**（发布版启用 ProGuard 裁剪，产物位于 `desktopApp/build/compose/binaries/main-release/`）：
   ```bash
-  ./gradlew :desktopApp:packageReleaseZip :desktopApp:packageReleaseMsi
+  ./gradlew :desktopApp:packageReleaseZip :desktopApp:packageReleaseSetup
   ```
 
 ### 混淆与签名说明
