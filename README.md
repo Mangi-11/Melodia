@@ -45,7 +45,7 @@
 <div align="center">
   <img src="docs/screenshots/desktop-lyrics.webp" width="32%" alt="桌面端歌词" />
   <img src="docs/screenshots/desktop-artist.webp" width="32%" alt="桌面端歌手页" />
-  <img src="docs/screenshots/desktop-playlist.webp" width="32%" alt="桌面端歌单页" />
+  <img src="docs/screenshots/desktop-library-compact.webp" width="32%" alt="桌面端音乐库（紧凑）" />
 </div>
 
 ---
