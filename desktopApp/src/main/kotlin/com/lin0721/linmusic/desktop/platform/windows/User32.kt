@@ -95,12 +95,14 @@ internal interface Ole32 : Library {
     fun CoInitializeEx(pvReserved: Pointer?, dwCoInit: Int): Int
     fun CoUninitialize()
     fun CoCreateInstance(rclsid: Pointer, pUnkOuter: Pointer?, dwClsContext: Int, riid: Pointer, ppv: PointerByReference): Int
+    fun CoTaskMemFree(pv: Pointer?)
 
     companion object {
         val INSTANCE: Ole32 by lazy { Native.load("ole32", Ole32::class.java, W32APIOptions.DEFAULT_OPTIONS) }
 
         const val COINIT_MULTITHREADED = 0
         const val CLSCTX_INPROC_SERVER = 1
+        const val CLSCTX_ALL = 23
     }
 }
 

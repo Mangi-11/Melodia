@@ -65,9 +65,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -180,6 +183,7 @@ private fun WideRightColumn(
     infoCards: LazyListScope.() -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val motion = LocalUiMotion.current
     val settingsPreferences: SettingsPreferences = koinInject()
     val lyricTextSize by settingsPreferences.fullScreenLyricTextSize.collectAsStateWithLifecycle(initialValue = 22)
     val effectiveLyricTextSize = lyricTextSize.coerceIn(20, 40)
@@ -336,8 +340,8 @@ private fun WideRightColumn(
 
         AnimatedVisibility(
             visible = showBackToLyrics,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = uiEnter(fadeIn()),
+            exit = uiExit(fadeOut()),
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = MelodiaSpacing.sm)
@@ -346,7 +350,7 @@ private fun WideRightColumn(
                 color = Color.White.copy(alpha = 0.16f),
                 shape = RoundedCornerShape(PillRadius),
                 modifier = Modifier.pressable(MelodiaPress.Pill) {
-                    scope.launch { columnState.animateScrollToItem(0) }
+                    scope.launch { motion.scrollToItem(columnState, 0) }
                 }
             ) {
                 Row(

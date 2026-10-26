@@ -1,13 +1,17 @@
 package com.lin0721.linmusic.desktop.ui.library
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -27,13 +31,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -60,6 +62,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -91,6 +95,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -108,10 +113,14 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
 import com.lin0721.linmusic.desktop.ui.components.trackTextInputFocus
+import com.lin0721.linmusic.desktop.ui.components.uiTween
+import com.lin0721.linmusic.desktop.ui.local.RemoveLocalPlaylistDialog
+import com.lin0721.linmusic.desktop.ui.local.RenameLocalPlaylistDialog
 import com.lin0721.linmusic.desktop.ui.playlist.EditPlaylistDialog
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -131,6 +140,8 @@ private val ShadowHeight = 8.dp
 // 网格单元内边距：越小封面越大
 private val LargeCardInset = 6.dp
 private val SmallTileInset = 2.dp
+private const val LargeGridMinColumns = 2
+private const val SmallGridMinColumns = 3
 // 网格封面随栏宽连续变化，固定请求尺寸，避免拖动时每帧换缩略图地址而反复加载
 private val GridCoverRequestSize = 320.dp
 
@@ -152,6 +163,7 @@ fun LibrarySidebar(
     onViewModeChange: (LibraryViewMode) -> Unit,
     onFilterToggle: (LibraryFilter) -> Unit,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
+    extras: LibraryExtrasEntry,
     modifier: Modifier = Modifier
 ) {
     val paneHover = remember { MutableInteractionSource() }
@@ -167,10 +179,8 @@ fun LibrarySidebar(
                 onTitleClick = { viewModel.loadLibraryData() }
             ) { onModeChange(LibraryMode.RAIL) }
             Spacer(Modifier.weight(1f))
-            if (isLoggedIn) {
-                LibraryCreateButton(viewModel, pill = false)
-                Spacer(Modifier.width(4.dp))
-            }
+            LibraryCreateButton(viewModel, extras, isLoggedIn, pill = false)
+            Spacer(Modifier.width(4.dp))
             LibraryIconButton(Icons.Rounded.OpenInFull, "展开音乐库") { onModeChange(LibraryMode.EXPANDED) }
         }
         LibraryBody(
@@ -182,6 +192,7 @@ fun LibrarySidebar(
             onViewModeChange = onViewModeChange,
             onFilterToggle = onFilterToggle,
             onSortOrderChange = onSortOrderChange,
+            extras = extras,
             wideSearch = false,
             edgePadding = 16.dp,
             cardMinWidth = 128.dp,
@@ -202,6 +213,7 @@ fun LibraryExpanded(
     onViewModeChange: (LibraryViewMode) -> Unit,
     onFilterToggle: (LibraryFilter) -> Unit,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
+    extras: LibraryExtrasEntry,
     modifier: Modifier = Modifier
 ) {
     Column(modifier.fillMaxSize().padding(top = 16.dp)) {
@@ -220,10 +232,8 @@ fun LibraryExpanded(
                 )
             }
             Spacer(Modifier.weight(1f))
-            if (isLoggedIn) {
-                LibraryCreateButton(viewModel, pill = true)
-                Spacer(Modifier.width(8.dp))
-            }
+            LibraryCreateButton(viewModel, extras, isLoggedIn, pill = true)
+            Spacer(Modifier.width(8.dp))
             LibraryIconButton(Icons.Rounded.CloseFullscreen, "收回音乐库") { onModeChange(LibraryMode.DEFAULT) }
         }
         LibraryBody(
@@ -235,6 +245,7 @@ fun LibraryExpanded(
             onViewModeChange = onViewModeChange,
             onFilterToggle = onFilterToggle,
             onSortOrderChange = onSortOrderChange,
+            extras = extras,
             wideSearch = true,
             edgePadding = 24.dp,
             cardMinWidth = 190.dp,
@@ -253,13 +264,16 @@ private fun LibraryBody(
     onViewModeChange: (LibraryViewMode) -> Unit,
     onFilterToggle: (LibraryFilter) -> Unit,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
+    extras: LibraryExtrasEntry,
     wideSearch: Boolean,
     edgePadding: Dp,
     cardMinWidth: Dp,
     smallTileMinWidth: Dp
 ) {
+    // 未登录时仍可使用本地歌单
     if (!isLoggedIn) {
         LoginPrompt(onLoginClick)
+        LibraryItems(viewModel, extras, false, onItemClick, edgePadding, cardMinWidth, smallTileMinWidth, LibraryViewMode.LIST)
         return
     }
     if (wideSearch) {
@@ -268,7 +282,7 @@ private fun LibraryBody(
             Modifier.fillMaxWidth().padding(start = edgePadding, end = edgePadding, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LibraryFilterChips(viewModel, onFilterToggle)
+            LibraryFilterChips(viewModel, extras, onFilterToggle)
             Spacer(Modifier.weight(1f))
             val query by viewModel.searchQuery.collectAsState()
             Box(
@@ -286,10 +300,10 @@ private fun LibraryBody(
             LibrarySortViewMenu(viewModel, viewMode, onViewModeChange, onSortOrderChange, showSortLabel = true)
         }
     } else {
-        Box(Modifier.padding(start = edgePadding, end = edgePadding, top = 12.dp)) { LibraryFilterChips(viewModel, onFilterToggle) }
+        Box(Modifier.padding(start = edgePadding, end = edgePadding, top = 12.dp)) { LibraryFilterChips(viewModel, extras, onFilterToggle) }
         LibraryCompactToolbar(viewModel, edgePadding, viewMode, onViewModeChange, onSortOrderChange)
     }
-    LibraryItems(viewModel, onItemClick, edgePadding, cardMinWidth, smallTileMinWidth, viewMode)
+    LibraryItems(viewModel, extras, true, onItemClick, edgePadding, cardMinWidth, smallTileMinWidth, viewMode)
 }
 
 // 窄版工具行：搜索图标点击后展开成输入框（排序标签让位），清空或失焦且无内容时收回
@@ -313,12 +327,12 @@ private fun LibraryCompactToolbar(
     ) {
         val fieldWidth by animateDpAsState(
             if (searching) maxWidth - SearchHeight - 8.dp else SearchHeight,
-            tween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
+            uiTween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
             label = "librarySearchWidth"
         )
         val background by animateColorAsState(
             if (searching) DesktopColors.Surface else Color.Transparent,
-            tween(SEARCH_ANIMATION_MS),
+            uiTween(SEARCH_ANIMATION_MS),
             label = "librarySearchBackground"
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -406,31 +420,61 @@ internal fun LibrarySearchInput(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun LibraryFilterChips(viewModel: LibraryViewModel, onToggle: (LibraryFilter) -> Unit) {
+private fun LibraryFilterChips(viewModel: LibraryViewModel, extras: LibraryExtrasEntry, onToggle: (LibraryFilter) -> Unit) {
     val selectedFilter by viewModel.selectedFilter.collectAsState()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val scrollState = rememberScrollState()
+    val wheelStepPx = with(LocalDensity.current) { CHIP_WHEEL_STEP.toPx() }
+    // 窄栏放不下全部胶囊时可横向滚动，竖向滚轮也换算成横向
+    Row(
+        Modifier
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                val delta = change.scrollDelta.let { if (it.x != 0f) it.x else it.y }
+                if (delta != 0f && scrollState.maxValue > 0 && scrollState.dispatchRawDelta(delta * wheelStepPx) != 0f) {
+                    change.consume()
+                }
+            }
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         LibraryFilters.forEach { (filter, label) ->
-            FilterChip(
-                selected = selectedFilter == filter,
-                onClick = { onToggle(filter) },
-                label = { Text(label, fontSize = 13.sp) },
-                shape = RoundedCornerShape(16.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = DesktopColors.Surface,
-                    labelColor = DesktopColors.TextPrimary,
-                    selectedContainerColor = DesktopColors.TextPrimary,
-                    selectedLabelColor = DesktopColors.Pane
-                ),
-                border = null
-            )
+            LibraryFilterChip(label, selected = extras.selected == null && selectedFilter == filter) { onToggle(filter) }
+        }
+        LibraryFilterChip(LOCAL_FILTER_LABEL, selected = extras.selected == LibraryExtraFilter.LOCAL) {
+            extras.onToggle(LibraryExtraFilter.LOCAL)
+        }
+        LibraryFilterChip(CLOUD_FILTER_LABEL, selected = extras.selected == LibraryExtraFilter.CLOUD) {
+            extras.onToggle(LibraryExtraFilter.CLOUD)
         }
     }
+}
+
+private val CHIP_WHEEL_STEP = 48.dp
+
+@Composable
+private fun LibraryFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 13.sp, maxLines = 1, softWrap = false) },
+        shape = RoundedCornerShape(16.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = DesktopColors.Surface,
+            labelColor = DesktopColors.TextPrimary,
+            selectedContainerColor = DesktopColors.TextPrimary,
+            selectedLabelColor = DesktopColors.Pane
+        ),
+        border = null
+    )
 }
 
 @Composable
 private fun LibraryItems(
     viewModel: LibraryViewModel,
+    extras: LibraryExtrasEntry,
+    isLoggedIn: Boolean,
     onItemClick: (LibraryItem) -> Unit,
     edgePadding: Dp,
     cardMinWidth: Dp,
@@ -439,8 +483,75 @@ private fun LibraryItems(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val query by viewModel.searchQuery.collectAsState()
+    val displayItems = rememberLibraryDisplayItems(viewModel, extras, isLoggedIn)
+    val handlers = rememberLibraryItemHandlers(viewModel, extras)
+    val openItem: (LibraryItem) -> Unit = { item -> extras.open(item, onItemClick) }
+
+    Box(Modifier.fillMaxSize()) {
+        val state = uiState
+        when {
+            displayItems == null && state is LibraryUiState.Error -> CenteredBox {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.message, color = DesktopColors.TextGray, fontSize = 13.sp)
+                    TextButton(onClick = { viewModel.loadLibraryData() }) {
+                        Text("重试", color = DesktopColors.TextPrimary)
+                    }
+                }
+            }
+            displayItems == null -> CenteredBox { CircularProgressIndicator(color = DesktopColors.Accent) }
+            extras.selected == LibraryExtraFilter.CLOUD && !isLoggedIn -> CenteredBox {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("登录后即可查看云盘", color = DesktopColors.TextGray, fontSize = 13.sp)
+                    TextButton(onClick = LocalDesktopNavigator.current.openLogin) {
+                        Text("登录", color = DesktopColors.TextPrimary)
+                    }
+                }
+            }
+            displayItems.isEmpty() && query.isNotBlank() -> CenteredBox {
+                Text("未找到与“$query”相关的内容", color = DesktopColors.TextGray, fontSize = 13.sp)
+            }
+            else -> {
+                val coverTransition = LocalLibraryCoverTransition.current
+                val motion = LocalUiMotion.current
+                AnimatedContent(
+                    targetState = viewMode,
+                    transitionSpec = {
+                        motion.transform(
+                            fadeIn(tween(COVER_TRANSITION_MS)) togetherWith fadeOut(tween(COVER_TRANSITION_MS)) using null
+                        )
+                    },
+                    label = "libraryView"
+                ) { mode ->
+                    CompositionLocalProvider(LocalLibraryCoverTransition provides coverTransition?.nested(this)) {
+                        when (mode) {
+                            LibraryViewMode.COMPACT_LIST -> LibraryList(displayItems, openItem, viewModel, handlers, compact = true)
+                            LibraryViewMode.LIST -> LibraryList(displayItems, openItem, viewModel, handlers, compact = false)
+                            LibraryViewMode.SMALL_GRID -> LibraryGrid(displayItems, openItem, viewModel, handlers, edgePadding, smallTileMinWidth, small = true)
+                            LibraryViewMode.LARGE_GRID -> LibraryGrid(displayItems, openItem, viewModel, handlers, edgePadding, cardMinWidth, small = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 条目右键菜单需要的回调；对话框由这里统一承载，默认态与收起态共用
+@Immutable
+internal class LibraryItemHandlers(
+    val extras: LibraryExtrasEntry,
+    val onEdit: (LibraryItem) -> Unit,
+    val onDelete: (LibraryItem) -> Unit,
+    val onRenameLocal: (LibraryItem) -> Unit,
+    val onRemoveLocal: (LibraryItem) -> Unit
+)
+
+@Composable
+internal fun rememberLibraryItemHandlers(viewModel: LibraryViewModel, extras: LibraryExtrasEntry): LibraryItemHandlers {
     var editingItem by remember { mutableStateOf<LibraryItem?>(null) }
     var deletingItem by remember { mutableStateOf<LibraryItem?>(null) }
+    var renamingLocal by remember { mutableStateOf<LibraryItem?>(null) }
+    var removingLocal by remember { mutableStateOf<LibraryItem?>(null) }
     var isSavingEdit by remember { mutableStateOf(false) }
 
     editingItem?.let { item ->
@@ -489,51 +600,53 @@ private fun LibraryItems(
         }
     }
 
-    val handleDelete: (LibraryItem) -> Unit = { item ->
-        if (item.isOwnedByMe && item.type == LibraryItemType.PLAYLIST) {
-            deletingItem = item
-        } else {
-            item.id.toLongOrNull()?.let { id ->
-                when (item.type) {
-                    LibraryItemType.PLAYLIST -> viewModel.unsubscribePlaylist(id)
-                    LibraryItemType.ALBUM -> viewModel.unsubscribeAlbum(id)
-                    LibraryItemType.ARTIST -> viewModel.unsubscribeArtist(id)
-                }
+    renamingLocal?.let { item ->
+        val id = item.localPlaylistId()
+        if (id != null) {
+            RenameLocalPlaylistDialog(item.title, onDismiss = { renamingLocal = null }) { name ->
+                extras.local.repository.rename(id, name)
+                renamingLocal = null
             }
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        when (val state = uiState) {
-            LibraryUiState.Loading -> CenteredBox { CircularProgressIndicator(color = DesktopColors.Accent) }
-            is LibraryUiState.Error -> CenteredBox {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.message, color = DesktopColors.TextGray, fontSize = 13.sp)
-                    TextButton(onClick = { viewModel.loadLibraryData() }) {
-                        Text("重试", color = DesktopColors.TextPrimary)
-                    }
-                }
-            }
-            is LibraryUiState.Success -> if (state.filteredItems.isEmpty() && query.isNotBlank()) {
-                CenteredBox { Text("未找到与“$query”相关的内容", color = DesktopColors.TextGray, fontSize = 13.sp) }
-            } else {
-                Crossfade(viewMode, animationSpec = tween(VIEW_SWITCH_MS), label = "libraryView") { mode ->
-                    when (mode) {
-                        LibraryViewMode.COMPACT_LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = true)
-                        LibraryViewMode.LIST -> LibraryList(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, compact = false)
-                        LibraryViewMode.SMALL_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, smallTileMinWidth, small = true)
-                        LibraryViewMode.LARGE_GRID -> LibraryGrid(state.filteredItems, onItemClick, viewModel, { editingItem = it }, handleDelete, edgePadding, cardMinWidth, small = false)
-                    }
-                }
+    removingLocal?.let { item ->
+        val id = item.localPlaylistId()
+        if (id != null) {
+            RemoveLocalPlaylistDialog(item.title, onDismiss = { removingLocal = null }) {
+                extras.local.repository.removePlaylist(id)
+                removingLocal = null
             }
         }
+    }
+
+    return remember(viewModel, extras) {
+        LibraryItemHandlers(
+            extras = extras,
+            onEdit = { editingItem = it },
+            onDelete = { item ->
+                if (item.isOwnedByMe && item.type == LibraryItemType.PLAYLIST) {
+                    deletingItem = item
+                } else {
+                    item.id.toLongOrNull()?.let { id ->
+                        when (item.type) {
+                            LibraryItemType.PLAYLIST -> viewModel.unsubscribePlaylist(id)
+                            LibraryItemType.ALBUM -> viewModel.unsubscribeAlbum(id)
+                            LibraryItemType.ARTIST -> viewModel.unsubscribeArtist(id)
+                        }
+                    }
+                }
+            },
+            onRenameLocal = { renamingLocal = it },
+            onRemoveLocal = { removingLocal = it }
+        )
     }
 }
 
 // 与移动端一致的吸顶边缘弥散阴影，仅在列表已向下滚动时显示
 @Composable
 internal fun BoxScope.ListTopShadow(visible: Boolean) {
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(VIEW_SWITCH_MS), label = "listTopShadow")
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, uiTween(VIEW_SWITCH_MS), label = "listTopShadow")
     Box(
         Modifier.fillMaxWidth().height(ShadowHeight).align(Alignment.TopCenter).graphicsLayer { this.alpha = alpha }
             .background(
@@ -553,17 +666,16 @@ private fun LibraryList(
     items: List<LibraryItem>,
     onItemClick: (LibraryItem) -> Unit,
     viewModel: LibraryViewModel,
-    onEdit: (LibraryItem) -> Unit,
-    onDelete: (LibraryItem) -> Unit,
+    handlers: LibraryItemHandlers,
     compact: Boolean
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberAnchoredListState(items)
     val scrolled by remember { derivedStateOf { listState.isScrolled } }
     Box(Modifier.fillMaxSize()) {
         HoverScrollbarBox(listState) {
             LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 items(items, key = { it.id }) { item ->
-                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
+                    LibraryContextMenuBox(item, viewModel, handlers) {
                         if (compact) LibraryCompactRow(item) { onItemClick(item) } else LibraryRow(item) { onItemClick(item) }
                     }
                 }
@@ -578,27 +690,36 @@ private fun LibraryGrid(
     items: List<LibraryItem>,
     onItemClick: (LibraryItem) -> Unit,
     viewModel: LibraryViewModel,
-    onEdit: (LibraryItem) -> Unit,
-    onDelete: (LibraryItem) -> Unit,
+    handlers: LibraryItemHandlers,
     edgePadding: Dp,
     cardMinWidth: Dp,
     small: Boolean
 ) {
-    val gridState = rememberLazyGridState()
+    val gridState = rememberAnchoredGridState(items)
     val scrolled by remember { derivedStateOf { gridState.isScrolled } }
     Box(Modifier.fillMaxSize()) {
         HoverScrollbarBox(gridState) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(cardMinWidth),
-                state = gridState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = edgePadding - if (small) SmallTileInset else LargeCardInset, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(items, key = { it.id }) { item ->
-                    LibraryContextMenuBox(item, viewModel, onEdit, onDelete) {
-                        if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+            LookaheadScope {
+                CompositionLocalProvider(LocalLibraryGridLookahead provides this) {
+                    val reflow = isGridReflowEnabled()
+                    LazyVerticalGrid(
+                        columns = AdaptiveAtLeast(cardMinWidth, if (small) SmallGridMinColumns else LargeGridMinColumns),
+                        state = gridState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = edgePadding - if (small) SmallTileInset else LargeCardInset, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(items, key = { it.id }) { item ->
+                            // 位移挂在格子上、尺寸挂在内层：animateBounds 不跟随父级位移，滚动不会被当成重排
+                            Box(if (reflow) Modifier.animateItem(placementSpec = GridReflowPlacementSpec) else Modifier) {
+                                Box(Modifier.libraryGridReflow()) {
+                                    LibraryContextMenuBox(item, viewModel, handlers) {
+                                        if (small) LibraryCoverTile(item) { onItemClick(item) } else LibraryCard(item) { onItemClick(item) }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -695,8 +816,7 @@ private fun LibraryItemMenu(
 internal fun LibraryContextMenuBox(
     item: LibraryItem,
     viewModel: LibraryViewModel,
-    onEdit: (LibraryItem) -> Unit,
-    onDelete: (LibraryItem) -> Unit,
+    handlers: LibraryItemHandlers,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -718,15 +838,36 @@ internal fun LibraryContextMenuBox(
     ) {
         content()
         if (contextMenuOffset != null) {
-            LibraryItemMenu(
-                expanded = true,
-                offset = contextMenuOffset ?: DpOffset.Zero,
-                item = item,
-                viewModel = viewModel,
-                onEdit = { onEdit(item) },
-                onDelete = { onDelete(item) },
-                onDismiss = { contextMenuOffset = null }
-            )
+            if (item.isCloud) {
+                val cloudState by handlers.extras.cloud.library.state.collectAsState()
+                CloudLibraryItemMenu(
+                    expanded = true,
+                    offset = contextMenuOffset ?: DpOffset.Zero,
+                    cloud = handlers.extras.cloud,
+                    state = cloudState,
+                    onDismiss = { contextMenuOffset = null }
+                )
+            } else if (item.isLocal) {
+                LocalLibraryItemMenu(
+                    expanded = true,
+                    offset = contextMenuOffset ?: DpOffset.Zero,
+                    item = item,
+                    extras = handlers.extras,
+                    onRename = { handlers.onRenameLocal(item) },
+                    onRemove = { handlers.onRemoveLocal(item) },
+                    onDismiss = { contextMenuOffset = null }
+                )
+            } else {
+                LibraryItemMenu(
+                    expanded = true,
+                    offset = contextMenuOffset ?: DpOffset.Zero,
+                    item = item,
+                    viewModel = viewModel,
+                    onEdit = { handlers.onEdit(item) },
+                    onDelete = { handlers.onDelete(item) },
+                    onDismiss = { contextMenuOffset = null }
+                )
+            }
         }
     }
 }
@@ -738,7 +879,7 @@ private fun LibraryRow(item: LibraryItem, onClick: () -> Unit) {
             .clickable(onClick = onClick).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Cover(item.coverUrl, 48.dp, shape = coverShape(item))
+        Cover(item.coverUrl, 48.dp, modifier = Modifier.libraryCoverElement(item.id), shape = coverShape(item))
         Column(Modifier.padding(start = 12.dp)) {
             Text(
                 item.title,
@@ -772,7 +913,12 @@ private fun LibraryCompactRow(item: LibraryItem, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false)
         )
-        Text(" · ${typeLabel(item.type)}", color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, softWrap = false)
+        if (item.isLocal) {
+            Spacer(Modifier.width(LocalBadgeSpacing))
+            LocalPlaylistBadge()
+        } else {
+            Text(" · ${typeLabel(item.type)}", color = DesktopColors.TextGray, fontSize = 13.sp, maxLines = 1, softWrap = false)
+        }
     }
 }
 
@@ -789,7 +935,10 @@ private fun LibraryCoverTile(item: LibraryItem, onClick: () -> Unit) {
         val shape = coverShape(item)
         Box(Modifier.padding(SmallTileInset).clip(shape).pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Cover(item.coverUrl, maxWidth, shape = shape, requestSize = GridCoverRequestSize)
+                Cover(
+                    item.coverUrl, maxWidth, modifier = Modifier.libraryCoverElement(item.id), shape = shape,
+                    requestSize = GridCoverRequestSize
+                )
             }
         }
     }
@@ -799,7 +948,10 @@ private fun LibraryCoverTile(item: LibraryItem, onClick: () -> Unit) {
 private fun LibraryCard(item: LibraryItem, onClick: () -> Unit) {
     Column(Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(LargeCardInset)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Cover(item.coverUrl, maxWidth, shape = coverShape(item), requestSize = GridCoverRequestSize)
+            Cover(
+                item.coverUrl, maxWidth, modifier = Modifier.libraryCoverElement(item.id), shape = coverShape(item),
+                requestSize = GridCoverRequestSize
+            )
         }
         Text(
             item.title,
@@ -845,6 +997,10 @@ internal fun LibrarySubtitle(item: LibraryItem, lineHeight: TextUnit = TextUnit.
         if (item.isPinned) {
             Icon(Icons.Rounded.PushPin, "已置顶", tint = DesktopColors.Accent, modifier = Modifier.size(13.dp))
             Spacer(Modifier.width(4.dp))
+        }
+        if (item.isLocal) {
+            LocalPlaylistBadge()
+            Spacer(Modifier.width(LocalBadgeSpacing))
         }
         Text(
             item.subtitle,

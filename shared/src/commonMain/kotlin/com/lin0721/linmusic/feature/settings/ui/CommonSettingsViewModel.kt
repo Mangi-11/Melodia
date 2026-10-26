@@ -35,6 +35,7 @@ class CommonSettingsViewModel(
     val crossfadeEnabled = settingsPreferences.crossfadeEnabled.asState(false)
     val crossfadeDurationMs = settingsPreferences.crossfadeDurationMs.asState(CrossfadePolicy.DEFAULT_DURATION_MS)
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
+    val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
 
     val searchAggregationEnabled = sourcePreferences.searchAggregationEnabled.asState(false)
     val fallbackEnabled = sourcePreferences.fallbackEnabled.asState(false)
@@ -55,6 +56,8 @@ class CommonSettingsViewModel(
         settingsPreferences.fullPlayerCardLayout.asState(FullPlayerCardLayout.DEFAULT)
 
     val logLevel = settingsPreferences.logLevel.asState(AppLogger.LogLevel.WARN.name)
+    val autoCheckUpdateEnabled = settingsPreferences.autoCheckUpdateEnabled.asState(true)
+    val allowPrereleaseChannel = settingsPreferences.allowPrereleaseChannel.asState(false)
 
     fun updateWifiQuality(quality: String) = launchSave { settingsPreferences.saveWifiQuality(quality) }
 
@@ -63,6 +66,8 @@ class CommonSettingsViewModel(
     fun updateCrossfadeDurationMs(durationMs: Int) = launchSave { settingsPreferences.saveCrossfadeDurationMs(durationMs) }
 
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
+
+    fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
 
     fun updateSearchAggregationEnabled(enabled: Boolean) = launchSave { sourcePreferences.saveSearchAggregationEnabled(enabled) }
 
@@ -96,6 +101,10 @@ class CommonSettingsViewModel(
     }
 
     // 立即生效，同时持久化供下次启动读取
+    fun updateAutoCheckUpdateEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveAutoCheckUpdateEnabled(enabled) }
+
+    fun updateAllowPrereleaseChannel(enabled: Boolean) = launchSave { settingsPreferences.saveAllowPrereleaseChannel(enabled) }
+
     fun updateLogLevel(level: AppLogger.LogLevel) {
         AppLogger.setLevel(level)
         launchSave { settingsPreferences.saveLogLevel(level.name) }

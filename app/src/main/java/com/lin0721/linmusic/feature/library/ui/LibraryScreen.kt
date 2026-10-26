@@ -1,9 +1,12 @@
 package com.lin0721.linmusic.feature.library.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -51,12 +54,14 @@ import com.lin0721.linmusic.core.ui.components.LoginBottomSheet
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.WebViewLoginScreen
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaGridColumns
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import org.koin.androidx.compose.koinViewModel
 import androidx.compose.foundation.gestures.*
 import androidx.compose.animation.core.*
@@ -88,6 +93,7 @@ fun LibraryScreen(
     onLoginScreenVisibilityChanged: (Boolean) -> Unit = {},
     onNavigateToLocalMusic: () -> Unit = {}
 ) {
+    val motion = LocalUiMotion.current
     val viewModel: LibraryViewModel = koinViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -162,18 +168,18 @@ fun LibraryScreen(
                 val forward = targetState
                 val offsetY = 40
                 if (forward) {
-                    (fadeIn(tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
-                            + slideInVertically(tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { offsetY })
+                    (fadeIn(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
+                            + slideInVertically(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { offsetY })
                         .togetherWith(
-                            fadeOut(tween(200, easing = FastOutSlowInEasing))
-                                    + slideOutVertically(tween(200, easing = FastOutSlowInEasing)) { -offsetY }
+                            fadeOut(motion.tween(200, easing = FastOutSlowInEasing))
+                                    + slideOutVertically(motion.tween(200, easing = FastOutSlowInEasing)) { -offsetY }
                         )
                 } else {
-                    (fadeIn(tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
-                            + slideInVertically(tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { -offsetY })
+                    (fadeIn(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
+                            + slideInVertically(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { -offsetY })
                         .togetherWith(
-                            fadeOut(tween(200, easing = FastOutSlowInEasing))
-                                    + slideOutVertically(tween(200, easing = FastOutSlowInEasing)) { offsetY }
+                            fadeOut(motion.tween(200, easing = FastOutSlowInEasing))
+                                    + slideOutVertically(motion.tween(200, easing = FastOutSlowInEasing)) { offsetY }
                         )
                 }.using(SizeTransform(clip = false))
             },
@@ -194,7 +200,7 @@ fun LibraryScreen(
             AnimatedContent(
                 targetState = isSearchActive,
                 transitionSpec = {
-                    fadeIn() togetherWith fadeOut()
+                    motion.transform(fadeIn() togetherWith fadeOut())
                 },
                 label = "top_bar_search"
             ) { active ->
@@ -509,8 +515,8 @@ fun LibraryScreen(
 
         AnimatedVisibility(
             visible = showWebViewLogin,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             WebViewLoginScreen(
                 onClose = { showWebViewLogin = false },
@@ -614,6 +620,7 @@ private fun LibraryReorderView(
     onCancel: () -> Unit,
     onDone: () -> Unit
 ) {
+    val motion = LocalUiMotion.current
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -776,7 +783,7 @@ private fun LibraryReorderView(
                 val isDragging = draggedIndex == idx
                 val isSettling = settlingIndex == idx
                 Box(
-                    modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else Modifier.animateItem()
+                    modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier
                 ) {
                     DraggablePlaylistRow(
                         item = item,
@@ -810,7 +817,7 @@ private fun LibraryReorderView(
                                     settlingIndex = idx
                                     scope.launch {
                                         settleOffset.snapTo(releasedOffset)
-                                        settleOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                        settleOffset.animateTo(0f, motion.spring(stiffness = Spring.StiffnessMediumLow))
                                         settlingIndex = -1
                                     }
                                 }

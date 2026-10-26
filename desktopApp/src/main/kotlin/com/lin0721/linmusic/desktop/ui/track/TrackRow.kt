@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.HeartBroken
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
@@ -77,6 +79,7 @@ import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
+import com.lin0721.linmusic.desktop.ui.components.MenuScope
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
 import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
@@ -130,9 +133,13 @@ fun TrackRow(
     // 无 actions 时行尾的自定义操作（推荐区的添加按钮）
     trailingAction: (@Composable () -> Unit)? = null,
     // 非 null 表示多选态：首列显示复选框，点击整行切换勾选，悬停操作与右键菜单停用
-    selection: TrackRowSelection? = null
+    selection: TrackRowSelection? = null,
+    // 非 null 时用它替换默认的歌曲菜单（本地歌曲）
+    menuContent: (@Composable MenuScope.(dismiss: () -> Unit) -> Unit)? = null
 ) {
     val activeActions = actions.takeIf { selection == null }
+    val activeMenu = menuContent.takeIf { selection == null }
+    val hasMenu = activeActions != null || activeMenu != null
     val navigator = LocalDesktopNavigator.current
     val density = LocalDensity.current
     var hovered by remember { mutableStateOf(false) }
@@ -173,7 +180,7 @@ fun TrackRow(
                 .onPointerEvent(PointerEventType.Enter) { hovered = true }
                 .onPointerEvent(PointerEventType.Exit) { hovered = false }
                 .onPointerEvent(PointerEventType.Press) { event ->
-                    if (activeActions != null && event.buttons.isSecondaryPressed) {
+                    if (hasMenu && event.buttons.isSecondaryPressed) {
                         val position = event.changes.firstOrNull()?.position ?: return@onPointerEvent
                         contextMenuOffset = with(density) {
                             DpOffset(position.x.toDp(), (position.y - rowHeightPx).toDp())
@@ -289,6 +296,8 @@ fun TrackRow(
                         )
                     }
                 }
+            } else if (activeMenu != null) {
+                Spacer(Modifier.width(32.dp))
             }
             Text(
                 formatDuration(track.dt),
@@ -297,8 +306,8 @@ fun TrackRow(
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(48.dp)
             )
-            if (activeActions == null) trailingAction?.invoke()
-            if (activeActions != null) {
+            if (!hasMenu) trailingAction?.invoke()
+            if (hasMenu) {
                 Box {
                     IconButton(
                         onClick = { moreMenuOpen = true },
@@ -309,27 +318,31 @@ fun TrackRow(
                             Icon(Icons.Rounded.MoreHoriz, "更多有关《${track.name}》的选项", tint = DesktopColors.TextGray)
                         }
                     }
-                    TrackMenu(
-                        expanded = moreMenuOpen,
-                        offset = DpOffset.Zero,
-                        track = track,
-                        actions = activeActions,
-                        onPlay = onPlay,
-                        onDismiss = { moreMenuOpen = false }
-                    )
+                    RowMenu(moreMenuOpen, DpOffset.Zero, track, activeActions, activeMenu, onPlay) { moreMenuOpen = false }
                 }
             }
         }
-        if (activeActions != null) {
-            TrackMenu(
-                expanded = contextMenuOffset != null,
-                offset = contextMenuOffset ?: DpOffset.Zero,
-                track = track,
-                actions = activeActions,
-                onPlay = onPlay,
-                onDismiss = { contextMenuOffset = null }
-            )
+        if (hasMenu) {
+            RowMenu(contextMenuOffset != null, contextMenuOffset ?: DpOffset.Zero, track, activeActions, activeMenu, onPlay) {
+                contextMenuOffset = null
+            }
         }
+    }
+}
+
+@Composable
+private fun RowMenu(
+    expanded: Boolean,
+    offset: DpOffset,
+    track: Track,
+    actions: TrackActions?,
+    menuContent: (@Composable MenuScope.(dismiss: () -> Unit) -> Unit)?,
+    onPlay: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    when {
+        menuContent != null -> DesktopMenu(expanded = expanded, onDismiss = onDismiss, offset = offset) { menuContent(onDismiss) }
+        actions != null -> TrackMenu(expanded, offset, track, actions, onPlay, onDismiss)
     }
 }
 
@@ -340,7 +353,7 @@ private fun copySongLink(songId: Long): Boolean = runCatching {
 }.isSuccess
 
 @Composable
-private fun TrackMenu(
+internal fun TrackMenu(
     expanded: Boolean,
     offset: DpOffset,
     track: Track,
@@ -403,6 +416,12 @@ private fun TrackMenu(
             onDismiss()
             actions.onDownload(track)
         })
+        actions.onReduceRecommend?.let { reduce ->
+            MenuItem("减少推荐", icon = Icons.Rounded.HeartBroken, onClick = {
+                onDismiss()
+                reduce(track)
+            })
+        }
         MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
             onDismiss()
             val ok = copySongLink(track.id)
@@ -420,6 +439,7 @@ private fun TrackMenu(
                 remove(track)
             })
         }
+        actions.extraMenuItems?.invoke(this, track, onDismiss)
     }
 }
 

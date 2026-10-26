@@ -3,13 +3,17 @@ package com.lin0721.linmusic.desktop.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.desktop.app.DesktopPaths
+import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheDirState
 import com.lin0721.linmusic.desktop.data.CacheRelocator
 import com.lin0721.linmusic.desktop.data.CacheUsage
 import com.lin0721.linmusic.desktop.data.CloseAction
 import com.lin0721.linmusic.desktop.data.DesktopCacheManager
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
+import com.lin0721.linmusic.desktop.data.MiniLyricSettings
+import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.data.RelocationProgress
 import com.lin0721.linmusic.desktop.data.RelocationResult
 import com.lin0721.linmusic.desktop.platform.AutoStartService
@@ -30,6 +34,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,6 +67,12 @@ class DesktopSettingsViewModel(
     val closeAction = desktopPreferences.closeAction.asState(CloseAction.TRAY)
     val mediaKeysEnabled = desktopPreferences.mediaKeysEnabled.asState(true)
     val hotkeyMap = desktopPreferences.hotkeys.asState(HotkeyCombo.defaults)
+    val renderBackend = desktopPreferences.renderBackend.asState(RenderBackend.AUTO)
+    val desktopLyricStyle = desktopPreferences.desktopLyricStyle.asState(DesktopPreferences.DEFAULT_DESKTOP_LYRIC_STYLE)
+    val desktopLyricLocked = desktopPreferences.desktopLyricLocked.asState(false)
+    val miniPlayerStyle = desktopPreferences.miniPlayerStyle.asState(MiniPlayerStyle.DEFAULT)
+    val miniPlayerAlwaysOnTop = desktopPreferences.miniPlayerAlwaysOnTop.asState(true)
+    val miniLyricSettings = desktopPreferences.miniLyricSettings.asState(MiniLyricSettings())
 
     val hotkeysSupported: Boolean = hotkeys.isSupported
     val failedHotkeys: StateFlow<Set<HotkeyAction>> = hotkeys.failed
@@ -107,6 +118,34 @@ class DesktopSettingsViewModel(
 
     fun updateCloseAction(action: CloseAction) {
         viewModelScope.launch { desktopPreferences.saveCloseAction(action) }
+    }
+
+    fun updateRenderBackend(backend: RenderBackend) {
+        if (backend == renderBackend.value) return
+        viewModelScope.launch {
+            desktopPreferences.saveRenderBackend(backend)
+            _messages.tryEmit("渲染方式已更改，重启后生效")
+        }
+    }
+
+    fun updateDesktopLyricStyle(transform: (FloatingLyricStyle) -> FloatingLyricStyle) {
+        viewModelScope.launch { desktopPreferences.saveDesktopLyricStyle(transform(desktopPreferences.desktopLyricStyle.first())) }
+    }
+
+    fun updateDesktopLyricLocked(locked: Boolean) {
+        viewModelScope.launch { desktopPreferences.saveDesktopLyricLocked(locked) }
+    }
+
+    fun updateMiniPlayerStyle(style: MiniPlayerStyle) {
+        viewModelScope.launch { desktopPreferences.saveMiniPlayerStyle(style) }
+    }
+
+    fun updateMiniPlayerAlwaysOnTop(onTop: Boolean) {
+        viewModelScope.launch { desktopPreferences.saveMiniPlayerAlwaysOnTop(onTop) }
+    }
+
+    fun updateMiniLyricSettings(transform: (MiniLyricSettings) -> MiniLyricSettings) {
+        viewModelScope.launch { desktopPreferences.saveMiniLyricSettings(transform(desktopPreferences.miniLyricSettings.first())) }
     }
 
     fun updateMediaKeysEnabled(enabled: Boolean) {

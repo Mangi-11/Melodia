@@ -19,7 +19,6 @@ import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.get
 import com.lin0721.linmusic.core.source.SourcePreferences
-import com.lin0721.linmusic.feature.cloud.upload.CloudUploadManager
 import com.lin0721.linmusic.feature.podcast.data.PodcastProgressPreferences
 import com.lin0721.linmusic.feature.podcast.data.PodcastSeenPreferences
 import com.lin0721.linmusic.feature.search.data.SearchHistoryPreferences
@@ -47,6 +46,4 @@ val localModule = module {
     single { PodcastSeenPreferences(PreferencesStores.get(androidContext(), PreferencesStores.PODCAST)) }
     single<XeapiKeyStore> { XeapiKeyStoreImpl(PreferencesStores.get(androidContext(), PreferencesStores.XEAPI_KEY)) }
     single { DownloadPreferences(androidContext()) }
-    // 云盘上传队列状态源，依赖 Android Uri，留在应用层
-    single { CloudUploadManager() }
 }

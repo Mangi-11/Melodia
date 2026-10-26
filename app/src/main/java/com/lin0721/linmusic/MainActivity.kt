@@ -15,12 +15,21 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.lin0721.linmusic.core.player.FloatingLyricService
+import com.lin0721.linmusic.core.player.floatinglyric.ACTION_OPEN_LYRIC_SETTINGS
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricRequests
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaTheme
+import com.lin0721.linmusic.core.ui.theme.UiMotion
 import com.lin0721.linmusic.core.ui.theme.scaledBy
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -33,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
     private val settingsPreferences: SettingsPreferences by inject()
     private val playbackRecognitionState: PlaybackRecognitionState by inject()
+    private val floatingLyricRequests: FloatingLyricRequests by inject()
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -68,7 +78,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
         requestNotificationPermissionIfNeeded()
-        handleRecognitionIntent(intent)
+        handleLaunchIntent(intent)
 
         // 监听悬浮歌词开关
         lifecycleScope.launch {
@@ -89,21 +99,27 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MelodiaTheme {
-                MelodiaApp()
+            val uiAnimationsEnabled by settingsPreferences.uiAnimationsEnabled.collectAsState(initial = true)
+            val uiMotion = remember { UiMotion() }
+            LaunchedEffect(uiAnimationsEnabled) { uiMotion.enabled = uiAnimationsEnabled }
+            CompositionLocalProvider(LocalUiMotion provides uiMotion) {
+                MelodiaTheme {
+                    MelodiaApp()
+                }
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleRecognitionIntent(intent)
+        handleLaunchIntent(intent)
     }
 
-    // 点开识曲结果通知：交给界面层打开识别页展示该结果
-    private fun handleRecognitionIntent(intent: Intent?) {
-        if (intent?.action == ACTION_OPEN_RECOGNITION_RESULT) {
-            playbackRecognitionState.requestOpenResult()
+    // 识曲结果通知与悬浮歌词设置按钮拉起：交给界面层打开对应页面
+    private fun handleLaunchIntent(intent: Intent?) {
+        when (intent?.action) {
+            ACTION_OPEN_RECOGNITION_RESULT -> playbackRecognitionState.requestOpenResult()
+            ACTION_OPEN_LYRIC_SETTINGS -> floatingLyricRequests.requestOpenSettings()
         }
     }
 

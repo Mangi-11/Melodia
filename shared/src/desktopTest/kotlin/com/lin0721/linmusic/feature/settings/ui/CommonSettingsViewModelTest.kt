@@ -75,6 +75,14 @@ class CommonSettingsViewModelTest {
     }
 
     @Test
+    fun uiAnimationsDefaultOnAndPersisted() {
+        settings.uiAnimationsEnabled.awaitValue(true)
+
+        vm.updateUiAnimationsEnabled(false)
+        settings.uiAnimationsEnabled.awaitValue(false)
+    }
+
+    @Test
     fun sourceSettingsArePersisted() {
         vm.updateFallbackEnabled(true)
         vm.updateCommunityPriority(true)

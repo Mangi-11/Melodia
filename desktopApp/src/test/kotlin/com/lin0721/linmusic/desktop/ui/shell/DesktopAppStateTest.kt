@@ -8,6 +8,7 @@ import com.lin0721.linmusic.desktop.ui.comments.CommentsHost
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_ALL
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_MUSIC
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_PODCAST
+import com.lin0721.linmusic.desktop.ui.library.LibraryExtraFilter
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
 import com.lin0721.linmusic.desktop.ui.nowplaying.DockOverlay
@@ -36,12 +37,19 @@ class DesktopAppStateTest {
 
     private class FakeLibrary : LibraryViewControl {
         override var filter: LibraryFilter? = null
+        override var extra: LibraryExtraFilter? = null
         override var sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_PLAYED
         override fun toggleFilter(filter: LibraryFilter) {
+            extra = null
             this.filter = if (this.filter == filter) null else filter
         }
         override fun selectFilter(filter: LibraryFilter?) {
+            extra = null
             this.filter = filter
+        }
+        override fun selectExtra(extra: LibraryExtraFilter?) {
+            if (extra != null) filter = null
+            this.extra = extra
         }
         override fun updateSortOrder(order: LibrarySortOrder) {
             sortOrder = order
@@ -198,6 +206,44 @@ class DesktopAppStateTest {
         state.navigateForward()
         assertEquals(LibraryFilter.ALBUM, library.filter)
         assertEquals(LibrarySortOrder.NAME, library.sortOrder)
+    }
+
+    @Test
+    fun extraLibraryChipsAreRestoredWithHistory() {
+        val state = create()
+        state.toggleLibraryFilter(LibraryFilter.ALBUM)
+        state.toggleLibraryExtra(LibraryExtraFilter.LOCAL)
+        assertEquals(LibraryExtraFilter.LOCAL, library.extra)
+        assertNull(library.filter)
+        state.toggleLibraryExtra(LibraryExtraFilter.CLOUD)
+        assertEquals(LibraryExtraFilter.CLOUD, library.extra)
+
+        state.navigateBack()
+        assertEquals(LibraryExtraFilter.LOCAL, library.extra)
+        state.navigateBack()
+        assertNull(library.extra)
+        assertEquals(LibraryFilter.ALBUM, library.filter)
+
+        state.navigateForward()
+        state.navigateForward()
+        assertEquals(LibraryExtraFilter.CLOUD, library.extra)
+        state.toggleLibraryExtra(LibraryExtraFilter.CLOUD)
+        assertNull(library.extra)
+    }
+
+    @Test
+    fun openCloudPushesRoute() {
+        val state = create()
+        state.openCloud()
+        assertEquals(DesktopRoute.Cloud, state.backStack.current)
+    }
+
+    @Test
+    fun openLocalPlaylistPushesRouteAndLeavesExpandedLibrary() {
+        val state = create(LibraryMode.EXPANDED)
+        state.openLocalPlaylist(7, "本地")
+        assertEquals(DesktopRoute.LocalPlaylist(7, "本地"), state.backStack.current)
+        assertEquals(LibraryMode.DEFAULT, state.pane.libraryMode)
     }
 
     @Test

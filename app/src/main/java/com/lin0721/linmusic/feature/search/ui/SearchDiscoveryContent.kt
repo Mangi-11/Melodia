@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.search.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +59,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.search.domain.HotSearch
 import com.lin0721.linmusic.feature.search.domain.PlaylistTag
 import java.util.Locale
@@ -179,7 +179,7 @@ private fun FeaturedHotCard(
     LaunchedEffect(coverUrl) {
         baseColor = if (coverUrl != null) extractBaseColorFromUrl(context, coverUrl) else FallbackBase
     }
-    val animatedBase by animateColorAsState(baseColor, tween(500), label = "featured_hot_base")
+    val animatedBase by animateColorAsState(baseColor, uiTween(500), label = "featured_hot_base")
     val secondaryText = Color.White.copy(alpha = 0.72f)
 
     Row(

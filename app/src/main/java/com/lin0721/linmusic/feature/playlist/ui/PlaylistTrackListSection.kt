@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiSpec
 
 // 切歌单排序方式时的行位移动画：与 Library 筛选胶囊的增删动效同一套规格
 private val trackPlacementSpec = spring<IntOffset>(
@@ -50,20 +52,24 @@ fun LazyListScope.playlistTrackItems(
     unplayableIds: Set<Long> = emptySet(),
     selectionUi: TrackSelectionUi = TrackSelectionUi()
 ) {
-    items(tracks, key = { it.id }) { track ->
+    val activeTrackId = currentTrackId?.toLongOrNull()
+    items(tracks, key = { it.id }, contentType = { "track" }) { track ->
         val selecting = selectionUi.active
+        val rowData = remember(track) {
+            SongRowData(
+                id = track.id,
+                title = track.name,
+                artist = track.ar.joinToString(" • ") { it.name },
+                coverUrl = track.al.picUrl,
+                isVip = track.fee == 1
+            )
+        }
         // SongRow 本身不接受外部 modifier，外层套 Box 挂 animateItem：
         // 切排序方式时 key 不变、位置变了，行会顺着新位置滑过去
-        Box(modifier = Modifier.animateItem(trackFadeInSpec, trackPlacementSpec, trackFadeOutSpec)) {
+        Box(modifier = Modifier.animateItem(uiSpec(trackFadeInSpec), uiSpec(trackPlacementSpec), uiSpec(trackFadeOutSpec))) {
             SongRow(
-                data = SongRowData(
-                    id = track.id,
-                    title = track.name,
-                    artist = track.ar.joinToString(" • ") { it.name },
-                    coverUrl = track.al.picUrl,
-                    isVip = track.fee == 1
-                ),
-                isActive = currentTrackId == track.id.toString(),
+                data = rowData,
+                isActive = activeTrackId == track.id,
                 isPlaying = isPlaying,
                 // 多选态下不可播放的歌曲也能勾选
                 enabled = selecting || track.id !in unplayableIds,

@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.track
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -81,6 +80,7 @@ import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.trackTextInputFocus
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import kotlin.math.max
 
@@ -148,7 +148,7 @@ private fun CollectPanel(
     var newName by remember(songId) { mutableStateOf("") }
     val ready = state.songId == songId && !state.isLoading
     val listState = rememberLazyListState()
-    val topShadowAlpha by animateFloatAsState(if (listState.canScrollBackward) 1f else 0f, tween(SHADOW_FADE_MS), label = "listTopShadow")
+    val topShadowAlpha by animateFloatAsState(if (listState.canScrollBackward) 1f else 0f, uiTween(SHADOW_FADE_MS), label = "listTopShadow")
 
     val keyword = query.trim()
     val searching = keyword.isNotEmpty()

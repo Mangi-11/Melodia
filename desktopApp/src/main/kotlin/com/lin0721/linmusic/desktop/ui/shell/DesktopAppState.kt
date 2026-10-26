@@ -4,11 +4,13 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.lin0721.linmusic.core.share.ShareCardKind
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.data.LibraryViewMode
 import com.lin0721.linmusic.desktop.ui.comments.CommentsHost
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_ALL
 import com.lin0721.linmusic.desktop.ui.home.HOME_TAB_MUSIC
+import com.lin0721.linmusic.desktop.ui.library.LibraryExtraFilter
 import com.lin0721.linmusic.desktop.ui.lyricsview.LyricsViewState
 import com.lin0721.linmusic.desktop.ui.navigation.BackStack
 import com.lin0721.linmusic.desktop.ui.navigation.DesktopRoute
@@ -34,6 +36,13 @@ class DesktopAppState(
     var showNewWorks by mutableStateOf(false)
         private set
     var showLogin by mutableStateOf(false)
+
+    // 非空时显示分享卡片对话框，值为初始类型
+    var shareCardKind by mutableStateOf<ShareCardKind?>(null)
+    var showRecognition by mutableStateOf(false)
+
+    // 打开设置页后要滚动到的分区（SettingsCategory.name），滚动完即清空
+    var settingsFocus by mutableStateOf<String?>(null)
 
     // 初值为关闭：读到已保存的开启状态后，侧栏随动画展开
     private var savedDockOpen by mutableStateOf(false)
@@ -73,6 +82,7 @@ class DesktopAppState(
         libraryMode = pane.libraryMode,
         libraryViewMode = pane.libraryViewMode,
         libraryFilter = library.filter,
+        libraryExtra = library.extra,
         librarySortOrder = library.sortOrder,
         dockOpen = dockOpen,
         dockOverlay = dockOverlay,
@@ -113,6 +123,7 @@ class DesktopAppState(
         applyLibraryMode(ui.libraryMode)
         pane.updateViewMode(ui.libraryViewMode)
         if (library.filter != ui.libraryFilter) library.selectFilter(ui.libraryFilter)
+        if (library.extra != ui.libraryExtra) library.selectExtra(ui.libraryExtra)
         if (library.sortOrder != ui.librarySortOrder) library.updateSortOrder(ui.librarySortOrder)
         applyDockOpen(ui.dockOpen)
         if (ui.dockOpen) {
@@ -183,6 +194,20 @@ class DesktopAppState(
     fun setLibraryViewMode(mode: LibraryViewMode) = record { pane.updateViewMode(mode) }
 
     fun toggleLibraryFilter(filter: LibraryFilter) = record { library.toggleFilter(filter) }
+
+    val libraryExtra: LibraryExtraFilter? get() = library.extra
+
+    fun toggleLibraryExtra(extra: LibraryExtraFilter) = record {
+        library.selectExtra(if (library.extra == extra) null else extra)
+    }
+
+    fun openLocalPlaylist(id: Long, name: String) = record(DesktopRoute.LocalPlaylist(id, name)) {
+        if (pane.libraryMode == LibraryMode.EXPANDED) applyLibraryMode(LibraryMode.DEFAULT)
+    }
+
+    fun openCloud() = record(DesktopRoute.Cloud) {
+        if (pane.libraryMode == LibraryMode.EXPANDED) applyLibraryMode(LibraryMode.DEFAULT)
+    }
 
     fun setLibrarySortOrder(order: LibrarySortOrder) = record { library.updateSortOrder(order) }
 

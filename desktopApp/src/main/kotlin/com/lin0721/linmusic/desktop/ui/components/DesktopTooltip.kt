@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,8 +95,9 @@ private fun TooltipPopup(tooltipContent: @Composable () -> Unit, side: TooltipSi
     val provider = remember(side, density) {
         with(density) { TooltipPositionProvider(side, AnchorGap.roundToPx(), WindowMargin.roundToPx()) }
     }
+    val motion = LocalUiMotion.current
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { progress.animateTo(1f, tween(FADE_MS)) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, motion.tween(FADE_MS)) }
     val slidePx = with(density) { SlideDistance.toPx() }
     Popup(popupPositionProvider = provider, properties = PopupProperties(focusable = false)) {
         // 外圈留白给阴影，避免被弹层边界裁掉

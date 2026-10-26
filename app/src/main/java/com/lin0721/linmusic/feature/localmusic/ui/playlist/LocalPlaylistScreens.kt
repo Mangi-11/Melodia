@@ -63,6 +63,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaTextButton
 import com.lin0721.linmusic.core.ui.components.SecondaryScreenScaffold
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.feature.localmusic.domain.LocalPlaylist
@@ -360,7 +361,7 @@ private fun EditPlaylistContent(
                 val dragging = reorder.draggingKey == key
                 Row(
                     modifier = Modifier
-                        .then(if (dragging) Modifier.zIndex(1f) else Modifier.animateItem())
+                        .then(if (dragging) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier)
                         .graphicsLayer { translationY = if (dragging) reorder.dragOffset else 0f }
                         .fillMaxWidth()
                         .background(if (dragging) MaterialTheme.colorScheme.surface else Color.Transparent)

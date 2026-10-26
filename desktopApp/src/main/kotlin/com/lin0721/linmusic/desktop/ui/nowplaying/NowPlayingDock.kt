@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -46,6 +45,7 @@ import com.lin0721.linmusic.desktop.ui.comments.CommentsPanel
 import com.lin0721.linmusic.desktop.ui.comments.asCommentsHost
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.TooltipSide
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.download.DownloadsPanel
 import com.lin0721.linmusic.desktop.ui.player.AudioDevicePanel
 import com.lin0721.linmusic.desktop.ui.player.PlayQueuePanel
@@ -104,7 +104,7 @@ fun rememberNowPlayingDockState(hasTrack: Boolean, open: Boolean, openWidth: Dp,
     }
     val target = if (peeking.value && hasTrack && !open) DesktopDimens.NowPlayingPeekWidth else settled
     // 拖动调宽时跟手，不走过渡动画
-    val spec = if (resizing) snap<Dp>() else tween<Dp>(PANE_ANIMATION_MS, easing = FastOutSlowInEasing)
+    val spec = if (resizing) snap<Dp>() else uiTween<Dp>(PANE_ANIMATION_MS, easing = FastOutSlowInEasing)
     val width = animateDpAsState(target, spec, label = "nowPlayingDock")
     return NowPlayingDockState(width, settled, openWidth, peeking)
 }
@@ -115,8 +115,8 @@ fun rememberNowPlayingDockState(hasTrack: Boolean, open: Boolean, openWidth: Dp,
 private fun OverlayLayer(visible: Boolean, content: @Composable (Modifier) -> Unit) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(OVERLAY_FADE_MS)),
-        exit = fadeOut(tween(OVERLAY_FADE_MS))
+        enter = fadeIn(uiTween(OVERLAY_FADE_MS)),
+        exit = fadeOut(uiTween(OVERLAY_FADE_MS))
     ) {
         content(
             Modifier.background(DesktopColors.Pane).clickable(

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Timer
@@ -48,12 +49,14 @@ import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.PlaybackController.Companion.CONTEXT_INTELLIGENCE
 import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.formatSleepTimerRemaining
+import com.lin0721.linmusic.core.share.ShareCardKind
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
+import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
+import com.lin0721.linmusic.desktop.ui.components.songLink
 import com.lin0721.linmusic.desktop.ui.components.SimpleMenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
-import com.lin0721.linmusic.desktop.ui.components.copyTextToClipboard
 import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -67,7 +70,7 @@ private val QualityKeys = listOf("standard", "exhigh", "lossless", "hires", "jym
 private val MoreMenuWidth = 220.dp
 private val CustomInputHeight = 36.dp
 
-// 与移动端播放页「更多」面板对齐；桌面没有系统分享，分享落成复制歌曲链接
+// 与移动端播放页「更多」面板对齐
 @Composable
 internal fun NowPlayingMoreMenu(
     track: NowPlaying,
@@ -180,9 +183,13 @@ internal fun NowPlayingMoreMenu(
         }
 
         if (cloud && cloudSongId != null) {
+            MenuItem("分享", icon = Icons.Rounded.Share, onClick = {
+                onDismiss()
+                navigator.openShareCard(ShareCardKind.SONG)
+            })
             MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
                 onDismiss()
-                val ok = copyTextToClipboard("https://music.163.com/song?id=$cloudSongId")
+                val ok = copyTextToClipboard(songLink(cloudSongId))
                 navigator.showMessage(if (ok) "已复制链接" else "复制失败")
             })
             // 账号权限未知时不限制，超出可下载上限的档位置灰

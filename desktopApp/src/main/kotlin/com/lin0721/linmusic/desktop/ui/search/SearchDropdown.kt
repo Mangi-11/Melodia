@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.search.domain.SearchSuggestion
@@ -217,9 +218,10 @@ fun SearchDropdown(
     if (!visible) return
 
     val listState = rememberLazyListState()
+    val motion = LocalUiMotion.current
     LaunchedEffect(state.selected) {
         val rowIndex = rows.indexOfFirst { it is DropdownRow.Item && it.index == state.selected }
-        if (rowIndex >= 0) listState.animateScrollToItem(rowIndex)
+        if (rowIndex >= 0) motion.scrollToItem(listState, rowIndex)
     }
 
     val anchor = state.anchor

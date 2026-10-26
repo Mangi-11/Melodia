@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.feature.artist.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -29,6 +28,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaTextButton
 import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.download.ui.DownloadQualityPickerSheet
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.playlist.ui.PlaylistImportTargetSheet
 import com.lin0721.linmusic.core.ui.components.MelodiaButton
 import com.lin0721.linmusic.core.ui.components.LoginBottomSheet
@@ -212,8 +212,8 @@ fun ArtistScreen(
 
         AnimatedVisibility(
             visible = showWebViewLogin,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             WebViewLoginScreen(
                 onClose = { showWebViewLogin = false },

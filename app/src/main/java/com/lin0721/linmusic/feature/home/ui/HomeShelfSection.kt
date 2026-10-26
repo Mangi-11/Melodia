@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.home.ui
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +52,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.TextGray
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.home.domain.HomeCard
 import com.lin0721.linmusic.feature.home.domain.HomeShelf
 
@@ -88,7 +88,7 @@ internal fun rememberHomeCardWidth(containerWidth: Dp): Dp {
         .coerceAtLeast(MinCardWidth)
     val width by animateDpAsState(
         targetValue = target,
-        animationSpec = tween(LayoutReflowDurationMs, easing = FastOutSlowInEasing),
+        animationSpec = uiTween(LayoutReflowDurationMs, easing = FastOutSlowInEasing),
         label = "home_card_width"
     )
     return width

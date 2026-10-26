@@ -3,7 +3,6 @@ package com.lin0721.linmusic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -68,9 +67,12 @@ import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.ProfileSidebar
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.ui.components.MiniPlayerCard
 import com.lin0721.linmusic.core.ui.components.MiniPlayerLikeMode
+import com.lin0721.linmusic.core.ui.theme.uiTween
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricRequests
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import com.lin0721.linmusic.feature.recognition.ui.RecognitionScreen
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
@@ -78,8 +80,7 @@ import com.lin0721.linmusic.core.ui.theme.BackgroundBlack
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.update.UpdateManager
-import com.lin0721.linmusic.core.update.UpdateUiState
+import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.feature.library.ui.LibraryViewModel
 import com.lin0721.linmusic.core.preferences.BottomBarItem
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
@@ -127,6 +128,7 @@ private class PanelRevealShape(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MelodiaApp() {
+    val motion = LocalUiMotion.current
     val viewModel: HomeViewModel = koinViewModel()
     val libraryViewModel: LibraryViewModel = koinViewModel()
     val settingsPreferences: SettingsPreferences = koinInject()
@@ -213,6 +215,12 @@ fun MelodiaApp() {
     LaunchedEffect(pendingRecognitionResult) {
         if (pendingRecognitionResult) showRecognition = true
     }
+    // 悬浮歌词的设置按钮：先进设置页，由设置页消费请求并展开歌词子菜单
+    val floatingLyricRequests: FloatingLyricRequests = koinInject()
+    val pendingLyricSettings by floatingLyricRequests.pendingOpenSettings.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingLyricSettings) {
+        if (pendingLyricSettings) navigation.navigateTo(Screen.Settings)
+    }
     // 网页登录界面可见性状态
     var isLoginScreenVisible by remember { mutableStateOf(false) }
     // 悬浮播放卡片 + 导航栏的实际高度，下发给各页面用作列表底部留白
@@ -247,11 +255,11 @@ fun MelodiaApp() {
             panelRise.snapTo(0f)
             panelFullscreen.snapTo(0f)
         } else if (isPanelVisible) {
-            panelRise.animateTo(1f, PanelRiseSpec)
+            panelRise.animateTo(1f, motion.spec(PanelRiseSpec))
             isPanelDocked = true
         } else {
             isPanelDocked = false
-            panelRise.animateTo(0f, PanelRiseSpec)
+            panelRise.animateTo(0f, motion.spec(PanelRiseSpec))
         }
     }
     // 切到侧栏模式（设置变更或旋转）时收起已打开的底部全屏播放页
@@ -268,7 +276,7 @@ fun MelodiaApp() {
         if (isPanelFullscreen && panelRise.value == 0f) {
             panelFullscreen.snapTo(1f)
         } else {
-            panelFullscreen.animateTo(if (isPanelFullscreen) 1f else 0f, PanelFullscreenSpec)
+            panelFullscreen.animateTo(if (isPanelFullscreen) 1f else 0f, motion.spec(PanelFullscreenSpec))
         }
     }
     val panelWidth = rememberMelodiaPlayerPanelWidth()
@@ -672,7 +680,7 @@ fun MelodiaApp() {
             currentTrack = currentTrack,
             screenHeightPx = playerSheet.screenHeightPx,
             isPlayerOpen = playerSheet.isOpen,
-            playerOffsetY = playerSheet.offsetY,
+            playerOffsetY = { playerSheet.offsetY },
             isPlaying = isPlaying,
             currentPositionProvider = currentPositionProvider,
             duration = duration,
@@ -721,8 +729,8 @@ fun MelodiaApp() {
         // 放在 Toast 之前，识别页上仍能看到提示
         AnimatedVisibility(
             visible = showRecognition,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             RecognitionScreen(
                 onClose = { showRecognition = false },
@@ -768,17 +776,16 @@ fun MelodiaApp() {
         MelodiaToastHost(toastMessage = toastMessage)
 
         // 6. 全局更新弹窗，由更新横幅或设置页手动检查打开
-        val updateManager: UpdateManager = koinInject()
-        val updateState by updateManager.uiState.collectAsStateWithLifecycle()
-        val isDialogVisible by updateManager.isDialogVisible.collectAsStateWithLifecycle()
-        if (isDialogVisible && updateState !is UpdateUiState.Idle) {
+        val updateChecker: UpdateChecker = koinInject()
+        val availableUpdate by updateChecker.availableUpdate.collectAsStateWithLifecycle()
+        val isUpdateDialogVisible by updateChecker.isDialogVisible.collectAsStateWithLifecycle()
+        val shownUpdate = availableUpdate
+        if (isUpdateDialogVisible && shownUpdate != null) {
             UpdateDialog(
-                state = updateState,
-                onDismiss = { updateManager.dismiss() },
-                onHide = { updateManager.hideDialog() },
-                onIgnore = { updateManager.ignoreCurrentVersion() },
-                onStartDownload = { updateManager.startDownload() },
-                onInstall = { updateManager.retryInstall() }
+                info = shownUpdate,
+                onDismiss = { updateChecker.dismiss() },
+                onHide = { updateChecker.hideDialog() },
+                onIgnore = { updateChecker.ignoreCurrentVersion() }
             )
         }
 
@@ -798,7 +805,7 @@ fun MelodiaApp() {
 
 // 订阅全局 Toast 事件，展示 2 秒后自动清空
 @Composable
-private fun rememberGlobalToastMessage(): String? {
+internal fun rememberGlobalToastMessage(): String? {
     var message by remember { mutableStateOf<String?>(null) }
     var trigger by remember { mutableStateOf(0) }
 

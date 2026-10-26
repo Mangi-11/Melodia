@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -168,6 +169,12 @@ fun FullScreenLyricsRow(
                     scaleY = animatedScale
                     alpha = animatedAlpha
                     transformOrigin = targetTransformOrigin
+                    // 非当前行各子项纵向堆叠不重叠，直接调制画笔透明度避免触发 saveLayer
+                    compositingStrategy = if (!isCurrent && animatedAlpha < 0.999f) {
+                        CompositingStrategy.ModulateAlpha
+                    } else {
+                        CompositingStrategy.Auto
+                    }
                 }
                 .pressable(MelodiaPress.None) {
                     onClick()
@@ -245,7 +252,7 @@ fun FullScreenLyricsRow(
                         else -> Alignment.Start
                     }
                 ) {
-                    if (background.words.isNotEmpty()) {
+                    if (isCurrent && background.words.isNotEmpty()) {
                         KaraokeLyricRow(
                             line = background,
                             currentPositionProvider = currentPositionProvider,

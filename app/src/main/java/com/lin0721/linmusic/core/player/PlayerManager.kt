@@ -467,6 +467,14 @@ class PlayerManager(
     }
 
     override fun pause() {
+        // 播放地址尚未返回时按暂停，取消拉链并还原待播状态
+        if (pendingSkipFromIndex != null) {
+            activePlayJob?.cancel()
+            pendingSkipFromIndex = null
+            pausedForPendingPlay = false
+            clearPendingTrack(restorePlayWhenReady = false)
+            MelodiaPlaybackService.stopPendingForeground(context)
+        }
         _playWhenReady.value = false
         externalInterruptionResumeController.onExplicitUserPause()
         controllerHolder.pause()
@@ -603,6 +611,9 @@ class PlayerManager(
         val fromIndex = playbackQueue.currentIndex.value
         if (playWhenReady) {
             externalInterruptionResumeController.onExplicitUserPlay()
+            if (networkRetryAttempt == 0 && item.localUri == null) {
+                MelodiaPlaybackService.startForPendingPlay(context, item.title, item.artist)
+            }
         }
 
         activePlayJob = scope.launch {
@@ -642,6 +653,7 @@ class PlayerManager(
 
             if (localRecord == null && networkGuard.blockPlaybackOnMobile()) {
                 pendingStartPosition = 0L
+                MelodiaPlaybackService.stopPendingForeground(context)
                 return@launch
             }
 
@@ -740,6 +752,7 @@ class PlayerManager(
             }
         }
         pendingStartPosition = 0L
+        MelodiaPlaybackService.stopPendingForeground(context)
         Toast.makeText(context, "离线状态下没有可播放的已缓存歌曲", Toast.LENGTH_SHORT).show()
     }
 
@@ -761,6 +774,8 @@ class PlayerManager(
         if (pausedForPendingPlay) {
             pausedForPendingPlay = false
             controllerHolder.play()
+        } else if (!_isPlaying.value) {
+            MelodiaPlaybackService.stopPendingForeground(context)
         }
         // resetTo() 已经把进度条乐观置零/清空时长，撤销后按播放器的真实位置纠正回来
         progress.setPosition(controllerHolder.currentPosition)
@@ -1047,6 +1062,7 @@ class PlayerManager(
             _playWhenReady.value = false
             pausedForPendingPlay = false
             clearPendingTrack(restorePlayWhenReady = false)
+            MelodiaPlaybackService.stopPendingForeground(context)
             scope.launch {
                 Toast.makeText(context, "无法获取该歌曲的播放链接", Toast.LENGTH_SHORT).show()
             }

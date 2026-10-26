@@ -3,7 +3,6 @@ package com.lin0721.linmusic.feature.player.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +57,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.MelodiaSwitch
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiSpring
 
 // 全屏播放页信息卡片编辑弹窗：长按整行拖动排序，开关控制显隐
 @OptIn(ExperimentalMaterial3Api::class)
@@ -197,7 +197,7 @@ private fun CardEditorRow(
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit
 ) {
-    val liftSpec = remember { spring<Dp>(stiffness = Spring.StiffnessMediumLow) }
+    val liftSpec = uiSpring<Dp>(stiffness = Spring.StiffnessMediumLow)
     val elevation by animateDpAsState(
         targetValue = if (isDragging) 8.dp else 0.dp,
         animationSpec = liftSpec,
@@ -205,6 +205,7 @@ private fun CardEditorRow(
     )
     val bgColor by animateColorAsState(
         targetValue = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        animationSpec = uiSpring(),
         label = "card_editor_bg"
     )
     val currentOnDragStart by rememberUpdatedState(onDragStart)

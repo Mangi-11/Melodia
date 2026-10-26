@@ -1,8 +1,10 @@
 package com.lin0721.linmusic.desktop.platform.windows.taskbar
 
+import com.sun.jna.Platform
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -93,6 +95,7 @@ class ThumbnailImagesTest {
 
     @Test
     fun createEmptyDibCreatesValidPointer() {
+        assumeTrue("Requires Windows GDI", Platform.isWindows())
         val dib = GdiBitmaps.createEmptyDib()
         assertTrue(dib != null)
         dib?.let { GdiBitmaps.delete(it) }

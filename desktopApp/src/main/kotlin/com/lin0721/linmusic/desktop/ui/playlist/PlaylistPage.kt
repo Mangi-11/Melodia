@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,6 +73,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,9 +108,12 @@ import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
 import com.lin0721.linmusic.desktop.ui.components.MenuItem
 import com.lin0721.linmusic.desktop.ui.components.SubMenuItem
+import com.lin0721.linmusic.desktop.ui.components.uiSpring
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.library.CreatePlaylistDialog
 import com.lin0721.linmusic.desktop.ui.library.EMPTY_NAME_MESSAGE
 import com.lin0721.linmusic.desktop.ui.library.LibraryPopupMenu
@@ -420,7 +423,12 @@ private fun PlaylistContent(
         onPrepareCollect = viewModel::prepareCollectDialog,
         onSaveCollect = viewModel::savePlaylistCollection,
         onCreateAndAdd = viewModel::createPlaylistAndAddSong,
-        onRemove = removeTrack
+        onRemove = removeTrack,
+        onReduceRecommend = if (playlist.id == DAILY_RECOMMEND_ID && navigator.isLoggedIn) {
+            { track -> viewModel.reduceDailyRecommend(track.id) }
+        } else {
+            null
+        }
     )
 
     val commentsHost = remember(viewModel) { viewModel.asCommentsHost() }
@@ -500,13 +508,14 @@ private fun PlaylistContent(
     LaunchedEffect(playlist.coverImgUrl) {
         if (playlist.coverImgUrl.isNotBlank()) heroBase = extractCoverPaletteFromUrl(playlist.coverImgUrl).base
     }
-    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), label = "playlistHero")
+    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), uiSpring(), label = "playlistHero")
 
     val density = LocalDensity.current
     val barHeightPx = with(density) { StickyBarHeight.roundToPx() }
     val playButtonBottomPx = with(density) { (ActionBarVerticalPadding + PlayButtonSize).roundToPx() }
-    var heroHeightPx by remember(playlist.id) { mutableIntStateOf(0) }
-    var headerHeightPx by remember(playlist.id) { mutableIntStateOf(0) }
+    // 恢复页面现场时列表直接停在中间，大标题不会再测一次，高度要随现场保存
+    var heroHeightPx by rememberSaveable(playlist.id) { mutableIntStateOf(0) }
+    var headerHeightPx by rememberSaveable(playlist.id) { mutableIntStateOf(0) }
     // 大标题整体滑到横栏之下时出现歌单名，操作栏的播放按钮滑到横栏之下时再出现播放按钮
     val showTitleBar by remember(barHeightPx) {
         derivedStateOf { heroHeightPx > 0 && listState.scrolledPast(heroHeightPx - barHeightPx) }
@@ -641,7 +650,7 @@ private fun PlaylistContent(
                     },
                     // 抬起中的行自己负责位移，交给 animateItem 会和手动位移打架
                     modifier = Modifier.padding(horizontal = 16.dp)
-                        .then(if (dragging || settling) Modifier.zIndex(1f) else Modifier.animateItem()),
+                        .then(if (dragging || settling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier),
                     addedAtText = if (hasDates) formatAddedDate(addedAt[track.id] ?: 0L) else null,
                     reorder = if (!selection.active && (canReorder || dragging)) {
                         TrackReorder(
@@ -712,8 +721,8 @@ private fun PlaylistContent(
         Box(Modifier.fillMaxWidth().clipToBounds()) {
             AnimatedVisibility(
                 visible = showTitleBar,
-                enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
-                exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(tween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
+                enter = fadeIn(uiTween(STICKY_BAR_ANIMATION_MS)) + slideInVertically(uiTween(STICKY_BAR_ANIMATION_MS)) { -it / 2 },
+                exit = fadeOut(uiTween(STICKY_BAR_ANIMATION_MS)) + slideOutVertically(uiTween(STICKY_BAR_ANIMATION_MS)) { -it / 2 }
             ) {
                 PlaylistStickyBar(playlist.name, heroColor, showPlayButton, playbackState.isCurrentlyPlayingThis, listState, playbackState.onPlayClick)
             }
@@ -783,11 +792,11 @@ private fun PlaylistHero(playlist: PlaylistDetail, isAlbum: Boolean, count: Int,
 }
 
 // 表头项已滚出视野，或滚动距离达到阈值
-private fun LazyListState.scrolledPast(thresholdPx: Int): Boolean =
+internal fun LazyListState.scrolledPast(thresholdPx: Int): Boolean =
     firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset >= thresholdPx
 
 @Composable
-private fun PlaylistStickyBar(
+internal fun PlaylistStickyBar(
     name: String,
     color: Color,
     showPlay: Boolean,
@@ -804,8 +813,8 @@ private fun PlaylistStickyBar(
     ) {
         AnimatedVisibility(
             visible = showPlay,
-            enter = fadeIn(tween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(tween(STICKY_BAR_ANIMATION_MS)),
-            exit = fadeOut(tween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(tween(STICKY_BAR_ANIMATION_MS))
+            enter = fadeIn(uiTween(STICKY_BAR_ANIMATION_MS)) + expandHorizontally(uiTween(STICKY_BAR_ANIMATION_MS)),
+            exit = fadeOut(uiTween(STICKY_BAR_ANIMATION_MS)) + shrinkHorizontally(uiTween(STICKY_BAR_ANIMATION_MS))
         ) {
             PlayCircleButton(StickyPlayButtonSize, 28.dp, isPlaying, onPlay, Modifier.padding(end = 12.dp))
         }
@@ -821,7 +830,7 @@ private fun PlaylistStickyBar(
 }
 
 @Composable
-private fun PlayCircleButton(
+internal fun PlayCircleButton(
     size: Dp,
     iconSize: Dp,
     isPlaying: Boolean,
@@ -918,7 +927,7 @@ private fun PlaylistActionBar(
 }
 
 @Composable
-private fun ActionIcon(
+internal fun ActionIcon(
     icon: ImageVector,
     description: String,
     tint: Color = DesktopColors.TextGray,
@@ -987,7 +996,7 @@ private fun PlaylistMoreMenu(
 }
 
 @Composable
-private fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
+internal fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(
         Modifier.clip(RoundedCornerShape(16.dp)).background(DesktopColors.Surface)
             .pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
@@ -1007,18 +1016,18 @@ private fun PlaylistPill(icon: ImageVector, text: String, onClick: () -> Unit) {
 
 // 点图标展开成输入框，失焦且为空时收回；Esc 清空并收回
 @Composable
-private fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
+internal fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
     var searching by remember { mutableStateOf(false) }
     var focusedOnce by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val width by animateDpAsState(
         if (searching) SearchWidth else ControlHeight,
-        tween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
+        uiTween(SEARCH_ANIMATION_MS, easing = FastOutSlowInEasing),
         label = "playlistSearchWidth"
     )
     val background by animateColorAsState(
         if (searching) DesktopColors.Surface else Color.Transparent,
-        tween(SEARCH_ANIMATION_MS),
+        uiTween(SEARCH_ANIMATION_MS),
         label = "playlistSearchBackground"
     )
     LaunchedEffect(searching) {
@@ -1058,7 +1067,7 @@ private fun PlaylistSearchBox(query: String, onQueryChange: (String) -> Unit) {
 }
 
 @Composable
-private fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSelect: (PlaylistSortKey) -> Unit) {
+internal fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSelect: (PlaylistSortKey) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var anchorWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
@@ -1086,7 +1095,7 @@ private fun PlaylistSortMenu(order: PlaylistSortOrder, showAdded: Boolean, onSel
 
 // 列宽与 TrackRow 逐项对齐：序号 32、封面槽 56、标题 0.45、专辑 0.35、[添加日期]、红心槽 32、时长 48、更多槽 36
 @Composable
-private fun TrackColumnHeader(order: PlaylistSortOrder, showAdded: Boolean, onSort: (PlaylistSortKey) -> Unit) {
+internal fun TrackColumnHeader(order: PlaylistSortOrder, showAdded: Boolean, onSort: (PlaylistSortKey) -> Unit) {
     Column(Modifier.fillMaxWidth().background(DesktopColors.Pane)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(horizontal = 12.dp, vertical = 8.dp),

@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -117,8 +116,9 @@ fun DesktopMenu(
     val scope = remember { MenuScope() }
     val density = LocalDensity.current
     val positionProvider = remember(offset, width, density) { MenuPositionProvider(offset, width, density, scope) }
+    val motion = LocalUiMotion.current
     val fade = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { fade.animateTo(1f, tween(FADE_IN_MS)) }
+    LaunchedEffect(Unit) { fade.animateTo(1f, motion.tween(FADE_IN_MS)) }
     // 弹层透明，主菜单与二级菜单各自成面板；弹层位置只取决于主菜单
     Popup(
         popupPositionProvider = positionProvider,
@@ -304,7 +304,8 @@ private fun MenuRow(
     source: MutableInteractionSource,
     onClick: () -> Unit,
     modifier: Modifier,
-    trailing: (@Composable () -> Unit)?
+    trailing: (@Composable () -> Unit)?,
+    leading: (@Composable () -> Unit)? = null
 ) {
     val color = if (danger) DangerColor else DesktopColors.TextPrimary
     Row(
@@ -318,6 +319,9 @@ private fun MenuRow(
     ) {
         if (icon != null) {
             Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(10.dp))
+        } else if (leading != null) {
+            leading()
             Spacer(Modifier.width(10.dp))
         }
         Text(text, color = color, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -335,9 +339,11 @@ fun SimpleMenuItem(
     danger: Boolean = false,
     selected: Boolean = false,
     enabled: Boolean = true,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    // 非图标的前置内容，如颜色色块；与 icon 同时传入时以 icon 为准
+    leading: (@Composable () -> Unit)? = null
 ) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
-    MenuRow(text, icon, danger, enabled, hovered || selected, source, onClick, modifier, trailing)
+    MenuRow(text, icon, danger, enabled, hovered || selected, source, onClick, modifier, trailing, leading)
 }

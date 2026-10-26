@@ -57,39 +57,13 @@ fun LyricsCard(
     currentIndex: Int,
     isLoading: Boolean,
     base: Color,
+    // 播放中且未被全屏歌词遮住时光斑才游走
+    animateMesh: Boolean,
     isAmll: Boolean = false,
+    isQrc: Boolean = false,
     onOpenFullScreen: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "fluid_mesh")
-
-    // 右下角光斑动画
-    val darkCenterX by infiniteTransition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(15000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_x"
-    )
-    val darkCenterY by infiniteTransition.animateFloat(
-        initialValue = 1.20f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(13000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_y"
-    )
-    val darkRadiusScale by infiniteTransition.animateFloat(
-        initialValue = 0.40f,
-        targetValue = 0.50f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(10000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dark_radius"
-    )
+    val meshPhaseMs = rememberMeshPhaseMs(animateMesh)
 
     val vividBase = remember(base) { base.saturateIfChromatic(0.6f) }
     val fillColor = remember(vividBase) { vividBase.darken(0.35f) }
@@ -124,6 +98,11 @@ fun LyricsCard(
                 .blur(LYRICS_CARD_BLUR_RADIUS)
                 .drawBehind {
                     val baseSize = size.minDimension
+                    // 右下角光斑游走
+                    val phaseMs = meshPhaseMs.longValue
+                    val darkCenterX = meshPingPong(phaseMs, 15000L, 1.20f, 1.35f)
+                    val darkCenterY = meshPingPong(phaseMs, 13000L, 1.20f, 1.35f)
+                    val darkRadiusScale = meshPingPong(phaseMs, 10000L, 0.40f, 0.50f)
                     drawSingleHueMesh(
                         fill = fillColor,
                         darkBlob = darkBlob,
@@ -143,9 +122,9 @@ fun LyricsCard(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-            if (isAmll) {
+            if (isAmll || isQrc) {
                 Text(
-                    "AMLL",
+                    if (isAmll) "TTML" else "QRC",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -198,8 +177,13 @@ fun LyricsPreview(
     val lazyListState = rememberLazyListState()
     var cardHeightPx by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(currentIndex) {
-        if (currentIndex < 0 || currentIndex >= lyrics.size) return@LaunchedEffect
+    LaunchedEffect(currentIndex, lyrics) {
+        // 新歌前奏或歌词重载时当前行尚未开始：回到顶部，否则停在上一首的位置
+        if (currentIndex < 0) {
+            if (lyrics.isNotEmpty()) lazyListState.animateScrollToItem(index = 0, scrollOffset = 0)
+            return@LaunchedEffect
+        }
+        if (currentIndex >= lyrics.size) return@LaunchedEffect
 
         val cardHeightDp = with(density) { cardHeightPx.toDp() }
         val linesAboveCentre = (cardHeightDp / 2 / itemStrideDp).toInt()

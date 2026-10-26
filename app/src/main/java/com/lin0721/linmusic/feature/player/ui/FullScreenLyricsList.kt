@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -46,6 +45,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -61,6 +66,8 @@ import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // 全屏歌词列表区：加载态/空态、当前行自动居中定位、居中行推导与拖动定位覆盖层
 @Composable
@@ -99,9 +106,24 @@ fun FullScreenLyricsList(
     val configuration = LocalConfiguration.current
     val defaultHalfViewportDp = remember(configuration.screenHeightDp) { (configuration.screenHeightDp / 2).dp }
     val halfViewportPadding = if (viewportHeightPx > 0f) with(density) { (viewportHeightPx / 2f).toDp() } else defaultHalfViewportDp
+    val effectiveTopInsetPx = if (topInsetPx > 0f) topInsetPx else with(density) { EdgeFadeHeight.toPx() }
+    val effectiveTopInsetDp = with(density) { effectiveTopInsetPx.toDp() }
 
-    LaunchedEffect(currentIndex, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
-        if (isUserScrolling || currentIndex !in lyrics.indices || viewportHeightPx <= 0f) return@LaunchedEffect
+    LaunchedEffect(currentIndex, lyrics, isUserScrolling, viewportHeightPx, fontSize, secondaryMode, lineSpacing, secondarySpacing, centerFirstLine, topInsetPx) {
+        if (isUserScrolling || viewportHeightPx <= 0f) return@LaunchedEffect
+
+        // 新歌前奏或歌词重载时当前行尚未开始：回到顶部，否则列表停在上一首的滚动位置
+        if (currentIndex < 0) {
+            if (lyrics.isNotEmpty()) {
+                lazyListState.springScrollToCentreClassic(
+                    targetIndex = 0,
+                    desiredOffsetPx = effectiveTopInsetPx.toInt(),
+                    fallbackScrollOffsetPx = 0
+                )
+            }
+            return@LaunchedEffect
+        }
+        if (currentIndex !in lyrics.indices) return@LaunchedEffect
 
         if (centerFirstLine) {
             lazyListState.springScrollToCentre(
@@ -118,7 +140,7 @@ fun FullScreenLyricsList(
         if (currentIndex < linesAboveCentre) {
             lazyListState.springScrollToCentreClassic(
                 targetIndex = 0,
-                desiredOffsetPx = 0,
+                desiredOffsetPx = effectiveTopInsetPx.toInt(),
                 fallbackScrollOffsetPx = 0
             )
             return@LaunchedEffect
@@ -133,7 +155,7 @@ fun FullScreenLyricsList(
         val itemHeightPx = with(density) {
             (if (hasSecondary) 96 + secondarySpacing - 6 else 54).coerceAtLeast(1).dp.toPx()
         }
-        val desiredOffsetPx = ((viewportHeightPx - itemHeightPx) / 2f - topInsetPx).toInt()
+        val desiredOffsetPx = ((viewportHeightPx - itemHeightPx) / 2f).toInt()
         lazyListState.springScrollToCentreClassic(
             targetIndex = currentIndex,
             desiredOffsetPx = desiredOffsetPx,
@@ -198,11 +220,12 @@ fun FullScreenLyricsList(
                 userScrollEnabled = userScrollEnabled,
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalEdgeFade(top = EdgeFadeHeight, bottom = EdgeFadeHeight)
                     .then(gestureModifier)
                     .onSizeChanged { onViewportHeightChange(it.height.toFloat()) },
                 verticalArrangement = Arrangement.spacedBy(lineSpacing.coerceAtLeast(0).dp),
                 contentPadding = PaddingValues(
-                    top = if (centerFirstLine) halfViewportPadding else with(density) { topInsetPx.toDp() },
+                    top = if (centerFirstLine) halfViewportPadding else effectiveTopInsetDp,
                     bottom = if (centerFirstLine) halfViewportPadding else with(density) { (viewportHeightPx / 2f).toDp() }
                 ),
                 horizontalAlignment = when (alignment) {
@@ -255,8 +278,8 @@ fun FullScreenLyricsList(
 private fun CenterTargetLine(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(spring(dampingRatio = 0.85f, stiffness = 300f)),
-        exit = fadeOut(tween(180)),
+        enter = fadeIn(uiSpring(dampingRatio = 0.85f, stiffness = 300f)),
+        exit = fadeOut(uiTween(180)),
         modifier = modifier
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -281,15 +304,15 @@ private fun PlayCapsule(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(spring(dampingRatio = 0.82f, stiffness = 380f)) +
+        enter = fadeIn(uiSpring(dampingRatio = 0.82f, stiffness = 380f)) +
                 scaleIn(
                     initialScale = 0.82f,
-                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f)
+                    animationSpec = uiSpring(dampingRatio = 0.75f, stiffness = 400f)
                 ),
-        exit = fadeOut(tween(160)) +
+        exit = fadeOut(uiTween(160)) +
                 scaleOut(
                     targetScale = 0.85f,
-                    animationSpec = tween(160)
+                    animationSpec = uiTween(160)
                 ),
         modifier = modifier
     ) {
@@ -408,3 +431,23 @@ private suspend fun LazyListState.springScrollToCentreClassic(
 
     this.animateScrollToItem(index = targetIndex, scrollOffset = fallbackScrollOffsetPx)
 }
+
+// 默认歌词视口边缘羽化高度
+private val EdgeFadeHeight = 32.dp
+
+// 视口上下边缘渐隐：用 DstIn 把内容按渐变蒙版擦淡
+internal fun Modifier.verticalEdgeFade(top: Dp = EdgeFadeHeight, bottom: Dp = EdgeFadeHeight): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+        drawContent()
+        val height = size.height
+        if (height <= 0f) return@drawWithContent
+        val topFraction = (top.toPx() / height).coerceIn(0f, 0.5f)
+        val bottomFraction = (bottom.toPx() / height).coerceIn(0f, 0.5f)
+        val stops = buildList {
+            add(0f to if (topFraction > 0f) Color.Transparent else Color.Black)
+            if (topFraction > 0f) add(topFraction to Color.Black)
+            add(1f - bottomFraction to Color.Black)
+            add(1f to if (bottomFraction > 0f) Color.Transparent else Color.Black)
+        }
+        drawRect(Brush.verticalGradient(colorStops = stops.toTypedArray()), blendMode = BlendMode.DstIn)
+    }

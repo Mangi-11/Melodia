@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
@@ -66,7 +65,7 @@ private fun ScrollbarHost(
     // 拖动滑块时指针可能移出区域，期间保持显示
     val dragging by barSource.collectIsDraggedAsState()
     val overflowing = state.canScrollForward || state.canScrollBackward
-    val alpha by animateFloatAsState(if (overflowing && (hovered || dragging)) 1f else 0f, tween(FADE_MS), label = "scrollbarAlpha")
+    val alpha by animateFloatAsState(if (overflowing && (hovered || dragging)) 1f else 0f, uiTween(FADE_MS), label = "scrollbarAlpha")
 
     Box(modifier.hoverable(hoverSource)) {
         content()

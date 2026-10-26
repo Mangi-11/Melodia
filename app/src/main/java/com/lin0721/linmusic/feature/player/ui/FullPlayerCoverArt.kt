@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.components.SwipeToSkipCover
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
@@ -116,6 +116,7 @@ fun FullPlayerSourceBar(
     onPlaylistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val motion = LocalUiMotion.current
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -155,15 +156,15 @@ fun FullPlayerSourceBar(
         AnimatedContent(
             targetState = playContext,
             transitionSpec = {
-                (fadeIn(animationSpec = tween(260)) +
-                        slideInVertically(animationSpec = tween(260)) { height -> height / 3 })
+                (fadeIn(animationSpec = motion.tween(260)) +
+                        slideInVertically(animationSpec = motion.tween(260)) { height -> height / 3 })
                     .togetherWith(
-                        fadeOut(animationSpec = tween(200)) +
-                                slideOutVertically(animationSpec = tween(200)) { height -> -height / 3 }
+                        fadeOut(animationSpec = motion.tween(200)) +
+                                slideOutVertically(animationSpec = motion.tween(200)) { height -> -height / 3 }
                     ).using(
                         SizeTransform(
                             clip = false,
-                            sizeAnimationSpec = { _, _ -> tween(280) }
+                            sizeAnimationSpec = { _, _ -> motion.tween(280) }
                         )
                     )
             },

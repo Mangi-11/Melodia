@@ -1,14 +1,28 @@
 package com.lin0721.linmusic.desktop.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -24,25 +38,49 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricAlign
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricColorOption
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricPalette
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricSecondary
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricShadow
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
+import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.core.update.UpdateChecker
+import com.lin0721.linmusic.core.update.data.UpdateRepository
+import com.lin0721.linmusic.desktop.app.AppInfo
+import com.lin0721.linmusic.desktop.app.RenderBackend
 import com.lin0721.linmusic.desktop.data.CacheLimits
 import com.lin0721.linmusic.desktop.data.CloseAction
+import com.lin0721.linmusic.desktop.data.MiniLyricFontSize
+import com.lin0721.linmusic.desktop.data.MiniLyricSettings
+import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
+import com.lin0721.linmusic.desktop.data.local.LocalScanFilter
+import com.lin0721.linmusic.desktop.data.local.LocalScanState
 import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.chooseDirectory
+import com.lin0721.linmusic.desktop.ui.local.musicHome
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
 import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.desktop.ui.update.openInBrowser
 import com.lin0721.linmusic.feature.cloud.domain.formatFileSize
 import com.lin0721.linmusic.feature.settings.ui.CommonSettingsViewModel
 import com.lin0721.linmusic.feature.settings.ui.LxPluginSettingsViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.io.File
@@ -54,7 +92,8 @@ internal enum class SettingsCategory(val label: String) {
     Storage("存储与下载"),
     Interface("界面与歌词"),
     System("系统与窗口"),
-    Hotkeys("快捷键")
+    Hotkeys("快捷键"),
+    About("关于")
 }
 
 // 一个设置项：分类、搜索用的文本与实际渲染内容；group 非空时在分区内按连续的同名组分段
@@ -93,12 +132,236 @@ private val QualityOptions = listOf(
 )
 
 private val ActionSpacing = Arrangement.spacedBy(8.dp)
+private const val CARD_LAYOUT_EXPAND_MS = 200
+
+private const val DESKTOP_LYRIC_GROUP = "桌面歌词"
+private const val MINI_PLAYER_GROUP = "迷你播放器"
+private val DesktopLyricFontSizes = listOf(20, 24, 28, 32, 36, 40, 48)
+private val DesktopLyricBackgroundAlphas = listOf(0, 20, 40, 60, 80)
+
+private fun miniLyricEntries(settings: MiniLyricSettings, desktop: DesktopSettingsViewModel): List<SettingsEntry> {
+    val update = desktop::updateMiniLyricSettings
+    return listOf(
+        rowEntry(
+            "miniLyricFontSize", SettingsCategory.Interface, "歌词字号",
+            subtitle = "歌词卡的基准字号，窗口拉宽后按比例放大",
+            keywords = listOf("迷你", "小窗", "歌词", "字号", "大小"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = MiniLyricFontSize.entries,
+                current = settings.fontSize,
+                label = { it.label },
+                onSelect = { size -> update { it.copy(fontSize = size) } }
+            )
+        },
+        rowEntry(
+            "miniLyricSecondary", SettingsCategory.Interface, "歌词第二行",
+            keywords = listOf("迷你", "小窗", "歌词", "翻译", "罗马音"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = MiniLyricSettings.SecondaryOptions,
+                current = settings.secondary,
+                label = { it.label },
+                onSelect = { mode -> update { it.copy(secondary = mode) } }
+            )
+        },
+        rowEntry(
+            "miniLyricKaraoke", SettingsCategory.Interface, "逐字高亮",
+            subtitle = "关闭后当前行整行高亮",
+            keywords = listOf("迷你", "小窗", "歌词", "逐字", "卡拉OK"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingSwitch(settings.karaoke, onChange = { enabled -> update { it.copy(karaoke = enabled) } })
+        },
+        rowEntry(
+            "miniLyricSideLines", SettingsCategory.Interface, "显示上下行",
+            keywords = listOf("迷你", "小窗", "歌词", "上一行", "下一行"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingSwitch(settings.showSideLines, onChange = { enabled -> update { it.copy(showSideLines = enabled) } })
+        },
+        rowEntry(
+            "miniLyricAlign", SettingsCategory.Interface, "歌词对齐",
+            keywords = listOf("迷你", "小窗", "歌词", "对齐", "居中", "左对齐"),
+            group = MINI_PLAYER_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricAlign.entries,
+                current = settings.align,
+                label = { it.label },
+                onSelect = { align -> update { it.copy(align = align) } }
+            )
+        }
+    )
+}
+
+private fun desktopLyricEntries(
+    style: FloatingLyricStyle,
+    locked: Boolean,
+    desktop: DesktopSettingsViewModel
+): List<SettingsEntry> {
+    val update = desktop::updateDesktopLyricStyle
+    return listOf(
+        rowEntry(
+            "desktopLyricLocked", SettingsCategory.Interface, "锁定桌面歌词",
+            subtitle = "锁定后鼠标穿透歌词窗口；也可在托盘菜单或双击歌词切换",
+            keywords = listOf("歌词", "锁定", "穿透", "解锁"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(locked, onChange = desktop::updateDesktopLyricLocked)
+        },
+        rowEntry(
+            "desktopLyricFontSize", SettingsCategory.Interface, "字号",
+            keywords = listOf("歌词", "字号", "大小"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = DesktopLyricFontSizes,
+                current = style.fontSizeSp,
+                label = { "$it sp" },
+                onSelect = { size -> update { it.copy(fontSizeSp = size) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricPlayedColor", SettingsCategory.Interface, "已播颜色",
+            subtitle = "逐字歌词唱过的部分与普通歌词的当前行",
+            keywords = listOf("歌词", "颜色", "高亮"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricPalette.played, style.playedColor) { hex -> update { it.copy(playedColor = hex) } }
+        },
+        rowEntry(
+            "desktopLyricUnplayedColor", SettingsCategory.Interface, "未播颜色",
+            keywords = listOf("歌词", "颜色"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricPalette.unplayed, style.unplayedColor) { hex -> update { it.copy(unplayedColor = hex) } }
+        },
+        rowEntry(
+            "desktopLyricSecondary", SettingsCategory.Interface, "第二行",
+            keywords = listOf("歌词", "翻译", "罗马音", "下一句", "双行"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricSecondary.entries,
+                current = style.secondary,
+                label = { it.label },
+                onSelect = { mode -> update { it.copy(secondary = mode) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricAlign", SettingsCategory.Interface, "对齐方式",
+            keywords = listOf("歌词", "对齐", "居中"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricAlign.entries,
+                current = style.align,
+                label = { it.label },
+                onSelect = { align -> update { it.copy(align = align) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricBackground", SettingsCategory.Interface, "背景不透明度",
+            subtitle = "0% 时只显示文字",
+            keywords = listOf("歌词", "背景", "透明"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = DesktopLyricBackgroundAlphas,
+                current = style.backgroundAlpha,
+                label = { "$it%" },
+                onSelect = { alpha -> update { it.copy(backgroundAlpha = alpha) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadow", SettingsCategory.Interface, "文字阴影",
+            subtitle = "浅色背景上也能看清歌词",
+            keywords = listOf("歌词", "阴影", "描边"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(style.shadow, onChange = { on -> update { it.copy(shadow = on) } })
+        },
+        *shadowEntries(style, update).toTypedArray(),
+        rowEntry(
+            "desktopLyricBold", SettingsCategory.Interface, "粗体",
+            keywords = listOf("歌词", "粗体", "字重"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingSwitch(style.bold, onChange = { on -> update { it.copy(bold = on) } })
+        }
+    )
+}
+
+// 阴影开启时才出现的细项
+private fun shadowEntries(style: FloatingLyricStyle, update: ((FloatingLyricStyle) -> FloatingLyricStyle) -> Unit): List<SettingsEntry> {
+    if (!style.shadow) return emptyList()
+    return listOf(
+        rowEntry(
+            "desktopLyricShadowAlpha", SettingsCategory.Interface, "阴影强度",
+            keywords = listOf("歌词", "阴影", "不透明度"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricShadow.alphas,
+                current = style.shadowAlpha,
+                label = { "$it%" },
+                onSelect = { alpha -> update { it.copy(shadowAlpha = alpha) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadowBlur", SettingsCategory.Interface, "阴影模糊",
+            keywords = listOf("歌词", "阴影", "模糊", "发散"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = FloatingLyricShadow.blursDp,
+                current = style.shadowBlurDp,
+                label = FloatingLyricShadow::blurLabel,
+                onSelect = { blur -> update { it.copy(shadowBlurDp = blur) } }
+            )
+        },
+        rowEntry(
+            "desktopLyricShadowColor", SettingsCategory.Interface, "阴影颜色",
+            subtitle = "白色阴影在深色背景上呈发光效果",
+            keywords = listOf("歌词", "阴影", "颜色", "发光"),
+            group = DESKTOP_LYRIC_GROUP
+        ) {
+            LyricColorDropdown(FloatingLyricShadow.colors, style.shadowColor) { hex -> update { it.copy(shadowColor = hex) } }
+        }
+    )
+}
+
+@Composable
+private fun LyricColorDropdown(options: List<FloatingLyricColorOption>, current: String, onSelect: (String) -> Unit) {
+    SettingsDropdown(
+        options = options.map { it.hex },
+        current = current,
+        label = { FloatingLyricPalette.labelOf(it, options) },
+        onSelect = onSelect,
+        leading = { hex -> ColorSwatch(hex) }
+    )
+}
+
+// 深色菜单上纯黑色块看不清，统一描一圈浅色边
+@Composable
+private fun ColorSwatch(hex: String) {
+    Box(
+        Modifier.size(14.dp).clip(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .background(Color((FloatingLyricPalette.parseArgb(hex) ?: 0xFFFFFFFFL).toInt()))
+    )
+}
 
 @Composable
 internal fun settingsEntries(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
-    lxPlugins: LxPluginSettingsViewModel
+    lxPlugins: LxPluginSettingsViewModel,
+    updateChecker: UpdateChecker,
+    localLibrary: LocalLibraryRepository
 ): List<SettingsEntry> {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
@@ -121,15 +384,27 @@ internal fun settingsEntries(
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
+    val uiAnimationsEnabled by common.uiAnimationsEnabled.collectAsState()
     val downloadFolder by common.downloadFolderUri.collectAsState()
     val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
+    val localData by localLibrary.data.collectAsState()
+    val localScan by localLibrary.scanState.collectAsState()
     val defaultPlaylistPrivate by common.defaultPlaylistPrivate.collectAsState()
     val cardLayout by common.fullPlayerCardLayout.collectAsState()
     val closeAction by desktop.closeAction.collectAsState()
+    val renderBackend by desktop.renderBackend.collectAsState()
+    val lyricStyle by desktop.desktopLyricStyle.collectAsState()
+    val lyricLocked by desktop.desktopLyricLocked.collectAsState()
+    val miniPlayerStyle by desktop.miniPlayerStyle.collectAsState()
+    val miniPlayerOnTop by desktop.miniPlayerAlwaysOnTop.collectAsState()
+    val miniLyric by desktop.miniLyricSettings.collectAsState()
     val mediaKeysEnabled by desktop.mediaKeysEnabled.collectAsState()
     val hotkeyMap by desktop.hotkeyMap.collectAsState()
     val failedHotkeys by desktop.failedHotkeys.collectAsState()
     val mediaSessionAvailable by desktop.mediaSessionAvailable.collectAsState()
+    val autoCheckUpdate by common.autoCheckUpdateEnabled.collectAsState()
+    val allowPrerelease by common.allowPrereleaseChannel.collectAsState()
+    val availableUpdate by updateChecker.availableUpdate.collectAsState()
 
     val customDownloadFolder = downloadFolder?.takeIf { it.isNotBlank() }
     val cacheDirSubtitle = relocation?.let { "正在迁移缓存：${formatFileSize(it.copiedBytes)} / ${formatFileSize(it.totalBytes)}" }
@@ -372,15 +647,43 @@ internal fun settingsEntries(
                 SettingSwitch(defaultPlaylistPrivate, onChange = common::updateDefaultPlaylistPrivate)
             }
         )
+        addAll(localMusicEntries(localLibrary, localData.filter, localScan, scope))
 
         add(
             rowEntry(
                 "desktopLyric", SettingsCategory.Interface, "显示桌面歌词",
-                keywords = listOf("歌词", "桌面", "悬浮")
+                keywords = listOf("歌词", "桌面", "悬浮"),
+                group = DESKTOP_LYRIC_GROUP
             ) {
                 SettingSwitch(showDesktopLyric, onChange = common::updateShowDesktopLrc)
             }
         )
+        if (showDesktopLyric) addAll(desktopLyricEntries(lyricStyle, lyricLocked, desktop))
+        add(
+            rowEntry(
+                "miniPlayerStyle", SettingsCategory.Interface, "默认样式",
+                subtitle = "悬停迷你播放器时也可点右上角按钮切换",
+                keywords = listOf("迷你", "小窗", "样式", "横条", "方卡", "歌词卡"),
+                group = MINI_PLAYER_GROUP
+            ) {
+                SettingsDropdown(
+                    options = MiniPlayerStyle.entries,
+                    current = miniPlayerStyle,
+                    label = { it.label },
+                    onSelect = desktop::updateMiniPlayerStyle
+                )
+            }
+        )
+        add(
+            rowEntry(
+                "miniPlayerAlwaysOnTop", SettingsCategory.Interface, "始终置顶",
+                keywords = listOf("迷你", "小窗", "置顶"),
+                group = MINI_PLAYER_GROUP
+            ) {
+                SettingSwitch(miniPlayerOnTop, onChange = desktop::updateMiniPlayerAlwaysOnTop)
+            }
+        )
+        addAll(miniLyricEntries(miniLyric, desktop))
         add(
             SettingsEntry(
                 key = "cardLayout",
@@ -389,12 +692,7 @@ internal fun settingsEntries(
                 subtitle = cardLayoutSubtitle,
                 keywords = SupportedInfoCards.map { it.title } + listOf("面板", "排序", "显示", "隐藏", "卡片")
             ) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Text("正在播放面板信息卡片", color = DesktopColors.TextPrimary, fontSize = 14.sp)
-                    Text(cardLayoutSubtitle, color = DesktopColors.TextGray, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    CardLayoutEditor(cardLayout, common::updateFullPlayerCardLayout)
-                }
+                CardLayoutSetting(cardLayout, cardLayoutSubtitle, common::updateFullPlayerCardLayout)
             }
         )
         add(
@@ -406,6 +704,29 @@ internal fun settingsEntries(
                 keywords = listOf("缩放", "放大", "大小", "dpi", "字体")
             ) {
                 UiScaleSetting(uiScalePercent, common::updateUiScalePercent)
+            }
+        )
+        add(
+            rowEntry(
+                "uiAnimations", SettingsCategory.Interface, "界面过渡动画",
+                subtitle = "关闭后切页、面板展开收起等直接切换，不影响歌词滚动",
+                keywords = listOf("动画", "过渡", "减少动态", "流畅")
+            ) {
+                SettingSwitch(uiAnimationsEnabled, onChange = common::updateUiAnimationsEnabled)
+            }
+        )
+        add(
+            rowEntry(
+                "renderBackend", SettingsCategory.Interface, "渲染方式",
+                subtitle = "出现黑屏、闪烁或花屏时可尝试切换，重启后生效",
+                keywords = listOf("渲染", "gpu", "显卡", "硬件加速", "黑屏", "闪烁", "directx", "opengl")
+            ) {
+                SettingsDropdown(
+                    options = RenderBackend.entries,
+                    current = renderBackend,
+                    label = ::renderBackendLabel,
+                    onSelect = desktop::updateRenderBackend
+                )
             }
         )
 
@@ -494,7 +815,130 @@ internal fun settingsEntries(
                 }
             )
         }
+
+        add(
+            SettingsEntry(
+                key = "appVersion",
+                category = SettingsCategory.About,
+                title = "当前版本",
+                keywords = listOf("版本", "更新", "升级", "version")
+            ) {
+                val update = availableUpdate
+                SettingRow(
+                    title = "当前版本",
+                    subtitle = update?.let { "发现新版本 ${it.versionName}${if (it.isPrerelease) "（测试版）" else ""}" }
+                        ?: appVersionLabel(),
+                    subtitleColor = if (update != null) DesktopColors.Accent else DesktopColors.TextGray
+                ) {
+                    Row(horizontalArrangement = ActionSpacing, verticalAlignment = Alignment.CenterVertically) {
+                        if (update != null) SettingsActionButton("查看新版本", onClick = updateChecker::showDialog)
+                        SettingsActionButton("检查更新", onClick = { updateChecker.checkForUpdate(manual = true) })
+                    }
+                }
+            }
+        )
+        add(
+            rowEntry(
+                "autoCheckUpdate", SettingsCategory.About, "自动检查更新",
+                subtitle = "启动应用时后台检查一次更新",
+                keywords = listOf("更新", "升级", "自动")
+            ) {
+                SettingSwitch(autoCheckUpdate, onChange = common::updateAutoCheckUpdateEnabled)
+            }
+        )
+        add(
+            rowEntry(
+                "allowPrerelease", SettingsCategory.About, "接收测试版更新",
+                subtitle = "包含 beta/rc 预览版本，可能不稳定",
+                keywords = listOf("更新", "测试版", "预发布", "beta", "rc")
+            ) {
+                SettingSwitch(allowPrerelease, onChange = common::updateAllowPrereleaseChannel)
+            }
+        )
+        add(
+            rowEntry(
+                "projectHome", SettingsCategory.About, "项目主页",
+                subtitle = UpdateRepository.REPOSITORY_URL,
+                keywords = listOf("github", "主页", "反馈", "源码")
+            ) {
+                SettingsActionButton("打开", onClick = {
+                    if (!openInBrowser(UpdateRepository.REPOSITORY_URL)) navigator.showMessage("无法打开浏览器")
+                })
+            }
+        )
     }
+}
+
+private const val LOCAL_MUSIC_GROUP = "本地音乐"
+private val LocalMinDurationOptions = listOf(0, 30, 60, 90, 120)
+
+private fun localMusicEntries(
+    repository: LocalLibraryRepository,
+    filter: LocalScanFilter,
+    scan: LocalScanState,
+    scope: CoroutineScope
+): List<SettingsEntry> {
+    val scanSubtitle = when (scan) {
+        is LocalScanState.Scanning -> "正在扫描 ${scan.done}/${scan.total}"
+        LocalScanState.Idle -> "启动时会自动扫描本地歌单绑定的文件夹"
+    }
+    val excludedSubtitle = if (filter.excludedFolders.isEmpty()) "扫描文件夹时跳过这些子文件夹" else "已排除 ${filter.excludedFolders.size} 个文件夹"
+    return listOf(
+        rowEntry(
+            "localMinDuration", SettingsCategory.Storage, "忽略短音频",
+            subtitle = "扫描文件夹时跳过时长不足的音频，如铃声、提示音",
+            keywords = listOf("本地", "扫描", "时长", "过滤"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            SettingsDropdown(
+                options = LocalMinDurationOptions,
+                current = filter.minDurationSec,
+                label = { if (it == 0) "不过滤" else "短于 $it 秒" },
+                onSelect = { repository.updateFilter(filter.copy(minDurationSec = it)) }
+            )
+        },
+        SettingsEntry(
+            key = "localExcludedFolders",
+            category = SettingsCategory.Storage,
+            title = "排除文件夹",
+            subtitle = excludedSubtitle,
+            keywords = listOf("本地", "扫描", "排除", "文件夹", "过滤"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            Column {
+                SettingRow("排除文件夹", excludedSubtitle) {
+                    SettingsActionButton("添加", onClick = {
+                        scope.launch {
+                            chooseDirectory(musicHome, "选择要排除的文件夹")?.let { folder ->
+                                repository.updateFilter(filter.copy(excludedFolders = filter.excludedFolders + folder.absolutePath))
+                            }
+                        }
+                    })
+                }
+                filter.excludedFolders.forEach { folder ->
+                    SettingRow(folder, null) {
+                        SettingsActionButton("移除", onClick = {
+                            repository.updateFilter(filter.copy(excludedFolders = filter.excludedFolders - folder))
+                        })
+                    }
+                }
+            }
+        },
+        rowEntry(
+            "localRescan", SettingsCategory.Storage, "重新扫描本地音乐",
+            subtitle = scanSubtitle,
+            keywords = listOf("本地", "扫描", "刷新"),
+            group = LOCAL_MUSIC_GROUP
+        ) {
+            SettingsActionButton("立即扫描", onClick = repository::rescan, enabled = scan is LocalScanState.Idle)
+        }
+    )
+}
+
+private fun appVersionLabel(): String = when {
+    !AppInfo.isRelease -> "开发版本 ${AppInfo.version}"
+    AppInfo.isPrerelease -> "Version ${AppInfo.version}（测试版）"
+    else -> "Version ${AppInfo.version}"
 }
 
 private val HotkeyActionLabels = HotkeyAction.entries.map { it.label }
@@ -523,6 +967,59 @@ private fun UiScaleSetting(percent: Int, onCommit: (Int) -> Unit) {
             modifier = Modifier.padding(top = 8.dp)
         )
     }
+}
+
+// 卡片列表较长，默认收起只留标题行
+@Composable
+private fun CardLayoutSetting(
+    layout: List<FullPlayerCardSetting>,
+    expandedSubtitle: String,
+    onChange: (List<FullPlayerCardSetting>) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val supported = layout.filter { it.card in SupportedInfoCards }
+    val subtitle = if (expanded) {
+        expandedSubtitle
+    } else {
+        "已显示 ${supported.count { it.visible }}/${supported.size} 张，展开可调整顺序与显隐"
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .pointerHoverIcon(PointerIcon.Hand)
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("正在播放面板信息卡片", color = DesktopColors.TextPrimary, fontSize = 14.sp)
+                Text(subtitle, color = DesktopColors.TextGray, fontSize = 12.sp)
+            }
+            Icon(
+                if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "收起" else "展开",
+                tint = DesktopColors.TextGray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(uiTween(CARD_LAYOUT_EXPAND_MS)) + expandVertically(uiTween(CARD_LAYOUT_EXPAND_MS)),
+            exit = fadeOut(uiTween(CARD_LAYOUT_EXPAND_MS)) + shrinkVertically(uiTween(CARD_LAYOUT_EXPAND_MS))
+        ) {
+            Column {
+                Spacer(Modifier.height(8.dp))
+                CardLayoutEditor(layout, onChange)
+            }
+        }
+    }
+}
+
+private fun renderBackendLabel(backend: RenderBackend): String = when (backend) {
+    RenderBackend.AUTO -> "自动"
+    RenderBackend.DIRECT3D -> "DirectX"
+    RenderBackend.OPENGL -> "OpenGL"
+    RenderBackend.SOFTWARE -> "软件渲染"
 }
 
 private fun logLevelLabel(level: AppLogger.LogLevel): String = when (level) {

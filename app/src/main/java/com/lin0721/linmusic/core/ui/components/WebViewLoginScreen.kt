@@ -33,6 +33,8 @@ import com.lin0721.linmusic.core.network.NeteaseEndpoints
 import com.lin0721.linmusic.core.network.RealIpProvider
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
+import com.lin0721.linmusic.core.ui.theme.uiEnter
+import com.lin0721.linmusic.core.ui.theme.uiExit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
@@ -182,8 +184,8 @@ fun WebViewLoginScreen(
             // 加载过渡
             AnimatedVisibility(
                 visible = isLoading,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = uiEnter(fadeIn()),
+                exit = uiExit(fadeOut()),
                 modifier = Modifier.fillMaxSize()
             ) {
                 // 加载页背景也改成网页同款浅灰，保持视觉过渡一致

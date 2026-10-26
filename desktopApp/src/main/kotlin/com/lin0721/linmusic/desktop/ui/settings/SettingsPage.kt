@@ -42,7 +42,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.linmusic.core.update.UpdateChecker
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.library.LibrarySearchInput
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -61,16 +64,22 @@ fun SettingsPage(
     common: CommonSettingsViewModel,
     desktop: DesktopSettingsViewModel,
     lxPlugins: LxPluginSettingsViewModel,
-    modifier: Modifier = Modifier
+    updateChecker: UpdateChecker,
+    localLibrary: LocalLibraryRepository,
+    modifier: Modifier = Modifier,
+    // SettingsCategory.name，从外部入口打开时定位到该分区
+    focusCategory: String? = null,
+    onFocusConsumed: () -> Unit = {}
 ) {
     val navigator = LocalDesktopNavigator.current
     val scope = rememberCoroutineScope()
+    val motion = LocalUiMotion.current
     val density = LocalDensity.current
 
     LaunchedEffect(desktop) { desktop.refresh() }
     LaunchedEffect(desktop) { desktop.messages.collect { navigator.showMessage(it) } }
 
-    val entries = settingsEntries(common, desktop, lxPlugins)
+    val entries = settingsEntries(common, desktop, lxPlugins, updateChecker, localLibrary)
     var query by remember { mutableStateOf("") }
     val searching = query.isNotBlank()
     val sections = SettingsCategory.entries.mapNotNull { category ->
@@ -97,6 +106,20 @@ fun SettingsPage(
         }
     }
 
+    // 分区位置测量出来后才能滚动
+    val focusTarget = focusCategory?.let { name -> SettingsCategory.entries.firstOrNull { it.name == name } }
+    val focusTop = focusTarget?.let { sectionTops[it] }
+    LaunchedEffect(focusCategory, focusTop) {
+        if (focusCategory == null) return@LaunchedEffect
+        if (focusTarget == null) {
+            onFocusConsumed()
+        } else if (focusTop != null) {
+            query = ""
+            scrollState.scrollTo(focusTop)
+            onFocusConsumed()
+        }
+    }
+
     // 末尾分区较短时补足高度，保证点击对应标签后它能滚到顶部
     val lastSectionHeight = sections.lastOrNull()?.let { sectionHeights[it.first] } ?: 0
     val tailHeight = if (searching) BottomPadding else with(density) { (viewportHeight - lastSectionHeight).coerceAtLeast(0).toDp() } + BottomPadding
@@ -110,7 +133,9 @@ fun SettingsPage(
             searching = searching,
             resultCount = sections.sumOf { it.second.size },
             onSelectCategory = { category ->
-                sectionTops[category]?.let { top -> scope.launch { scrollState.animateScrollTo(top) } }
+                sectionTops[category]?.let { top ->
+                    scope.launch { if (motion.enabled) scrollState.animateScrollTo(top) else scrollState.scrollTo(top) }
+                }
             }
         )
         HoverScrollbarBox(scrollState, Modifier.weight(1f).fillMaxWidth()) {

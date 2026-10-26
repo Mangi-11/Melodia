@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.player.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
@@ -21,8 +20,10 @@ import com.lin0721.linmusic.core.comment.ui.CommentsState
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.player.LyricsSource
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PlayerBackdropPalette
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 private const val EDIT_CARDS_KEY = "edit_cards"
 
@@ -70,6 +71,7 @@ fun LazyListScope.fullPlayerInfoSection(
     colors: PlayerBackdropPalette,
     commentsState: CommentsState,
     currentLyricIndex: Int,
+    animateLyricsMesh: Boolean,
     cardLayout: List<FullPlayerCardSetting>,
     onOpenFullScreenLyrics: () -> Unit,
     onCommentsClick: () -> Unit,
@@ -90,6 +92,7 @@ fun LazyListScope.fullPlayerInfoSection(
                     colors = colors,
                     commentsState = commentsState,
                     currentLyricIndex = currentLyricIndex,
+                    animateLyricsMesh = animateLyricsMesh,
                     onOpenFullScreenLyrics = onOpenFullScreenLyrics,
                     onCommentsClick = onCommentsClick,
                     onRetryComments = onRetryComments,
@@ -153,6 +156,7 @@ fun LazyListScope.fullPlayerInfoGrid(
                                 colors = colors,
                                 commentsState = commentsState,
                                 currentLyricIndex = -1,
+                                animateLyricsMesh = false,
                                 onOpenFullScreenLyrics = {},
                                 onCommentsClick = onCommentsClick,
                                 onRetryComments = onRetryComments,
@@ -193,6 +197,7 @@ private fun FullPlayerInfoCard(
     colors: PlayerBackdropPalette,
     commentsState: CommentsState,
     currentLyricIndex: Int,
+    animateLyricsMesh: Boolean,
     onOpenFullScreenLyrics: () -> Unit,
     onCommentsClick: () -> Unit,
     onRetryComments: () -> Unit,
@@ -207,7 +212,9 @@ private fun FullPlayerInfoCard(
             currentIndex = currentLyricIndex,
             isLoading = false,
             base = colors.base,
+            animateMesh = animateLyricsMesh,
             isAmll = songState.lyricsSource == LyricsSource.AMLL,
+            isQrc = songState.lyricsSource == LyricsSource.QQ && songState.lyrics.any { it.words.isNotEmpty() },
             onOpenFullScreen = onOpenFullScreenLyrics
         )
         FullPlayerCard.COMMENTS_PREVIEW -> CommentsPreviewCard(
@@ -273,8 +280,8 @@ fun LazyItemScope.FullPlayerItemEnterAnimation(content: @Composable () -> Unit) 
     visibleState.targetState = true
     AnimatedVisibility(
         visibleState = visibleState,
-        enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 6 },
-        modifier = Modifier.animateItem()
+        enter = fadeIn(uiTween(300)) + slideInVertically(uiTween(300)) { it / 6 },
+        modifier = if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier
     ) {
         content()
     }

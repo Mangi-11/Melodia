@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,12 +57,14 @@ import com.lin0721.linmusic.Screen
 import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.PaletteMemoryCache
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.gestures.Orientation
@@ -108,6 +109,7 @@ fun MiniPlayerCard(
     likeMode: MiniPlayerLikeMode = MiniPlayerLikeMode.Collect,
     expanded: Boolean = false
 ) {
+    val motion = LocalUiMotion.current
     if (currentTrack == null) return
 
     val context = LocalContext.current
@@ -135,7 +137,7 @@ fun MiniPlayerCard(
     // 平板宽屏下悬浮在深色页面背景上，压暗幅度收窄一档，避免浅色封面取色后和背景融在一起
     val animatedBase by animateColorAsState(
         targetValue = colorPalette.base,
-        animationSpec = tween(800),
+        animationSpec = uiTween(800),
         label = "mini_player_base"
     )
     val fillColor = remember(animatedBase, expanded) { animatedBase.darken(if (expanded) 0.20f else 0.45f) }
@@ -169,7 +171,7 @@ fun MiniPlayerCard(
     }
     LaunchedEffect(pendingSlideInKey) {
         if (pendingSlideInKey != null) {
-            animate(swipeState.offsetX, 0f, 0f, SwipeCoverSpringSpec) { value, _ ->
+            animate(swipeState.offsetX, 0f, 0f, motion.spec(SwipeCoverSpringSpec)) { value, _ ->
                 swipeState.offsetX = value
             }
         }
@@ -323,20 +325,23 @@ private fun MiniPlayerSlidingContent(
             .clipToBounds()
             .onSizeChanged { state.containerWidthPx = it.width.toFloat() }
     ) {
+        val shouldShowNeighbors = state.isDragActive || state.isTransitioning || state.offsetX != 0f
         val layers = buildList {
-            previousQueueItem?.let { item ->
-                add(
-                    MiniPlayerSlideLayer(
-                        // QueueItem.songId 是 Long，currentKey（mediaId）是 String，
-                        // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
-                        key = item.songId.toString(),
-                        title = item.title,
-                        artist = item.artist,
-                        coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
-                        connectedDevice = null,
-                        translationXProvider = { state.offsetX - state.containerWidthPx }
+            if (shouldShowNeighbors) {
+                previousQueueItem?.let { item ->
+                    add(
+                        MiniPlayerSlideLayer(
+                            // QueueItem.songId 是 Long，currentKey（mediaId）是 String，
+                            // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
+                            key = item.songId.toString(),
+                            title = item.title,
+                            artist = item.artist,
+                            coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
+                            connectedDevice = null,
+                            translationXProvider = { state.offsetX - state.containerWidthPx }
+                        )
                     )
-                )
+                }
             }
             add(
                 MiniPlayerSlideLayer(
@@ -348,19 +353,21 @@ private fun MiniPlayerSlidingContent(
                     translationXProvider = { state.offsetX }
                 )
             )
-            nextQueueItem?.let { item ->
-                add(
-                    MiniPlayerSlideLayer(
-                        // 队列只有两首歌时上一首/下一首指向同一首曲目，key 会撞上前面那层，加个后缀区分开；
-                        // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
-                        key = if (item.songId == previousQueueItem?.songId) "${item.songId}-next" else item.songId.toString(),
-                        title = item.title,
-                        artist = item.artist,
-                        coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
-                        connectedDevice = null,
-                        translationXProvider = { state.offsetX + state.containerWidthPx }
+            if (shouldShowNeighbors) {
+                nextQueueItem?.let { item ->
+                    add(
+                        MiniPlayerSlideLayer(
+                            // 队列只有两首歌时上一首/下一首指向同一首曲目，key 会撞上前面那层，加个后缀区分开；
+                            // 统一转成 String 才能在角色切换（下一首→当前）时被 Compose 判定为同一个 key
+                            key = if (item.songId == previousQueueItem?.songId) "${item.songId}-next" else item.songId.toString(),
+                            title = item.title,
+                            artist = item.artist,
+                            coverUrl = rememberQueueItemCoverUrl(item.coverUrl, item.songId, item.localUri),
+                            connectedDevice = null,
+                            translationXProvider = { state.offsetX + state.containerWidthPx }
+                        )
                     )
-                )
+                }
             }
         }
         layers.forEach { layer ->
@@ -386,6 +393,13 @@ private fun MiniPlayerContentRow(
     connectedDevice: AudioDeviceInfo?,
     translationXProvider: () -> Float
 ) {
+    val thumbUrl = remember(coverUrl) {
+        if ((coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) && !coverUrl.contains('?')) {
+            "$coverUrl?param=150y150"
+        } else {
+            coverUrl
+        }
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -393,7 +407,7 @@ private fun MiniPlayerContentRow(
             .graphicsLayer { translationX = translationXProvider() }
     ) {
         AntiFlickerCoverImage(
-            url = coverUrl,
+            url = thumbUrl,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(44.dp)

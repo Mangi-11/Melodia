@@ -1,7 +1,6 @@
 package com.lin0721.linmusic.desktop.ui.player
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -67,6 +66,7 @@ import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
 import com.lin0721.linmusic.desktop.ui.components.PlayPauseIcon
 import com.lin0721.linmusic.desktop.ui.components.TooltipLabel
+import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.icons.PlayerBarIcons
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingArtists
 import com.lin0721.linmusic.desktop.ui.nowplaying.NowPlayingSongTitle
@@ -76,6 +76,8 @@ import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
 import com.lin0721.linmusic.desktop.ui.track.CollectToPlaylistPopup
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private const val HOVER_SCALE = 1.1f
 private const val HOVER_SCALE_MS = 150
@@ -86,7 +88,8 @@ private val SideButtonSize = 32.dp
 private val SideIconSize = 20.dp
 private val VolumeSliderWidth = 120.dp
 private val VolumeTooltipGap = 8.dp
-private const val NOT_SUPPORTED_MESSAGE = "暂未支持"
+// mpv 每秒上报几十次播放位置，进度条与秒级时间无需这么密，按此粒度取整去重
+private const val POSITION_STEP_MS = 250L
 
 @Composable
 fun PlayerBar(
@@ -107,18 +110,21 @@ fun PlayerBar(
     onToggleLyric: () -> Unit,
     lyricsViewOpen: Boolean,
     onToggleLyricsView: () -> Unit,
+    onEnterMiniPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val navigator = LocalDesktopNavigator.current
     val nowPlaying by controller.nowPlaying.collectAsState()
     val isPlaying by controller.playWhenReady.collectAsState()
     val playMode by controller.playMode.collectAsState()
-    val position by controller.currentPosition.collectAsState()
+    val quantizedPosition = remember(controller) {
+        controller.currentPosition.map { it / POSITION_STEP_MS * POSITION_STEP_MS }.distinctUntilChanged()
+    }
+    val position by quantizedPosition.collectAsState(controller.currentPosition.value / POSITION_STEP_MS * POSITION_STEP_MS)
     val duration by controller.duration.collectAsState()
     val songDetail by playerViewModel.songDetailState.collectAsState()
     val podcast by playerViewModel.podcastState.collectAsState()
     val hasTrack = nowPlaying != null
-    val notSupported = { navigator.showMessage(NOT_SUPPORTED_MESSAGE) }
 
     Row(
         modifier.fillMaxWidth().height(DesktopDimens.PlayerBarHeight).padding(horizontal = 16.dp),
@@ -264,7 +270,7 @@ fun PlayerBar(
             )
             // 占位播放器没有音量能力时不显示
             if (volume != null) VolumeControl(volume, lastAudibleVolume, onVolumeChange)
-            BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = notSupported)
+            BarIconButton(Icons.Rounded.PictureInPictureAlt, "迷你播放器", size = SideButtonSize, iconSize = SideIconSize, onClick = onEnterMiniPlayer)
             BarIconButton(
                 if (isFullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
                 if (isFullscreen) "退出全屏" else "全屏",
@@ -409,7 +415,7 @@ private fun TimeLabel(ms: Long, align: TextAlign) {
 
 @Composable
 private fun hoverScale(hovered: Boolean) =
-    animateFloatAsState(if (hovered) HOVER_SCALE else 1f, tween(HOVER_SCALE_MS), label = "hoverScale")
+    animateFloatAsState(if (hovered) HOVER_SCALE else 1f, uiTween(HOVER_SCALE_MS), label = "hoverScale")
 
 // 底栏统一的图标按钮：悬停时变亮并放大；showDot 为真且处于激活态时，图标下方加指示点
 @Composable

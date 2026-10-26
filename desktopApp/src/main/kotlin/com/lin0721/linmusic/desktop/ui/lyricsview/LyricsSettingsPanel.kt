@@ -80,6 +80,8 @@ fun LyricsSettingsPanel(
             TabBar(options.map { it.first }, settings.secondaryMode, { key -> options.first { it.first == key }.second }, actions.setSecondaryMode, small = true)
         }
 
+        SwitchSetting("启用网易云歌词源", "提供歌词、翻译与逐字歌词", settings.neteaseEnabled, actions.setNeteaseEnabled)
+        SwitchSetting("启用QQ音乐歌词源", "提供更多逐字歌词", settings.qqEnabled, actions.setQqEnabled)
         SwitchSetting("启用 AMLL 歌词源", "支持对唱分边与背景和声，对下一次加载的歌词生效", settings.amllEnabled, actions.setAmllEnabled)
         SwitchSetting("逐字歌词流光动效", "开启柔和渐变推进边缘", settings.advancedEffect, actions.setAdvancedEffect)
         SwitchSetting("字词呼吸光晕动效", "演唱字词叠加呼吸高亮微光", settings.glowEffect, actions.setGlowEffect)

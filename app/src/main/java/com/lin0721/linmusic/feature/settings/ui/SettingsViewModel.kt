@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lin0721.linmusic.BuildConfig
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -96,6 +97,8 @@ class SettingsViewModel(
 
     val playWithOtherApps = settingsPreferences.playWithOtherApps.asState(false)
 
+    val audioOffload = settingsPreferences.audioOffload.asState(false)
+
     val resumeAfterExternalInterruption = settingsPreferences.resumeAfterExternalInterruption.asState(true)
 
     val crossfadeEnabled = settingsPreferences.crossfadeEnabled.asState(false)
@@ -131,9 +134,11 @@ class SettingsViewModel(
 
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
 
-    val lyricTextSize = settingsPreferences.lyricTextSize.asState(14)
+    val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
 
-    val lyricTextColor = settingsPreferences.lyricTextColor.asState("#FFFFFF")
+    val floatingLyricStyle = settingsPreferences.floatingLyricStyle.asState(FloatingLyricStyle(fontSizeSp = 14, backgroundAlpha = 70))
+
+    val floatingLyricLocked = settingsPreferences.floatingLyricLocked.asState(false)
 
     val fullScreenLyricTextSize = settingsPreferences.fullScreenLyricTextSize.asState(22)
 
@@ -341,6 +346,8 @@ class SettingsViewModel(
 
     fun updatePlayWithOtherApps(enabled: Boolean) = launchSave { settingsPreferences.savePlayWithOtherApps(enabled) }
 
+    fun updateAudioOffload(enabled: Boolean) = launchSave { settingsPreferences.saveAudioOffload(enabled) }
+
     fun updateResumeAfterExternalInterruption(enabled: Boolean) = launchSave { settingsPreferences.saveResumeAfterExternalInterruption(enabled) }
 
     fun updateCrossfadeEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveCrossfadeEnabled(enabled) }
@@ -379,9 +386,12 @@ class SettingsViewModel(
 
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
 
-    fun updateLyricTextSize(size: Int) = launchSave { settingsPreferences.saveLyricTextSize(size) }
+    fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
 
-    fun updateLyricTextColor(color: String) = launchSave { settingsPreferences.saveLyricTextColor(color) }
+    fun updateFloatingLyricStyle(transform: (FloatingLyricStyle) -> FloatingLyricStyle) =
+        launchSave { settingsPreferences.saveFloatingLyricStyle(transform(settingsPreferences.floatingLyricStyle.first())) }
+
+    fun updateFloatingLyricLocked(locked: Boolean) = launchSave { settingsPreferences.saveFloatingLyricLocked(locked) }
 
     fun updateFullScreenLyricTextSize(size: Int) = launchSave { settingsPreferences.saveFullScreenLyricTextSize(size) }
 

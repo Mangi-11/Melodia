@@ -2,7 +2,6 @@ package com.lin0721.linmusic.feature.home.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
@@ -59,9 +58,10 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PressStyle
 import com.lin0721.linmusic.core.ui.theme.PillRadius
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import java.util.Calendar
 import kotlinx.coroutines.delay
-
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.height
@@ -219,10 +219,10 @@ fun FilterPills(
                     // 平移与裁剪宽度同步，药丸保持完整尺寸从主药丸背后推出
                     AnimatedVisibility(
                         visible = secondaryVisible,
-                        enter = slideInHorizontally(tween(SecondaryPillAnimDurationMs)) { -it } +
-                            expandHorizontally(tween(SecondaryPillAnimDurationMs), expandFrom = Alignment.Start),
-                        exit = slideOutHorizontally(tween(SecondaryPillAnimDurationMs)) { -it } +
-                            shrinkHorizontally(tween(SecondaryPillAnimDurationMs), shrinkTowards = Alignment.Start),
+                        enter = slideInHorizontally(uiTween(SecondaryPillAnimDurationMs)) { -it } +
+                            expandHorizontally(uiTween(SecondaryPillAnimDurationMs), expandFrom = Alignment.Start),
+                        exit = slideOutHorizontally(uiTween(SecondaryPillAnimDurationMs)) { -it } +
+                            shrinkHorizontally(uiTween(SecondaryPillAnimDurationMs), shrinkTowards = Alignment.Start),
                         modifier = Modifier.overlapStart(PillRadius)
                     ) {
                         // 未点击是标准未激活灰底，点击后颜色比主药丸的强调色更深，两者区分开
@@ -261,8 +261,8 @@ private fun FilterPillChip(
     val targetBackground = if (selected) activeColor else inactiveColor
     val targetContent = if (selected) MaterialTheme.colorScheme.onPrimary else Color.LightGray
     // 动画值无条件求值，避免 animateColors 变化时组合槽位对不上
-    val animatedBackground by animateColorAsState(targetValue = targetBackground, label = "pillBackground")
-    val animatedContent by animateColorAsState(targetValue = targetContent, label = "pillContent")
+    val animatedBackground by animateColorAsState(targetValue = targetBackground, animationSpec = uiSpring(), label = "pillBackground")
+    val animatedContent by animateColorAsState(targetValue = targetContent, animationSpec = uiSpring(), label = "pillContent")
     val backgroundColor = if (animateColors) animatedBackground else targetBackground
     val contentColor = if (animateColors) animatedContent else targetContent
     Box(

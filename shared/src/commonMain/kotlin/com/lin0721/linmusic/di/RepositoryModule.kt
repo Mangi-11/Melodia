@@ -54,8 +54,13 @@ import com.lin0721.linmusic.feature.settings.data.SettingsRepositoryImpl
 import com.lin0721.linmusic.feature.playlist.data.PlaylistRepositoryImpl
 import com.lin0721.linmusic.feature.recent.data.RecentRepository
 import com.lin0721.linmusic.feature.recent.data.RecentRepositoryImpl
+import com.lin0721.linmusic.feature.recognition.data.RecognitionRepository
+import com.lin0721.linmusic.feature.recognition.data.RecognitionRepositoryImpl
 import com.lin0721.linmusic.feature.cloud.data.CloudRepository
 import com.lin0721.linmusic.feature.cloud.data.CloudRepositoryImpl
+import com.lin0721.linmusic.feature.cloud.upload.CloudUploadManager
+import com.lin0721.linmusic.feature.cloud.upload.CloudUploadRunner
+import com.lin0721.linmusic.feature.cloud.upload.NosUploadClient
 import com.lin0721.linmusic.feature.search.data.SearchRepository
 import com.lin0721.linmusic.feature.search.data.SearchRepositoryImpl
 import org.koin.core.module.dsl.bind
@@ -95,6 +100,13 @@ val repositoryModule = module {
 
     // 我的云盘数据仓储（feature/cloud）
     singleOf(::CloudRepositoryImpl) { bind<CloudRepository>() }
+
+    // 云盘上传队列与流水线，两端共用
+    single { CloudUploadManager() }
+    single { CloudUploadRunner(get(), get(), get<NosUploadClient>()) }
+
+    // 听歌识曲指纹匹配（feature/recognition）
+    singleOf(::RecognitionRepositoryImpl) { bind<RecognitionRepository>() }
 
     // 听歌数据仓储（feature/listendata）
     singleOf(::ListenDataRepositoryImpl) { bind<ListenDataRepository>() }

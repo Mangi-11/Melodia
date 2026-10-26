@@ -9,6 +9,7 @@ object DesktopPaths {
     const val METADATA_CACHE_NAME = "meta_cache"
     const val IMAGE_CACHE_NAME = "image_cache"
     const val LYRICS_CACHE_NAME = "lyrics"
+    const val LOCAL_COVER_CACHE_NAME = "local_covers"
 
     val dataDir: File by lazy {
         val base = System.getenv("APPDATA")?.takeIf { it.isNotBlank() } ?: System.getProperty("user.home")
@@ -41,6 +42,10 @@ object DesktopPaths {
     val metadataCacheDir: File get() = File(localCacheDir, METADATA_CACHE_NAME)
 
     val lyricsCacheDir: File get() = File(localCacheDir, LYRICS_CACHE_NAME)
+
+    val localCoverDir: File get() = File(localCacheDir, LOCAL_COVER_CACHE_NAME)
+
+    val localLibraryFile: File by lazy { File(dataDir, "local_library.json") }
 
     // 下载中间文件不算缓存，不跟随所选缓存目录
     val downloadTempDir: File by lazy { File(defaultCacheRoot, "download_tmp") }

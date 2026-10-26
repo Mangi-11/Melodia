@@ -43,6 +43,7 @@ internal fun desktopNavigator(
         showMessage = state::showMessage,
         goBack = state::popBack,
         toggleCommentsPanel = state::toggleCommentsPanel,
-        isCommentsPanelOpen = state::isCommentsPanelOpen
+        isCommentsPanelOpen = state::isCommentsPanelOpen,
+        openShareCard = { kind -> state.shareCardKind = kind }
     )
 }

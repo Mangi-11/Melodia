@@ -18,6 +18,8 @@ import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.player.data.AmllLyricsClient
 import com.lin0721.linmusic.core.player.data.LyricsCache
+import com.lin0721.linmusic.core.player.data.QqLyricsClient
+import com.lin0721.linmusic.core.player.data.QqLyricsSource
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -33,13 +35,22 @@ import com.lin0721.linmusic.desktop.data.DesktopLibraryPreferences
 import com.lin0721.linmusic.desktop.data.DesktopOnlineStateProvider
 import com.lin0721.linmusic.desktop.data.DesktopPreferences
 import com.lin0721.linmusic.desktop.data.DesktopResourceProvider
+import com.lin0721.linmusic.desktop.data.cloud.CloudLibrary
+import com.lin0721.linmusic.desktop.data.recognition.DesktopRecognition
+import com.lin0721.linmusic.desktop.data.recognition.GraalAfpFingerprintEngine
 import com.lin0721.linmusic.desktop.data.download.DesktopDownloadPreferences
 import com.lin0721.linmusic.desktop.data.download.DesktopSongDownloader
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryRepository
+import com.lin0721.linmusic.desktop.data.local.LocalLibraryStore
+import com.lin0721.linmusic.desktop.data.local.LocalMatcher
+import com.lin0721.linmusic.desktop.data.local.LocalScanner
 import com.lin0721.linmusic.desktop.plugin.GraalLxPluginRuntime
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.player.MpvPlaybackController
 import com.lin0721.linmusic.desktop.player.SilentPlaybackController
 import com.lin0721.linmusic.desktop.player.cache.AudioCache
+import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
+import com.lin0721.linmusic.desktop.ui.local.LocalMusicActions
 import com.lin0721.linmusic.desktop.ui.settings.DesktopSettingsViewModel
 import com.lin0721.linmusic.feature.artist.ui.ArtistViewModel
 import com.lin0721.linmusic.feature.home.ui.HomeViewModel
@@ -60,6 +71,8 @@ import com.lin0721.linmusic.feature.podcast.ui.RadioDetailViewModel
 import com.lin0721.linmusic.feature.profile.ui.FollowListViewModel
 import com.lin0721.linmusic.feature.profile.ui.ProfileViewModel
 import com.lin0721.linmusic.feature.recent.ui.RecentPlayViewModel
+import com.lin0721.linmusic.feature.recognition.data.RecognitionHistoryPreferences
+import com.lin0721.linmusic.feature.recognition.data.RecognitionPreferences
 import com.lin0721.linmusic.feature.search.data.SearchHistoryPreferences
 import com.lin0721.linmusic.feature.search.ui.PlaylistCategoryViewModel
 import com.lin0721.linmusic.feature.search.ui.SearchViewModel
@@ -69,6 +82,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
@@ -161,16 +175,44 @@ val desktopPlatformModule = module {
     single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get(), get()) }
     single<PlaybackController> { get<DesktopPlaybackController>() }
     single { AmllLyricsClient(get<LyricsCache>()) }
-    // 桌面第一版没有本地音乐，只取在线歌词
+    single { QqLyricsClient() }
+    single { QqLyricsSource(get(), get()) }
+    // 启动即加载并后台扫描
+    single(createdAtStart = true) {
+        LocalLibraryRepository(
+            store = LocalLibraryStore(DesktopPaths.localLibraryFile),
+            scanner = LocalScanner { DesktopPaths.localCoverDir },
+            matcher = LocalMatcher(get()),
+            downloadPreferences = get(),
+            onlineState = get(),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        )
+    }
+    single { LocalMusicActions(get(), get<PlaybackController>(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+    // 启动即监听账号变化，退出登录时清空云盘数据与上传队列
+    single(createdAtStart = true) { CloudLibrary(get(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+    single { CloudMusicActions(get(), get(), get(), get(), get<PlaybackController>()) }
+    single { RecognitionHistoryPreferences(store(PreferencesStores.RECOGNITION_HISTORY)) }
+    single { RecognitionPreferences(store(PreferencesStores.RECOGNITION)) }
+    single { GraalAfpFingerprintEngine() }
+    single {
+        val engine = get<GraalAfpFingerprintEngine>()
+        DesktopRecognition(get(), get(), get(), engine, get(), CoroutineScope(SupervisorJob() + Dispatchers.Main), warmUp = engine::warmUp)
+    }
     single {
         val amllLyricsClient = get<AmllLyricsClient>()
         val settingsPreferences = get<SettingsPreferences>()
+        val qqLyricsSource = get<QqLyricsSource>()
+        val localLibrary = get<LocalLibraryRepository>()
         LyricsResolver(
             playbackRepository = get(),
-            readLocalLyrics = { null },
-            localUriOf = { null },
+            readLocalLyrics = { path -> withContext(Dispatchers.IO) { localLibrary.readLyrics(path) } },
+            localUriOf = localLibrary::pathForSongId,
             readAmllLyrics = { songId -> amllLyricsClient.fetch(songId) },
-            isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() }
+            isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() },
+            isQqEnabled = { settingsPreferences.qqLyricsEnabled.first() },
+            isNeteaseEnabled = { settingsPreferences.neteaseLyricsEnabled.first() },
+            readQqLyrics = qqLyricsSource::fetch
         )
     }
 }

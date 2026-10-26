@@ -73,6 +73,7 @@ fun NowPlayingPanel(
     val track = nowPlaying ?: return
     val detailState by playerViewModel.songDetailState.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
+    val isPlaying by controller.isPlaying.collectAsState()
     val podcast by playerViewModel.podcastState.collectAsState()
 
     val navigator = LocalDesktopNavigator.current
@@ -108,9 +109,16 @@ fun NowPlayingPanel(
                                     lines = detailState.lyrics,
                                     currentIndex = currentLyricIndex,
                                     base = base,
+                                    isPlaying = isPlaying,
                                     onSeek = playerViewModel::seekToTime,
                                     onOpenFullscreen = onOpenLyricsFullscreen,
-                                    onOpenLyricsView = onOpenLyricsView
+                                    onOpenLyricsView = onOpenLyricsView,
+                                    sourceLabel = when (detailState.lyricsSource) {
+                                        com.lin0721.linmusic.core.player.LyricsSource.AMLL -> "TTML"
+                                        com.lin0721.linmusic.core.player.LyricsSource.QQ ->
+                                            "QRC".takeIf { detailState.lyrics.any { it.words.isNotEmpty() } }
+                                        else -> null
+                                    }
                                 )
                                 FullPlayerCard.COMMENTS_PREVIEW -> CommentsPreviewCard(
                                     state = commentsState,

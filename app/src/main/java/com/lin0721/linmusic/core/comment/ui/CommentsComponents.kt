@@ -3,8 +3,6 @@ package com.lin0721.linmusic.core.comment.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -51,6 +49,8 @@ import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.SurfaceDark
 import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.uiSpring
+import com.lin0721.linmusic.core.ui.theme.uiTween
 
 @Composable
 fun CommentsPreviewCard(
@@ -211,12 +211,12 @@ fun CommentSortTabs(
             val isSelected = type == current
             val bgColor by animateColorAsState(
                 targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-                animationSpec = tween(220),
+                animationSpec = uiTween(220),
                 label = "sort_pill_bg"
             )
             val contentColor by animateColorAsState(
                 targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.LightGray,
-                animationSpec = tween(220),
+                animationSpec = uiTween(220),
                 label = "sort_pill_content"
             )
             Box(
@@ -225,7 +225,7 @@ fun CommentSortTabs(
                     .pressable(MelodiaPress.Pill) { onSelect(type) }
                     .clip(RoundedCornerShape(PillRadius))
                     .background(bgColor)
-                    .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
+                    .animateContentSize(uiSpring(stiffness = Spring.StiffnessMedium))
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.Center
             ) {

@@ -38,6 +38,7 @@ import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.mergeSupportedOrder
 import com.lin0721.linmusic.core.preferences.setCardVisible
+import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
 import com.lin0721.linmusic.desktop.ui.player.rememberQueueReorderState
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
@@ -79,7 +80,7 @@ internal fun CardLayoutEditor(layout: List<FullPlayerCardSetting>, onChange: (Li
             })
             Row(
                 Modifier.fillMaxWidth().height(EditorRowHeight)
-                    .then(if (dragging || settling) Modifier.zIndex(1f) else Modifier.animateItem())
+                    .then(if (dragging || settling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier)
                     .graphicsLayer { translationY = offsetY }
                     .then(if (dragging) Modifier.shadow(8.dp, shape) else Modifier)
                     .clip(shape)

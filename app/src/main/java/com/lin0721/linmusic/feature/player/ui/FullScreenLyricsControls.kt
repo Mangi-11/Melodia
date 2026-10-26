@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -14,7 +13,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -75,6 +73,7 @@ import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
@@ -379,16 +378,19 @@ fun FullScreenLyricsSettingsSheet(
     onAdvancedKaraokeEffectChange: (Boolean) -> Unit = {},
     karaokeGlowEffect: Boolean = false,
     onKaraokeGlowEffectChange: (Boolean) -> Unit = {},
+    neteaseLyricsEnabled: Boolean = true,
+    onNeteaseLyricsEnabledChange: (Boolean) -> Unit = {},
+    qqLyricsEnabled: Boolean = true,
+    onQqLyricsEnabledChange: (Boolean) -> Unit = {},
     amllLyricsEnabled: Boolean = true,
     onAmllLyricsEnabledChange: (Boolean) -> Unit = {},
     autoHideControls: Boolean = false,
     onAutoHideControlsChange: (Boolean) -> Unit = {},
     centerFirstLine: Boolean = false,
     onCenterFirstLineChange: (Boolean) -> Unit = {},
-    edgeFade: Boolean = false,
-    onEdgeFadeChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    val motion = LocalUiMotion.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -489,12 +491,12 @@ fun FullScreenLyricsSettingsSheet(
                     targetState = selectedTab,
                     transitionSpec = {
                         val direction = if (targetState > initialState) 1 else -1
-                        (fadeIn(tween(220, delayMillis = 60)) +
-                            slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { it / 6 * direction }) togetherWith
-                            (fadeOut(tween(120)) +
-                                slideOutHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it / 6 * direction }) using
+                        (fadeIn(motion.tween(220, delayMillis = 60)) +
+                            slideInHorizontally(motion.tween(260, easing = FastOutSlowInEasing)) { it / 6 * direction }) togetherWith
+                            (fadeOut(motion.tween(120)) +
+                                slideOutHorizontally(motion.tween(260, easing = FastOutSlowInEasing)) { -it / 6 * direction }) using
                             SizeTransform(clip = true) { _, _ ->
-                                spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold)
+                                motion.spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold)
                             }
                     },
                     label = "lyric_settings_tab"
@@ -600,6 +602,20 @@ fun FullScreenLyricsSettingsSheet(
                         }
                         1 -> {
                             LyricCompactSwitchRow(
+                                title = "启用网易云歌词源",
+                                subtitle = "提供歌词、翻译与逐字歌词",
+                                checked = neteaseLyricsEnabled,
+                                onCheckedChange = onNeteaseLyricsEnabledChange
+                            )
+
+                            LyricCompactSwitchRow(
+                                title = "启用QQ音乐歌词源",
+                                subtitle = "提供更多逐字歌词",
+                                checked = qqLyricsEnabled,
+                                onCheckedChange = onQqLyricsEnabledChange
+                            )
+
+                            LyricCompactSwitchRow(
                                 title = "启用 AMLL 歌词源",
                                 subtitle = "支持对唱分边与背景和声",
                                 checked = amllLyricsEnabled,
@@ -635,12 +651,6 @@ fun FullScreenLyricsSettingsSheet(
                                 onCheckedChange = onCenterFirstLineChange
                             )
 
-                            LyricCompactSwitchRow(
-                                title = "歌词边缘渐隐",
-                                subtitle = "上下边缘渐隐，顶栏与播控悬浮于歌词之上",
-                                checked = edgeFade,
-                                onCheckedChange = onEdgeFadeChange
-                            )
                         }
                     }
                   }
@@ -674,6 +684,7 @@ fun FullScreenControls(
     onLyricsSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val motion = LocalUiMotion.current
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
 
@@ -837,16 +848,16 @@ fun FullScreenControls(
 
                 LaunchedEffect(isPressed) {
                     if (isPressed) {
-                        buttonAlpha.animateTo(0.70f, tween(durationMillis = 80))
+                        buttonAlpha.animateTo(0.70f, motion.tween(durationMillis = 80))
                     } else if (clickTrigger == 0) {
-                        buttonAlpha.animateTo(1f, tween(durationMillis = 200, easing = FastOutSlowInEasing))
+                        buttonAlpha.animateTo(1f, motion.tween(durationMillis = 200, easing = FastOutSlowInEasing))
                     }
                 }
 
                 LaunchedEffect(clickTrigger) {
                     if (clickTrigger > 0) {
                         buttonAlpha.snapTo(0.70f)
-                        buttonAlpha.animateTo(1f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
+                        buttonAlpha.animateTo(1f, motion.tween(durationMillis = 220, easing = FastOutSlowInEasing))
                     }
                 }
 

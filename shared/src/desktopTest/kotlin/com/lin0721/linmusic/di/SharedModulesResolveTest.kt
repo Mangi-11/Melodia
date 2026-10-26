@@ -24,6 +24,9 @@ import com.lin0721.linmusic.core.userartist.UserArtistRepositoryImpl
 import com.lin0721.linmusic.core.userplaylist.UserPlaylistRepositoryImpl
 import com.lin0721.linmusic.feature.artist.data.ArtistRepositoryImpl
 import com.lin0721.linmusic.feature.cloud.data.CloudRepositoryImpl
+import com.lin0721.linmusic.feature.cloud.upload.CloudUploadManager
+import com.lin0721.linmusic.feature.cloud.upload.CloudUploadRunner
+import com.lin0721.linmusic.feature.recognition.data.RecognitionRepository
 import com.lin0721.linmusic.feature.create.data.CreateRepositoryImpl
 import com.lin0721.linmusic.feature.home.data.HomeRepositoryImpl
 import com.lin0721.linmusic.feature.library.data.LibraryRepositoryImpl
@@ -90,6 +93,7 @@ class SharedModulesResolveTest {
                 UpdatePlaylistCoverUseCase::class, SongCollectDelegate::class, SyncProfileAfterLoginUseCase::class,
                 LoadLikedSongIdsUseCase::class, PlaylistMutationBus::class, ProfileRepositoryImpl::class,
                 PodcastProgressPreferences::class, PodcastSeenPreferences::class, OfflinePlayability::class,
+                CloudUploadManager::class, CloudUploadRunner::class, RecognitionRepository::class,
             ).forEach { assertNotNull(it.simpleName, koin.get<Any>(it)) }
         } finally {
             koin.close()

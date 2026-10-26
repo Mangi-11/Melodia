@@ -30,6 +30,7 @@ import com.lin0721.linmusic.core.ui.components.ArtistPickerEntry
 import com.lin0721.linmusic.core.ui.components.ArtistPickerSheet
 import com.lin0721.linmusic.core.ui.components.WebViewLoginScreen
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
+import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.comment.ui.CommentFullScreen
@@ -45,8 +46,6 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -78,6 +77,7 @@ import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.uiTween
 import java.util.Collections
 import kotlin.math.max
 import kotlin.math.min
@@ -98,6 +98,7 @@ fun PlaylistScreen(
     onAlbumClick: (Long) -> Unit,
     onNavigateToProfile: (Long) -> Unit = {}
 ) {
+    val motion = LocalUiMotion.current
     val uiState      by viewModel.uiState.collectAsStateWithLifecycle()
     val currentTrack by viewModel.playerManager.nowPlaying.collectAsStateWithLifecycle()
     val isPlaying by viewModel.playerManager.playWhenReady.collectAsStateWithLifecycle()
@@ -273,18 +274,18 @@ fun PlaylistScreen(
                         val forward = targetState
                         val offsetY = 40
                         if (forward) {
-                            (fadeIn(tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
-                                    + slideInVertically(tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { offsetY })
+                            (fadeIn(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
+                                    + slideInVertically(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { offsetY })
                                 .togetherWith(
-                                    fadeOut(tween(200, easing = FastOutSlowInEasing))
-                                            + slideOutVertically(tween(200, easing = FastOutSlowInEasing)) { -offsetY }
+                                    fadeOut(motion.tween(200, easing = FastOutSlowInEasing))
+                                            + slideOutVertically(motion.tween(200, easing = FastOutSlowInEasing)) { -offsetY }
                                 )
                         } else {
-                            (fadeIn(tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
-                                    + slideInVertically(tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { -offsetY })
+                            (fadeIn(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing))
+                                    + slideInVertically(motion.tween(300, delayMillis = 100, easing = FastOutSlowInEasing)) { -offsetY })
                                 .togetherWith(
-                                    fadeOut(tween(200, easing = FastOutSlowInEasing))
-                                            + slideOutVertically(tween(200, easing = FastOutSlowInEasing)) { offsetY }
+                                    fadeOut(motion.tween(200, easing = FastOutSlowInEasing))
+                                            + slideOutVertically(motion.tween(200, easing = FastOutSlowInEasing)) { offsetY }
                                 )
                         }.using(SizeTransform(clip = false))
                     },
@@ -477,7 +478,7 @@ fun PlaylistScreen(
                                 val isSettling = settlingIndex == idx
                                 Box(
                                     // 抬起中的行自己负责位移，交给 animateItem 会和手动 translationY 打架
-                                    modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else Modifier.animateItem()
+                                    modifier = if (isDragging || isSettling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier
                                 ) {
                                     DraggableSongRow(
                                         data = SongRowData(
@@ -526,7 +527,7 @@ fun PlaylistScreen(
                                                         settleOffset.snapTo(releasedOffset)
                                                         settleOffset.animateTo(
                                                             targetValue = 0f,
-                                                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                                            animationSpec = motion.spring(stiffness = Spring.StiffnessMediumLow)
                                                         )
                                                         settlingIndex = -1
                                                     }
@@ -640,6 +641,7 @@ fun PlaylistScreen(
                     onSelectedHistoryDateChange = { selectedHistoryDate = it },
                     onLoadHistoryDetail = { viewModel.loadHistoryDetail(it) },
                     onLoadDailyRecommend = { viewModel.loadPlaylist(-1L) },
+                    onReduceRecommend = viewModel::reduceDailyRecommend,
                     onCreatorClick = onNavigateToProfile,
                     selectionUi = TrackSelectionUi(
                         active = selection.active,
@@ -689,8 +691,8 @@ fun PlaylistScreen(
 
         AnimatedVisibility(
             visible = showWebViewLogin,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             WebViewLoginScreen(
                 onClose = { showWebViewLogin = false },
@@ -703,8 +705,8 @@ fun PlaylistScreen(
 
         AnimatedVisibility(
             visible = showCommentsSheet,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             CommentFullScreen(
                 commentsState = commentsState,
@@ -735,8 +737,8 @@ fun PlaylistScreen(
 
         AnimatedVisibility(
             visible = showCommentFloor,
-            enter = slideInVertically(tween(ScreenSlideDurationMs)) { it } + fadeIn(tween(ScreenSlideDurationMs)),
-            exit = slideOutVertically(tween(ScreenSlideDurationMs)) { it } + fadeOut(tween(ScreenSlideDurationMs))
+            enter = slideInVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeIn(uiTween(ScreenSlideDurationMs)),
+            exit = slideOutVertically(uiTween(ScreenSlideDurationMs)) { it } + fadeOut(uiTween(ScreenSlideDurationMs))
         ) {
             CommentFloorScreen(
                 floorState = floorState,

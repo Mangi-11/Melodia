@@ -20,12 +20,19 @@ object CoverImage {
     fun prepareJpeg(file: File): Result<ByteArray> = runCatching {
         require(file.isFile && file.length() in 1..MAX_FILE_BYTES) { "图片文件无效或超过 30MB" }
         val source = ImageIO.read(file) ?: throw IllegalArgumentException("无法读取该图片，请选择 JPG 或 PNG")
-        encodeJpeg(squareFit(source))
+        encodeJpeg(squareFit(source, MAX_EDGE))
     }
 
-    private fun squareFit(source: BufferedImage): BufferedImage {
+    // 内嵌封面转缩略图
+    fun thumbnailJpeg(bytes: ByteArray, maxEdge: Int): Result<ByteArray> = runCatching {
+        require(bytes.isNotEmpty() && maxEdge > 0) { "封面数据为空" }
+        val source = ImageIO.read(bytes.inputStream()) ?: throw IllegalArgumentException("无法解码封面")
+        encodeJpeg(squareFit(source, maxEdge))
+    }
+
+    private fun squareFit(source: BufferedImage, maxEdge: Int): BufferedImage {
         val side = minOf(source.width, source.height)
-        val target = minOf(side, MAX_EDGE)
+        val target = minOf(side, maxEdge)
         val left = (source.width - side) / 2
         val top = (source.height - side) / 2
         val output = BufferedImage(target, target, BufferedImage.TYPE_INT_RGB)
