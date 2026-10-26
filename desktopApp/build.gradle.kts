@@ -318,10 +318,12 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
         val customWxs = layout.projectDirectory.file("packaging/windows/main.wxs")
         val uninstallerExe = layout.projectDirectory.file("native/uninstall.exe")
         val uninstallerIco = layout.projectDirectory.file("icons/uninstall.ico")
+        // 覆盖 jpackage 同名资源，英文系统下也用 936 代码页
+        val englishStrings = layout.projectDirectory.file("packaging/windows/MsiInstallerStrings_en.wxl")
         val targetDir = layout.buildDirectory.dir("compose/tmp/resources").get()
         val customProvider = project.provider {
             // 缺任何一项都会打出不带卸载程序的 MSI，直接失败
-            val missing = listOf(customWxs, uninstallerExe, uninstallerIco).map { it.asFile }.filterNot { it.isFile }
+            val missing = listOf(customWxs, uninstallerExe, uninstallerIco, englishStrings).map { it.asFile }.filterNot { it.isFile }
             if (missing.isNotEmpty()) {
                 throw GradleException("打包 MSI 缺少文件：${missing.joinToString { it.absolutePath }}")
             }
@@ -331,6 +333,7 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
                 .replace("@MELODIA_UNINSTALL_EXE@", uninstallerExe.asFile.absolutePath)
                 .replace("@MELODIA_UNINSTALL_ICO@", uninstallerIco.asFile.absolutePath)
             File(dir, "main.wxs").writeText(content)
+            englishStrings.asFile.copyTo(File(dir, englishStrings.asFile.name), overwrite = true)
             targetDir
         }
         val field = org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask::class.java.getDeclaredField("jpackageResources")
