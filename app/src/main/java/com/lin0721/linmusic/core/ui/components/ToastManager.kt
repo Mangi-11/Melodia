@@ -57,7 +57,7 @@ fun CustomToast(message: String) {
                 modifier = Modifier.matchParentSize()
             )
             Image(
-                painter = painterResource(id = R.drawable.ic_notification),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = null,
                 modifier = Modifier.matchParentSize()
             )
