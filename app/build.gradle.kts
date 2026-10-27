@@ -164,6 +164,7 @@ dependencies {
     implementation(libs.android.image.cropper)
     implementation(libs.zxing.core)
     implementation(libs.bouncycastle)
+    implementation(libs.lyricon.provider)
     implementation(libs.androidx.profileinstaller)
     baselineProfile(project(":baselineprofile"))
 

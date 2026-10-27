@@ -36,6 +36,7 @@ bouncycastle = "1.85.2"
 workManager = "2.10.1"
 documentfile = "1.0.1"
 taglib = "1.0.5"
+lyriconProvider = "0.1.70"
 orgJson = "20230227"
 room = "2.8.5"
 ksp = "2.3.12"
@@ -128,6 +129,9 @@ android-image-cropper = { group = "com.vanniktech", name = "android-image-croppe
 
 # 二维码生成（登录二维码）
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+
+# 词幕 Provider
+lyricon-provider = { group = "io.github.proify.lyricon", name = "provider", version.ref = "lyriconProvider" }
 
 # Baseline Profile
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
