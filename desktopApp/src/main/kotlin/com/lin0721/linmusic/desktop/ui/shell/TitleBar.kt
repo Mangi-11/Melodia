@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
@@ -174,7 +173,7 @@ fun WindowScope.TitleBar(
         if (isMaximized) {
             Box(doubleClickToggle)
         } else {
-            WindowDraggableArea(doubleClickToggle) {
+            WindowDragArea(doubleClickToggle) {
                 Box(Modifier.fillMaxSize())
             }
         }

@@ -8,12 +8,14 @@ import com.lin0721.linmusic.desktop.platform.HotkeyAction
 import com.lin0721.linmusic.desktop.platform.HotkeyCombo
 import com.lin0721.linmusic.desktop.platform.MediaSessionService
 import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
+import com.lin0721.linmusic.desktop.platform.WindowEdge
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.koin.dsl.module
+import java.awt.Point
 import java.awt.Window
 
 // 尚未适配的系统：平台能力全部为空实现，界面据此隐藏对应入口
@@ -64,4 +66,7 @@ internal class NoopWindowEffects : WindowEffects {
     override fun applyFrame(window: Window, maximized: Boolean, borderRgb: Int) = Unit
     override fun systemBorderAccent(): Int? = null
     override fun setClickThrough(window: Window, enabled: Boolean) = Unit
+    override fun beginSystemMove(window: Window): Boolean = false
+    override fun beginSystemResize(window: Window, edge: WindowEdge): Boolean = false
+    override fun cursorPhysicalPosition(): Point? = null
 }

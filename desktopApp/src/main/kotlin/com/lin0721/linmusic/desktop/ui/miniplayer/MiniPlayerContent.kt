@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
@@ -103,19 +102,21 @@ import com.lin0721.linmusic.desktop.data.MiniPlayerStyle
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverReveal
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
+import com.lin0721.linmusic.desktop.ui.components.LocalWindowEffects
 import com.lin0721.linmusic.desktop.ui.components.PlayPauseIcon
+import com.lin0721.linmusic.desktop.ui.components.PointerTravel
 import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.lyricsview.KaraokeText
 import com.lin0721.linmusic.desktop.ui.lyricsview.rememberLyricClock
 import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
 import com.lin0721.linmusic.desktop.ui.player.PlayerSlider
+import com.lin0721.linmusic.desktop.ui.shell.WindowDragArea
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.feature.player.ui.PlayerViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.awt.Cursor
-import java.awt.MouseInfo
 import kotlin.math.roundToInt
 
 // mpv 每秒上报几十次播放位置，迷你窗无需这么密
@@ -236,7 +237,7 @@ fun WindowScope.MiniPlayerContent(
             .onPointerEvent(PointerEventType.Enter) { hovered = true }
             .onPointerEvent(PointerEventType.Exit) { hovered = false }
     ) {
-        WindowDraggableArea(Modifier.fillMaxSize()) {
+        WindowDragArea(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().restoreOnDoubleClick(actions.onRestore)) {
                 when (style) {
                     MiniPlayerStyle.BAR -> BarLayout(info, hovered, actions)
@@ -293,18 +294,19 @@ private fun BoxScope.ResizeZones(style: MiniPlayerStyle, resize: MiniResizeCallb
 @Composable
 private fun Modifier.resizeDrag(handle: MiniResizeHandle, cursor: Int, resize: MiniResizeCallbacks): Modifier {
     val callbacks by rememberUpdatedState(resize)
-    return pointerHoverIcon(PointerIcon(Cursor(cursor))).pointerInput(handle) {
+    val effects = LocalWindowEffects.current
+    return pointerHoverIcon(PointerIcon(Cursor(cursor))).pointerInput(handle, effects) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false).consume()
-            val origin = MouseInfo.getPointerInfo()?.location ?: return@awaitEachGesture
+            val travel = PointerTravel.start(effects) ?: return@awaitEachGesture
             callbacks.onStart(handle)
             try {
                 while (true) {
                     val event = awaitPointerEvent()
                     event.changes.forEach { it.consume() }
                     if (event.changes.none { it.pressed }) break
-                    val now = MouseInfo.getPointerInfo()?.location ?: continue
-                    callbacks.onDrag(handle, (now.x - origin.x).toFloat(), (now.y - origin.y).toFloat())
+                    val delta = travel.delta() ?: continue
+                    callbacks.onDrag(handle, delta.x, delta.y)
                 }
             } finally {
                 callbacks.onEnd(handle)

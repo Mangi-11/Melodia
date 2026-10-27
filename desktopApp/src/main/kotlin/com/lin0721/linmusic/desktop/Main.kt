@@ -68,6 +68,7 @@ import com.lin0721.linmusic.desktop.platform.TaskbarThumbnailService
 import com.lin0721.linmusic.desktop.platform.WindowEffects
 import com.lin0721.linmusic.desktop.player.DesktopPlaybackController
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
+import com.lin0721.linmusic.desktop.ui.components.LocalWindowEffects
 import com.lin0721.linmusic.desktop.ui.components.TextInputFocus
 import com.lin0721.linmusic.desktop.ui.components.UiMotion
 import com.lin0721.linmusic.desktop.ui.lyrics.DesktopLyricWindow
@@ -477,7 +478,7 @@ fun main() {
             WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
             CanvasClearColorEffect()
             TaskbarThumbnailEffect(taskbarThumbnail, controller)
-            CompositionLocalProvider(LocalUiMotion provides uiMotion) {
+            CompositionLocalProvider(LocalUiMotion provides uiMotion, LocalWindowEffects provides windowEffects) {
                 MelodiaDesktopTheme(uiScale = uiScaleFactor) {
                     shellSession.Provide {
                         MelodiaDesktopApp(
@@ -522,6 +523,7 @@ fun main() {
                 init = remember { loadMiniPlayerInit() },
                 uiScale = uiScaleFactor,
                 uiMotion = uiMotion,
+                windowEffects = windowEffects,
                 icon = appIcon,
                 isLoggedIn = userProfile != null,
                 playerViewModel = playerViewModel,
