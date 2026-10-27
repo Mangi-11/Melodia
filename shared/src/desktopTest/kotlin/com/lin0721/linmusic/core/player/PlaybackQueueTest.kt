@@ -413,4 +413,35 @@ class PlaybackQueueTest {
 
         assertEquals(playingSongId, restored.currentItem()?.songId)
     }
+
+    // ======================= 先播后补 =======================
+
+    @Test
+    fun `补全曲目按顺序接到末尾且不影响当前曲目`() {
+        val queue = queueOf(1, 2, startIndex = 1)
+        assertTrue(queue.extend(listOf(item(3), item(4))))
+        assertEquals(listOf(1L, 2L, 3L, 4L), queue.ids())
+        assertEquals(listOf(1L, 2L, 3L, 4L), queue.original.map { it.songId })
+        assertEquals(2L, queue.currentItem()?.songId)
+    }
+
+    @Test
+    fun `补全时跳过已在队列中的曲目`() {
+        val queue = queueOf(1, 2)
+        assertTrue(queue.extend(listOf(item(2), item(3))))
+        assertEquals(listOf(1L, 2L, 3L), queue.ids())
+        assertFalse(queue.extend(listOf(item(1), item(3))))
+    }
+
+    @Test
+    fun `随机模式下补全曲目只接在已打乱部分之后`() {
+        val queue = PlaybackQueue().apply { setPlayMode(PlayMode.SHUFFLE) }
+        queue.replaceAll(listOf(item(1), item(2), item(3)), 1)
+        val shuffledHead = queue.ids()
+        queue.extend((4L..20L).map { item(it) })
+        assertEquals(shuffledHead, queue.ids().take(3))
+        assertEquals((4L..20L).toSet(), queue.ids().drop(3).toSet())
+        assertEquals(0, queue.currentIndex.value)
+        assertEquals(2L, queue.currentItem()?.songId)
+    }
 }

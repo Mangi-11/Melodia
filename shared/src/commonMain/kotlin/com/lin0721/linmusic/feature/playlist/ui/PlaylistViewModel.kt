@@ -38,6 +38,9 @@ import com.lin0721.linmusic.core.playlistexternal.mergeExternalTracks
 import com.lin0721.linmusic.core.playlistexternal.toQueueItem
 import com.lin0721.linmusic.core.playlistexternal.toTrackIds
 import com.lin0721.linmusic.core.source.ExternalTrack
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Job
@@ -95,6 +98,9 @@ class PlaylistViewModel(
     private var loadJob: Job? = null
     // 起播/下载前补全全部曲目的任务，切换歌单时需一并取消，避免补全完成后误播上一个歌单
     private var fullTrackJob: Job? = null
+    // 先播后补的补全任务不随页面销毁取消
+    private val queueFillScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var queueFillJob: Job? = null
 
     // 内部只保存网易云曲目，分页补全与接口增删都基于它；外部平台歌曲在对外的 uiState 里按加入时间混排
     private val _uiState = MutableStateFlow<PlaylistUiState>(PlaylistUiState.Loading)
@@ -474,24 +480,62 @@ class PlaylistViewModel(
         }
     }
 
-    // 播放全部：需要时先补全全部曲目，shuffle 为真则打乱后起播
+    // 播放全部：shuffle 为真则打乱后起播
     fun playAll(shuffle: Boolean) {
-        withAllTracks { tracks ->
-            val ordered = if (shuffle) tracks.shuffled() else tracks
-            viewModelScope.launch {
-                // 离线时从第一首可播放的歌曲起播
-                val unplayable = offlinePlayability.unplayableIds(ordered.map { it.id })
-                ordered.firstOrNull { it.id !in unplayable }?.let { playSongInList(it, ordered) }
-            }
+        playLoadedThenFill(shuffle) { ordered ->
+            // 离线时从第一首可播放的歌曲起播
+            val unplayable = offlinePlayability.unplayableIds(ordered.map { it.id })
+            ordered.firstOrNull { it.id !in unplayable }
         }
     }
 
-    // 点击某首歌起播：队列必须包含歌单全部曲目，而不只是已滚动加载的部分
+    // 点击某首歌起播：队列最终包含歌单全部曲目，而不只是已滚动加载的部分
     fun playTrackInPlaylist(track: Track) {
         // 离线时置灰曲目点击无响应
         if (track.id in unplayableIds.value) return
-        withAllTracks { tracks -> playSongInList(track, tracks) }
+        playLoadedThenFill(shuffle = false) { track }
     }
+
+    // 超过截断阈值的大歌单逐批补全要好几秒，先用已加载部分起播，剩余曲目补全后接到队列末尾。
+    // 补全跑在独立作用域里，起播后离开歌单页也能补完；队列已被换掉时由 extendQueue 按播放来源丢弃
+    private fun playLoadedThenFill(shuffle: Boolean, pickStart: suspend (ordered: List<Track>) -> Track?) {
+        val state = _uiState.value as? PlaylistUiState.Success ?: return
+        val playlist = state.playlist
+        val pendingIds = state.pendingTrackIds
+        val entries = externalEntries.value
+        val loaded = mergeExternalTracks(playlist.tracks, playlist.trackIds, entries, fullyLoaded = pendingIds.isEmpty())
+        val ordered = if (shuffle) loaded.shuffled() else loaded
+        val source = currentPlaySource()
+        queueFillJob?.cancel()
+        queueFillJob = queueFillScope.launch {
+            val start = pickStart(ordered) ?: return@launch
+            playSongInList(start, ordered)
+            if (pendingIds.isEmpty() || source == null) return@launch
+
+            val fetched = ArrayList<Track>(pendingIds.size)
+            for (chunk in pendingIds.chunked(TRACK_PAGE_SIZE)) {
+                val result = playlistRepository.loadMoreTracks(chunk).first()
+                val tracks = result.getOrNull()
+                if (tracks == null) {
+                    // 补全失败时保留已起播的部分队列
+                    val error = result.exceptionOrNull() ?: IllegalStateException("补全歌单曲目失败")
+                    _toastEvent.emit(error.toUserMessage(resourceProvider))
+                    return@launch
+                }
+                fetched.addAll(tracks)
+            }
+            val queuedIds = ordered.mapTo(HashSet()) { it.id }
+            val rest = mergeExternalTracks(playlist.tracks + fetched, playlist.trackIds, entries, fullyLoaded = true)
+                .filter { it.id !in queuedIds }
+            if (rest.isEmpty()) return@launch
+            playerManager.extendQueue(source, (if (shuffle) rest.shuffled() else rest).map { it.toQueueItem() })
+        }
+    }
+
+    private fun currentPlaySource(): PlaySource? =
+        (_uiState.value as? PlaylistUiState.Success)?.playlist?.let {
+            PlaySource(if (isAlbumMode) PlaySource.Kind.ALBUM else PlaySource.Kind.PLAYLIST, it.id, it.name, it.coverImgUrl)
+        }
 
     // 全部加入下一首播放
     fun addAllTracksToPlayNext() {
@@ -502,10 +546,7 @@ class PlaylistViewModel(
         val playlist = (_uiState.value as? PlaylistUiState.Success)?.playlist
         val queueItems = allTracks.map { it.toQueueItem() }
         val startIndex = allTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        val source = playlist?.let {
-            PlaySource(if (isAlbumMode) PlaySource.Kind.ALBUM else PlaySource.Kind.PLAYLIST, it.id, it.name, it.coverImgUrl)
-        }
-        playerManager.playQueue(queueItems, startIndex, playlist?.name, source)
+        playerManager.playQueue(queueItems, startIndex, playlist?.name, currentPlaySource())
     }
 
     // 点击推荐歌曲：插播到当前队列的下一首并立即播放，保留原队列。推荐歌曲不在歌单里，

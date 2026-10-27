@@ -168,6 +168,17 @@ class PlaybackQueue {
         _items.value = playItems
     }
 
+    // 先播后补的大歌单接上后台补全的曲目：已在队列里的跳过，随机模式下打乱后再接，返回是否有新增
+    fun extend(items: List<QueueItem>): Boolean {
+        val queuedIds = originalItems.mapTo(HashSet()) { it.songId }
+        val fresh = items.filter { it.songId !in queuedIds }
+        if (fresh.isEmpty()) return false
+        playItems = playItems + if (_playMode.value == PlayMode.SHUFFLE) fresh.shuffled() else fresh
+        originalItems = originalItems + fresh
+        _items.value = playItems
+        return true
+    }
+
     // 移除指定项，返回需要重新起播的下标，无需重播时返回 -1
     fun removeAt(index: Int): Int {
         if (index < 0 || index >= playItems.size || playItems.size <= 1) return -1
