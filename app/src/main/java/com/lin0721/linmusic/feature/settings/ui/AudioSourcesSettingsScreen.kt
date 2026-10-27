@@ -457,7 +457,8 @@ private fun ServerUrlEditDialog(
                 OutlinedTextField(
                     value = textValue,
                     onValueChange = {
-                        textValue = it
+                        // 复制来的地址常带换行，单行输入框只显示首行会像是空的
+                        textValue = it.filterNot(Char::isWhitespace)
                         testResult = null
                     },
                     placeholder = { Text("例如 https://your-unm-server.com", fontSize = 13.sp) },

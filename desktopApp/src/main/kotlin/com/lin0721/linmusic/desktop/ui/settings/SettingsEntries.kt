@@ -1131,7 +1131,8 @@ private fun DesktopServerUrlInput(
                 fontSize = 12.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            DialogTextField(value = text, onValueChange = { text = it }, placeholder = "例如 https://your-unm-server.com")
+            // 复制来的地址常带换行，单行输入框只显示首行会像是空的
+            DialogTextField(value = text, onValueChange = { text = it.filterNot(Char::isWhitespace) }, placeholder = "例如 https://your-unm-server.com")
         }
     }
 }
