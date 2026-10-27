@@ -52,6 +52,9 @@ fun PlaylistSongOptionsSheet(
     onRequireLogin: () -> Unit,
     // 歌手详情页场景下点击「歌手」等于跳到当前页本身，传 false 隐藏该项
     showArtistOption: Boolean = true,
+    // 外部平台搜索结果不在任何歌单与队列里，无法记住红心，也没有网易云专辑
+    showLikeOption: Boolean = true,
+    showAlbumOption: Boolean = true,
     // 仅当前歌单创建者可从歌单中移除歌曲，由调用方按登录态与创建者身份算好传入
     canRemoveFromPlaylist: Boolean = false,
     onRemoveFromPlaylist: (Long) -> Unit = {},
@@ -142,19 +145,21 @@ fun PlaylistSongOptionsSheet(
                 val likeIconTint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 val likeText = if (isLiked) "取消喜欢" else "喜欢"
 
-                OptionRow(
-                    icon = likeIcon,
-                    text = likeText,
-                    iconTint = likeIconTint,
-                    onClick = {
-                        onDismiss()
-                        if (!isLoggedIn) {
-                            onRequireLogin()
-                        } else {
-                            onToggleLike(track.id, !isLiked)
+                if (showLikeOption) {
+                    OptionRow(
+                        icon = likeIcon,
+                        text = likeText,
+                        iconTint = likeIconTint,
+                        onClick = {
+                            onDismiss()
+                            if (!isLoggedIn) {
+                                onRequireLogin()
+                            } else {
+                                onToggleLike(track.id, !isLiked)
+                            }
                         }
-                    }
-                )
+                    )
+                }
 
                 OptionRow(
                     icon = Icons.AutoMirrored.Filled.PlaylistAdd,
@@ -234,18 +239,20 @@ fun PlaylistSongOptionsSheet(
                     )
                 }
 
-                OptionRow(
-                    icon = Icons.Default.Album,
-                    text = "专辑: ${track.al.name}",
-                    onClick = {
-                        onDismiss()
-                        if (track.al.id > 0) {
-                            onAlbumClick(track.al.id)
-                        } else {
-                            ToastManager.showToast("暂无专辑信息")
+                if (showAlbumOption) {
+                    OptionRow(
+                        icon = Icons.Default.Album,
+                        text = "专辑: ${track.al.name}",
+                        onClick = {
+                            onDismiss()
+                            if (track.al.id > 0) {
+                                onAlbumClick(track.al.id)
+                            } else {
+                                ToastManager.showToast("暂无专辑信息")
+                            }
                         }
-                    }
-                )
+                    )
+                }
 
                 extraOptions()
             }

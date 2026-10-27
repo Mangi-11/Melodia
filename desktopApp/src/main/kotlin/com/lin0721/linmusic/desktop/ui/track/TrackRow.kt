@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,6 +76,7 @@ import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.format.formatDuration
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.model.Track
+import com.lin0721.linmusic.core.source.MusicPlatform
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
@@ -135,7 +137,9 @@ fun TrackRow(
     // 非 null 表示多选态：首列显示复选框，点击整行切换勾选，悬停操作与右键菜单停用
     selection: TrackRowSelection? = null,
     // 非 null 时用它替换默认的歌曲菜单（本地歌曲）
-    menuContent: (@Composable MenuScope.(dismiss: () -> Unit) -> Unit)? = null
+    menuContent: (@Composable MenuScope.(dismiss: () -> Unit) -> Unit)? = null,
+    // 混排进歌单的外部平台歌曲，歌名后显示来源角标
+    sourcePlatform: MusicPlatform? = null
 ) {
     val activeActions = actions.takeIf { selection == null }
     val activeMenu = menuContent.takeIf { selection == null }
@@ -246,13 +250,17 @@ fun TrackRow(
             }
             Cover(track.al.picUrl, 40.dp, modifier = Modifier.padding(start = 16.dp))
             Column(Modifier.weight(0.45f).padding(start = 12.dp)) {
-                Text(
-                    track.name,
-                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        track.name,
+                        color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (sourcePlatform != null) PlatformBadge(sourcePlatform, Modifier.padding(start = 6.dp))
+                }
                 Text(
                     artistLinks(track.ar, navigator.openArtist),
                     color = DesktopColors.TextGray,
@@ -412,21 +420,27 @@ internal fun TrackMenu(
                 navigator.openAlbum(track.al.id, track.al.name)
             })
         }
-        MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
-            onDismiss()
-            actions.onDownload(track)
-        })
+        // 外部平台歌曲没有网易云 id，不能下载与分享网易云链接
+        val isExternal = track.id < 0L
+        if (!isExternal) {
+            MenuItem("下载", icon = Icons.Rounded.Download, onClick = {
+                onDismiss()
+                actions.onDownload(track)
+            })
+        }
         actions.onReduceRecommend?.let { reduce ->
             MenuItem("减少推荐", icon = Icons.Rounded.HeartBroken, onClick = {
                 onDismiss()
                 reduce(track)
             })
         }
-        MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
-            onDismiss()
-            val ok = copySongLink(track.id)
-            navigator.showMessage(if (ok) "已复制链接" else "复制失败")
-        })
+        if (!isExternal) {
+            MenuItem("复制歌曲链接", icon = Icons.Rounded.Link, onClick = {
+                onDismiss()
+                val ok = copySongLink(track.id)
+                navigator.showMessage(if (ok) "已复制链接" else "复制失败")
+            })
+        }
         MenuItem("复制歌曲信息", icon = Icons.Rounded.ContentCopy, onClick = {
             onDismiss()
             val ok = copyTextToClipboard(songInfoText(track.name, track.ar.joinToString(" / ") { it.name }))
@@ -446,6 +460,14 @@ internal fun TrackMenu(
 private val LinkStyles = TextLinkStyles(hoveredStyle = SpanStyle(color = DesktopColors.TextPrimary, textDecoration = TextDecoration.Underline))
 
 // 多位歌手各自可点，无 id 的歌手只展示名字
+@Composable
+fun PlatformBadge(platform: MusicPlatform, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.size(6.dp).background(Color(platform.brandColorArgb), CircleShape))
+        Text(platform.badgeName, color = DesktopColors.TextGray, fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
 fun artistLinks(artists: List<Artist>, onClick: (Long, String) -> Unit): AnnotatedString = buildAnnotatedString {
     artists.forEachIndexed { i, artist ->
         if (i > 0) append(" / ")

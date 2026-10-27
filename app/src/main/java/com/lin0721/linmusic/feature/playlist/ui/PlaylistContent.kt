@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.LocalBottomOverlayInset
 import com.lin0721.linmusic.core.model.Track
+import com.lin0721.linmusic.core.source.MusicPlatform
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectSheet
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
@@ -60,6 +61,7 @@ fun PlaylistContent(
     isPlaying: Boolean,
     likedSongIds: Set<Long>,
     unplayableIds: Set<Long> = emptySet(),
+    externalPlatforms: Map<Long, MusicPlatform> = emptyMap(),
     collectState: PlaylistCollectState,
     isLoggedIn: Boolean,
     recommendedSongs: List<Track>,
@@ -363,7 +365,8 @@ fun PlaylistContent(
                     onMoreClick        = { activeSongMoreOptions = it },
                     trackPlayCounts    = trackPlayCounts,
                     unplayableIds      = unplayableIds,
-                    selectionUi        = selectionUi
+                    selectionUi        = selectionUi,
+                    externalPlatforms  = externalPlatforms
                 )
 
                 if (isLoadingMoreTracks) {
@@ -498,6 +501,8 @@ fun PlaylistContent(
 
     if (activeSongMoreOptions != null) {
         val track = activeSongMoreOptions!!
+        // 外部平台歌曲没有网易云歌手、专辑与下载
+        val isExternal = track.id in externalPlatforms
         PlaylistSongOptionsSheet(
             track = track,
             isLiked = track.id in likedSongIds,
@@ -514,7 +519,9 @@ fun PlaylistContent(
             onRequireLogin = onRequireLogin,
             canRemoveFromPlaylist = canRemoveFromPlaylist,
             onRemoveFromPlaylist = onRemoveFromPlaylist,
-            onDownloadClick = onDownloadSongClick,
+            onDownloadClick = onDownloadSongClick.takeIf { !isExternal },
+            showArtistOption = !isExternal,
+            showAlbumOption = !isExternal,
             onReduceRecommend = if (playlist.id == -1L && selectedHistoryDate == "今天" && isLoggedIn) {
                 { onReduceRecommend(it.id) }
             } else {

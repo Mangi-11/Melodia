@@ -140,8 +140,8 @@ fun CommentsPanel(
                     )
                 }
             }
-            // 输入栏常驻底部，不因中间内容状态消失
-            CommentInputBar(
+            // 输入栏常驻底部，不因中间内容状态消失；只读评论不提供
+            if ((state as? CommentsState.Success)?.readOnly != true) CommentInputBar(
                 replyTarget = replyTarget,
                 composerState = composerState,
                 focusRequester = focusRequester,
@@ -245,9 +245,10 @@ private fun CommentList(
             items(comments, key = { it.commentId }) { comment ->
                 CommentRow(
                     comment = comment,
+                    canLike = !state.readOnly,
                     onLike = { host.like(comment) },
-                    onReply = { onReply(comment) },
-                    onExpandFloor = { onExpandFloor(comment) },
+                    onReply = if (state.readOnly) null else ({ onReply(comment) }),
+                    onExpandFloor = if (state.readOnly) null else ({ onExpandFloor(comment) }),
                     onDelete = if (comment.user.userId == currentUserId) ({ onDelete(comment) }) else null
                 )
             }

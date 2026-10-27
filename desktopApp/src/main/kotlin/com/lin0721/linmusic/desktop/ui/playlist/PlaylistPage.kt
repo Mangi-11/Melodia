@@ -404,6 +404,7 @@ private fun PlaylistContent(
     val collectState by viewModel.collectState.collectAsState()
     val importState by viewModel.importState.collectAsState()
     val selection by viewModel.selection.collectAsState()
+    val externalTracks by viewModel.externalTracks.collectAsState()
 
     val uid = profile?.uid
     val isLikedView = uid != null && !isAlbum && isLikedSongsPlaylist(playlist.name, playlist.id, uid)
@@ -652,7 +653,9 @@ private fun PlaylistContent(
                     modifier = Modifier.padding(horizontal = 16.dp)
                         .then(if (dragging || settling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier),
                     addedAtText = if (hasDates) formatAddedDate(addedAt[track.id] ?: 0L) else null,
-                    reorder = if (!selection.active && (canReorder || dragging)) {
+                    sourcePlatform = externalTracks[track.id]?.platform,
+                    // 外部歌曲的位置跟随加入时间，不参与拖动调序
+                    reorder = if (!selection.active && track.id > 0L && (canReorder || dragging)) {
                         TrackReorder(
                             dragging = dragging,
                             offsetY = reorder.offsetOf(index),

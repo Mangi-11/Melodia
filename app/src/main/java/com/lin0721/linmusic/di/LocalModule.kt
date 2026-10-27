@@ -18,6 +18,7 @@ import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.get
+import com.lin0721.linmusic.core.playlistexternal.PlaylistExternalTrackStore
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.feature.podcast.data.PodcastProgressPreferences
 import com.lin0721.linmusic.feature.podcast.data.PodcastSeenPreferences
@@ -32,6 +33,7 @@ val localModule = module {
     single { UserPreferences(PreferencesStores.get(androidContext(), PreferencesStores.USER)) }
     single { SettingsPreferences(PreferencesStores.get(androidContext(), PreferencesStores.SETTINGS)) }
     single { SourcePreferences(PreferencesStores.get(androidContext(), PreferencesStores.SOURCE)) }
+    single { PlaylistExternalTrackStore(PreferencesStores.get(androidContext(), PreferencesStores.PLAYLIST_EXTERNAL)) }
     single { ContentFilter(get()) }
     single<ResourceProvider> { AndroidResourceProvider(androidContext()) }
     single<NetworkStateProvider> { AndroidNetworkStateProvider(androidContext()) }

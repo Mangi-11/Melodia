@@ -246,6 +246,8 @@ fun CommentRowItem(
     modifier: Modifier = Modifier,
     contentMaxLines: Int = Int.MAX_VALUE,
     isLikeClickable: Boolean = true,
+    // 只读评论（QQ 音乐）不能回复，也没有楼层
+    allowReply: Boolean = true,
     onLikeClick: () -> Unit = {},
     onUserClick: (Long) -> Unit = {},
     onReplyClick: () -> Unit = {},
@@ -342,7 +344,7 @@ fun CommentRowItem(
                         .then(
                             if (isInteractive) {
                                 Modifier.combinedClickable(
-                                    onClick = onReplyClick,
+                                    onClick = { if (allowReply) onReplyClick() },
                                     onLongClick = { showActionMenu = true }
                                 )
                             } else {
@@ -398,14 +400,16 @@ fun CommentRowItem(
                                     clipboardManager.setText(AnnotatedString(comment.content))
                                 }
                             )
-                            CommentActionMenuItem(
-                                icon = Icons.AutoMirrored.Rounded.Reply,
-                                label = "回复",
-                                onClick = {
-                                    showActionMenu = false
-                                    onReplyClick()
-                                }
-                            )
+                            if (allowReply) {
+                                CommentActionMenuItem(
+                                    icon = Icons.AutoMirrored.Rounded.Reply,
+                                    label = "回复",
+                                    onClick = {
+                                        showActionMenu = false
+                                        onReplyClick()
+                                    }
+                                )
+                            }
                             CommentActionMenuItem(
                                 icon = Icons.Rounded.Share,
                                 label = "分享",
@@ -434,7 +438,7 @@ fun CommentRowItem(
                 }
             }
 
-            if (isInteractive && comment.replyCount > 0) {
+            if (isInteractive && allowReply && comment.replyCount > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "展开 ${comment.replyCount} 条回复 ›",

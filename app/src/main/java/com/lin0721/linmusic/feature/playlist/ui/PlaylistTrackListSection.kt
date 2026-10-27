@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.model.Track
+import com.lin0721.linmusic.core.source.MusicPlatform
 import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
@@ -50,18 +51,23 @@ fun LazyListScope.playlistTrackItems(
     onMoreClick: (Track) -> Unit,
     trackPlayCounts: Map<Long, Int> = emptyMap(),
     unplayableIds: Set<Long> = emptySet(),
-    selectionUi: TrackSelectionUi = TrackSelectionUi()
+    selectionUi: TrackSelectionUi = TrackSelectionUi(),
+    // 混排进歌单的外部平台歌曲，歌名后显示来源角标
+    externalPlatforms: Map<Long, MusicPlatform> = emptyMap()
 ) {
     val activeTrackId = currentTrackId?.toLongOrNull()
     items(tracks, key = { it.id }, contentType = { "track" }) { track ->
         val selecting = selectionUi.active
-        val rowData = remember(track) {
+        val platform = externalPlatforms[track.id]
+        val rowData = remember(track, platform) {
             SongRowData(
                 id = track.id,
                 title = track.name,
                 artist = track.ar.joinToString(" • ") { it.name },
                 coverUrl = track.al.picUrl,
-                isVip = track.fee == 1
+                isVip = track.fee == 1,
+                platformTag = platform?.badgeName,
+                platformTagColorArgb = platform?.brandColorArgb
             )
         }
         // SongRow 本身不接受外部 modifier，外层套 Box 挂 animateItem：

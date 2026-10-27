@@ -6,9 +6,12 @@ import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.player.domain.LyricParser
 import com.lin0721.linmusic.core.player.domain.LyricTimeline
 import com.lin0721.linmusic.core.player.domain.TtmlLyricParser
+import com.lin0721.linmusic.core.source.ExternalTrack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -41,7 +44,11 @@ class LyricsResolver(
     private val processingDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val readQqLyrics: suspend (songId: Long) -> List<LyricLine> = { emptyList() },
     private val isQqEnabled: suspend () -> Boolean = { true },
-    private val isNeteaseEnabled: suspend () -> Boolean = { true }
+    private val isNeteaseEnabled: suspend () -> Boolean = { true },
+    // 外部平台歌曲：从播放队列找回歌曲信息，QQ 按自身信息查，网易与 AMLL 先匹配网易云上的同一首
+    private val externalOf: (songId: Long) -> ExternalTrack? = { null },
+    private val matchNeteaseId: suspend (ExternalTrack) -> Long? = { null },
+    private val readExternalQqLyrics: suspend (ExternalTrack) -> List<LyricLine> = { emptyList() }
 ) {
 
     private companion object {
@@ -54,6 +61,13 @@ class LyricsResolver(
         .map { result -> result.map { it.lines } }
 
     fun lyricsWithSourceFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
+        // 外部歌曲的 localUri 可能是预先解析的直链，不能当本地文件读歌词
+        val external = if (songId < 0) externalOf(songId) else null
+        if (songId < 0) AppLogger.i("LyricsResolver", "负数 id 歌词 songId=$songId 外部歌曲=${external?.resolveKey ?: "否"}")
+        if (external != null) {
+            emitAll(externalLyricsFor(songId, external))
+            return@flow
+        }
         val localUri = localUriOf(songId)
         if (localUri == null) {
             if (songId > 0) emitAll(onlineLyricsFor(songId)) else emit(Result.success(ResolvedLyrics(emptyList(), LyricsSource.LOCAL)))
@@ -102,7 +116,39 @@ class LyricsResolver(
         }
     }
 
-    private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> = flow {
+    private fun onlineLyricsFor(songId: Long): Flow<Result<ResolvedLyrics>> =
+        onlineLyrics(songId, neteaseId = songId, matchNetease = null, readQq = { readQqLyrics(songId) })
+
+    private fun externalLyricsFor(songId: Long, track: ExternalTrack): Flow<Result<ResolvedLyrics>> =
+        onlineLyrics(
+            songId,
+            neteaseId = null,
+            matchNetease = {
+                try {
+                    matchNeteaseId(track).also {
+                        AppLogger.i("LyricsResolver", "外部歌曲《${track.name}》匹配网易云 id=${it ?: "无"}")
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLogger.w("LyricsResolver", "外部歌曲匹配网易云失败 songId=$songId: ${e.message}")
+                    null
+                }
+            },
+            readQq = {
+                readExternalQqLyrics(track).also {
+                    AppLogger.i("LyricsResolver", "外部歌曲《${track.name}》QQ 歌词 ${it.size} 行 时长=${track.durationMs}")
+                }
+            }
+        )
+
+    // 已知网易 id 时直接查，不多一次挂起；需要匹配时网易与 AMLL 共享同一次匹配，匹配不到按无歌词处理，不算失败
+    private fun onlineLyrics(
+        songId: Long,
+        neteaseId: Long?,
+        matchNetease: (suspend () -> Long?)?,
+        readQq: suspend () -> List<LyricLine>
+    ): Flow<Result<ResolvedLyrics>> = flow {
         coroutineScope {
             val amllEnabled = isAmllEnabled()
             val qqEnabled = isQqEnabled()
@@ -115,13 +161,20 @@ class LyricsResolver(
             }
             val updates = Channel<SourceUpdate>(Channel.UNLIMITED)
             val jobs = mutableListOf<Job>()
+            val matched = matchNetease?.let { match -> async(start = CoroutineStart.LAZY) { match() }.also { jobs += it } }
+            suspend fun resolvedNeteaseId(): Long? = matched?.await() ?: neteaseId
             if (neteaseEnabled) {
-                jobs += query(LyricsSource.NETEASE, updates) { SourceUpdate.Netease(fetchNeteaseResult(songId)) }
+                jobs += query(LyricsSource.NETEASE, updates) {
+                    val id = resolvedNeteaseId()
+                    SourceUpdate.Netease(if (id == null) Result.success(emptyList()) else fetchNeteaseResult(id))
+                }
             }
             val amllJob = if (amllEnabled) {
-                query(LyricsSource.AMLL, updates) { SourceUpdate.Amll(fetchAmllLines(songId)) }.also { jobs += it }
+                query(LyricsSource.AMLL, updates) {
+                    SourceUpdate.Amll(resolvedNeteaseId()?.let { fetchAmllLines(it) }.orEmpty())
+                }.also { jobs += it }
             } else null
-            if (qqEnabled) jobs += query(LyricsSource.QQ, updates) { SourceUpdate.Qq(fetchQqLines(songId)) }
+            if (qqEnabled) jobs += query(LyricsSource.QQ, updates) { SourceUpdate.Qq(fetchQqLines(readQq)) }
             val ticker = launch {
                 while (isActive) {
                     delay(UPDATE_INTERVAL_MS)
@@ -168,8 +221,8 @@ class LyricsResolver(
         }
     }
 
-    private suspend fun fetchQqLines(songId: Long): List<LyricLine> = try {
-        withTimeoutOrNull(QQ_TIMEOUT_MS) { readQqLyrics(songId) }.orEmpty()
+    private suspend fun fetchQqLines(readQq: suspend () -> List<LyricLine>): List<LyricLine> = try {
+        withTimeoutOrNull(QQ_TIMEOUT_MS) { readQq() }.orEmpty()
     } catch (e: CancellationException) {
         throw e
     } catch (_: Exception) {

@@ -158,7 +158,7 @@ private fun ResultsContent(
                 }
             }
         } else {
-            ExternalResultsContent(viewModel, selectedPlatform, nowPlaying?.songId)
+            ExternalResultsContent(viewModel, selectedPlatform, nowPlaying?.songId, actions)
         }
     }
 }
@@ -167,7 +167,8 @@ private fun ResultsContent(
 private fun ExternalResultsContent(
     viewModel: SearchViewModel,
     platform: MusicPlatform,
-    currentSongId: Long?
+    currentSongId: Long?,
+    actions: TrackActions
 ) {
     val resultsState = viewModel.externalResults[platform]?.collectAsState()?.value ?: ExternalSearchUiState.Idle
     val resolvingKey by viewModel.resolvingTrackKey.collectAsState()
@@ -203,7 +204,8 @@ private fun ExternalResultsContent(
                             track = track,
                             isCurrent = currentSongId == track.queueSongId,
                             resolving = resolvingKey == track.resolveKey,
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            actions = actions
                         )
                     }
                     if (resultsState.isLoadingMore) {
@@ -221,7 +223,8 @@ private fun ExternalResultEntry(
     track: ExternalTrack,
     isCurrent: Boolean,
     resolving: Boolean,
-    viewModel: SearchViewModel
+    viewModel: SearchViewModel,
+    actions: TrackActions
 ) {
     val onPlay = { viewModel.playExternalTrack(track) }
     SearchResultRow(
@@ -252,7 +255,7 @@ private fun ExternalResultEntry(
         },
         trailingText = if (track.durationMs > 0) formatDuration(track.durationMs) else null,
         onDoubleClick = onPlay,
-        menu = { dismiss -> ExternalTrackMenuItems(track, viewModel, onPlay, dismiss) }
+        menu = { dismiss -> ExternalTrackMenuItems(track, viewModel, actions, onPlay, dismiss) }
     )
 }
 

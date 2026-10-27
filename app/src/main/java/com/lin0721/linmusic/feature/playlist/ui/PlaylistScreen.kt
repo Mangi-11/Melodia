@@ -106,6 +106,8 @@ fun PlaylistScreen(
     val playContext by viewModel.playerManager.playContext.collectAsStateWithLifecycle()
     val likedSongIds by viewModel.likedSongIds.collectAsStateWithLifecycle()
     val unplayableIds by viewModel.unplayableIds.collectAsStateWithLifecycle()
+    val externalTracks by viewModel.externalTracks.collectAsStateWithLifecycle()
+    val externalPlatforms = remember(externalTracks) { externalTracks.mapValues { it.value.platform } }
     val collectState by viewModel.collectState.collectAsStateWithLifecycle()
     val userProfile  by viewModel.userProfile.collectAsStateWithLifecycle()
     val commentsState by viewModel.commentsState.collectAsStateWithLifecycle()
@@ -192,7 +194,7 @@ fun PlaylistScreen(
     // reorderedTracks 是引用不变的 SnapshotStateList，remember(keys) 感知不到其内容变化，必须用 derivedStateOf 才能正确响应拖拽
     val isOrderChanged by remember {
         derivedStateOf {
-            val current = (uiState as? PlaylistUiState.Success)?.playlist?.tracks.orEmpty()
+            val current = (uiState as? PlaylistUiState.Success)?.playlist?.tracks.orEmpty().filter { it.id > 0L }
             reorderedTracks.isNotEmpty() && reorderedTracks != current
         }
     }
@@ -552,7 +554,8 @@ fun PlaylistScreen(
                             // 排序保存是全量覆盖，必须先补全未加载的曲目，否则会把服务端剩余部分删掉
                             viewModel.ensureAllTracksLoaded { allTracks ->
                                 reorderedTracks.clear()
-                                reorderedTracks.addAll(allTracks)
+                                // 外部歌曲的位置跟随加入时间，不参与手动排序
+                                reorderedTracks.addAll(allTracks.filter { it.id > 0L })
                                 isReorderMode = true
                             }
                         },
@@ -565,6 +568,7 @@ fun PlaylistScreen(
                     isPlaying      = isPlaying,
                     likedSongIds   = likedSongIds,
                     unplayableIds  = unplayableIds,
+                    externalPlatforms = externalPlatforms,
                     collectState   = collectState,
                     isLoggedIn     = userProfile != null,
                     recommendedSongs = state.recommendedSongs,

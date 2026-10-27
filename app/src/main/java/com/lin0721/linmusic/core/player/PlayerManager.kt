@@ -19,6 +19,7 @@ import com.lin0721.linmusic.core.download.SongDownloadManager
 import com.lin0721.linmusic.core.download.yearFromEpochMillis
 import com.lin0721.linmusic.core.localmusic.LocalMusicApi
 import com.lin0721.linmusic.core.log.AppLogger
+import com.lin0721.linmusic.core.source.ExternalTrackResolver
 import com.lin0721.linmusic.core.network.AppError
 import com.lin0721.linmusic.core.network.OnlineStateProvider
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
@@ -65,7 +66,8 @@ class PlayerManager(
     private val localMusicApi: LocalMusicApi,
     private val songDownloadManager: SongDownloadManager,
     private val externalInterruptionResumeController: ExternalInterruptionResumeController,
-    private val onlineState: OnlineStateProvider
+    private val onlineState: OnlineStateProvider,
+    private val externalResolver: ExternalTrackResolver
 ) : Player.Listener, PlaybackController {
 
     companion object {
@@ -666,6 +668,25 @@ class PlayerManager(
             progress.resetTo(startPosition, preserveDuration = startPosition > 0L)
             if (playWhenReady) showPendingTrack(item)
 
+            // 外部平台歌曲轮到时才经换源插件解析，解析失败按播放失败跳下一首
+            val external = item.external
+            if (external != null) {
+                if (playWhenReady && !autoTransition && _currentTrack.value?.mediaId?.toLongOrNull() != item.songId) {
+                    pauseOutgoingWhilePending()
+                }
+                val url = prefetchedUrl ?: externalResolver.resolve(external)
+                if (url == null) {
+                    AppLogger.w(TAG, "外部歌曲解析失败 songId=${item.songId} platform=${external.platform.key}")
+                    Toast.makeText(context, externalResolver.explainFailure(external), Toast.LENGTH_SHORT).show()
+                    skipToNextOnError(index)
+                    return@launch
+                }
+                pendingSkipFromIndex = null
+                val mediaItem = item.toMediaItem(url, playbackQueue.playContext.value)
+                controllerHolder.playItem(mediaItem.withCrossfade(autoTransition, startPosition), playbackQueue.playMode.value, startPosition, playWhenReady)
+                return@launch
+            }
+
             roaming.prefetchOnPlay(item.songId, index)
 
             if (localRecord != null) {
@@ -842,6 +863,11 @@ class PlayerManager(
 
         prefetchJob?.cancel()
         prefetchJob = scope.launch {
+            val external = nextItem.external
+            if (external != null) {
+                externalResolver.resolve(external)?.let { prefetchedNextUrl = PrefetchedUrl(nextItem.songId, it) }
+                return@launch
+            }
             // 下一首已下载时跳过网络预取
             if (downloadPreferences.findVerifiedRecord(nextItem.songId) != null) return@launch
             repository.getSongPlaybackInfo(nextItem.songId).collect { result ->
@@ -1013,8 +1039,9 @@ class PlayerManager(
     private var reportingSource: PlaySource? = null
 
     // 歌曲一开始播放就立即打卡（进「最近播放」），跟切歌时补报的时长上报分开、各自独立失败互不影响
+    // 负数 id 是外部平台歌曲或未匹配的本地歌曲，不属于网易云曲库，不上报
     private fun reportStartPlay(mediaItem: MediaItem) {
-        val songId = mediaItem.mediaId.toLongOrNull() ?: return
+        val songId = mediaItem.mediaId.toLongOrNull()?.takeIf { it > 0L } ?: return
         val source = playbackQueue.playSource.value
         reportingSource = source
         scope.launch {
@@ -1026,7 +1053,7 @@ class PlayerManager(
 
     // 切歌/退出播放时把刚播完的这首上报播放时长打卡（用挂钟时间差算出的播放时长）；听不满 5 秒的跳过不算
     private fun reportPlayedTrack() {
-        val songId = _currentTrack.value?.mediaId?.toLongOrNull() ?: return
+        val songId = _currentTrack.value?.mediaId?.toLongOrNull()?.takeIf { it > 0L } ?: return
         val playedSeconds = currentTrackPlayedMs() / 1000
         if (playedSeconds < 5) {
             AppLogger.i(TAG, "打卡上报跳过（未满5秒）songId=$songId playedSeconds=$playedSeconds")

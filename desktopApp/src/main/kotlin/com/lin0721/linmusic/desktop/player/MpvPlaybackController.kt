@@ -11,6 +11,7 @@ import com.lin0721.linmusic.core.player.PlaybackQueue
 import com.lin0721.linmusic.core.player.PlaybackState
 import com.lin0721.linmusic.core.player.PlaybackStateStore
 import com.lin0721.linmusic.core.player.QueueItem
+import com.lin0721.linmusic.core.source.ExternalTrackResolver
 import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.SleepTimer
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
@@ -78,7 +79,8 @@ class MpvPlaybackController(
     // 仅测试用
     engineOptions: Map<String, String> = emptyMap(),
     private val audioCache: AudioCache? = null,
-    private val cacheManager: DesktopCacheManager? = null
+    private val cacheManager: DesktopCacheManager? = null,
+    private val externalResolver: ExternalTrackResolver? = null
 ) : DesktopPlaybackController, MpvEngine.Listener {
 
     private val playbackQueue = PlaybackQueue()
@@ -595,7 +597,7 @@ class MpvPlaybackController(
         playJob = scope.launch {
             val playback = knownUrl?.let { Playback(it, null) } ?: resolvePlayback(item).getOrElse { error ->
                 AppLogger.w(TAG, "取播放地址失败 songId=${item.songId}", error)
-                handleFailure("《${item.title}》暂无版权或需要会员")
+                handleFailure(if (item.external != null) error.message.orEmpty() else "《${item.title}》暂无版权或需要会员")
                 return@launch
             }
             // 从中途起播录不出完整文件
@@ -614,10 +616,13 @@ class MpvPlaybackController(
         if (isOnlineSong(songId)) roaming.prefetchOnPlay(songId, index)
     }
 
-    // 队列项自带直链时直接使用，否则按网易云歌曲 id 解析
+    // 队列项自带直链时直接使用；外部平台歌曲轮到时经换源插件解析；否则按网易云歌曲 id 解析
     private suspend fun resolvePlayback(item: QueueItem): Result<Playback> {
         item.localUri?.takeIf { it.isNotBlank() }?.let { return Result.success(Playback(it, null)) }
-        return resolvePlayback(item.songId)
+        val external = item.external ?: return resolvePlayback(item.songId)
+        val resolver = externalResolver ?: return Result.failure(IllegalStateException("当前平台暂无可用换源插件"))
+        val url = resolver.resolve(external) ?: return Result.failure(IllegalStateException(resolver.explainFailure(external)))
+        return Result.success(Playback(url, null))
     }
 
     // 已下载 > 缓存命中 > 联网（同时录制缓存）；联网失败退回任意音质缓存

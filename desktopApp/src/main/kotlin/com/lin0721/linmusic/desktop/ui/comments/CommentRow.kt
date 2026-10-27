@@ -74,6 +74,7 @@ fun CommentRow(
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     contentMaxLines: Int = Int.MAX_VALUE,
+    canLike: Boolean = true,
     onLike: () -> Unit = {},
     onReply: (() -> Unit)? = null,
     onExpandFloor: (() -> Unit)? = null,
@@ -161,7 +162,7 @@ fun CommentRow(
                         )
                     }
                 }
-                LikeButton(comment, interactive, onLike)
+                LikeButton(comment, interactive && canLike, onLike)
             }
 
             Text(

@@ -189,6 +189,8 @@ fun CommentFullScreen(
                             items(allComments, key = { it.commentId }) { comment ->
                                 CommentRowItem(
                                     comment = comment,
+                                    isLikeClickable = !commentsState.readOnly,
+                                    allowReply = !commentsState.readOnly,
                                     onLikeClick = { onLikeComment(comment) },
                                     onUserClick = onUserClick,
                                     onReplyClick = {
@@ -229,8 +231,8 @@ fun CommentFullScreen(
             }
         }
 
-        // 底部输入栏：常驻底部，不因中间内容状态消失
-        CommentInputBar(
+        // 底部输入栏：常驻底部，不因中间内容状态消失；只读评论不提供
+        if ((commentsState as? CommentsState.Success)?.readOnly != true) CommentInputBar(
             replyTarget = replyTarget,
             composerState = composerState,
             focusRequester = focusRequester,

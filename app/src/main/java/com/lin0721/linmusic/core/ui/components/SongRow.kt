@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,7 +90,9 @@ data class SongRowData(
     val coverUrl: String?,
     val isVip: Boolean = false,
     val durationText: String? = null,
+    // 外部平台来源：品牌色圆点加灰字
     val platformTag: String? = null,
+    val platformTagColorArgb: Long? = null,
     // 长按复制的歌手文本，为空时复制展示的 artist（artist 掺了专辑等附加信息时单独指定）
     val copyArtist: String? = null
 )
@@ -211,20 +214,16 @@ fun SongRow(
                 )
                 if (!data.platformTag.isNullOrBlank()) {
                     Spacer(Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
-                            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.tertiary), RoundedCornerShape(3.dp))
-                            .padding(horizontal = MelodiaSpacing.xs, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = data.platformTag,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 10.sp
-                        )
+                    data.platformTagColorArgb?.let { argb ->
+                        Spacer(Modifier.size(6.dp).background(Color(argb), CircleShape))
+                        Spacer(Modifier.width(4.dp))
                     }
+                    Text(
+                        text = data.platformTag,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
                 } else if (data.isVip) {
                     Spacer(Modifier.width(6.dp))
                     Box(

@@ -24,9 +24,12 @@ import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.source.AudioSourceProvider
+import com.lin0721.linmusic.core.source.ExternalTrackResolver
+import com.lin0721.linmusic.core.source.NeteaseSongLookup
 import com.lin0721.linmusic.core.source.LxAudioSourceProvider
 import com.lin0721.linmusic.core.source.LxPluginRuntime
 import com.lin0721.linmusic.core.source.PlatformSearchProvider
+import com.lin0721.linmusic.core.playlistexternal.PlaylistExternalTrackStore
 import com.lin0721.linmusic.core.source.SourcePreferences
 import com.lin0721.linmusic.desktop.app.DesktopPaths
 import com.lin0721.linmusic.desktop.data.CacheRelocator
@@ -100,14 +103,16 @@ private fun createPlaybackController(
     desktopPreferences: DesktopPreferences,
     downloadPreferences: DesktopDownloadPreferences,
     audioCache: AudioCache,
-    cacheManager: DesktopCacheManager
+    cacheManager: DesktopCacheManager,
+    externalResolver: ExternalTrackResolver
 ): DesktopPlaybackController = try {
     MpvPlaybackController(
         repository, settingsPreferences, playbackPreferences, desktopPreferences,
         localAudioOf = { songId -> downloadPreferences.findVerifiedRecord(songId)?.mediaStoreUri },
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
         audioCache = audioCache,
-        cacheManager = cacheManager
+        cacheManager = cacheManager,
+        externalResolver = externalResolver
     )
 } catch (e: LinkageError) {
     AppLogger.e(TAG, "libmpv 加载失败，播放不可用", e)
@@ -123,6 +128,7 @@ val desktopPlatformModule = module {
     single { UserPreferences(store(PreferencesStores.USER)) }
     single { SettingsPreferences(store(PreferencesStores.SETTINGS)) }
     single { SourcePreferences(store(PreferencesStores.SOURCE)) }
+    single { PlaylistExternalTrackStore(store(PreferencesStores.PLAYLIST_EXTERNAL)) }
     single { GraalLxPluginRuntime() } bind LxPluginRuntime::class
     single<AudioSourceProvider>(named("lx")) { LxAudioSourceProvider(get<LxPluginRuntime>(), get(), getAll<PlatformSearchProvider>()) }
     single { SessionMonitor(get(), get()) }
@@ -172,7 +178,7 @@ val desktopPlatformModule = module {
         )
     }
     single<SongDownloader> { get<DesktopSongDownloader>() }
-    single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get(), get()) }
+    single<DesktopPlaybackController> { createPlaybackController(get(), get(), get(), get(), get(), get(), get(), get()) }
     single<PlaybackController> { get<DesktopPlaybackController>() }
     single { AmllLyricsClient(get<LyricsCache>()) }
     single { QqLyricsClient() }
@@ -204,6 +210,9 @@ val desktopPlatformModule = module {
         val settingsPreferences = get<SettingsPreferences>()
         val qqLyricsSource = get<QqLyricsSource>()
         val localLibrary = get<LocalLibraryRepository>()
+        val neteaseLookup = get<NeteaseSongLookup>()
+        // 播放器创建时不依赖歌词，延迟到查询时再取，避免组装顺序问题
+        val queueOf = { get<PlaybackController>().queue.value }
         LyricsResolver(
             playbackRepository = get(),
             readLocalLyrics = { path -> withContext(Dispatchers.IO) { localLibrary.readLyrics(path) } },
@@ -212,7 +221,10 @@ val desktopPlatformModule = module {
             isAmllEnabled = { settingsPreferences.amllLyricsEnabled.first() },
             isQqEnabled = { settingsPreferences.qqLyricsEnabled.first() },
             isNeteaseEnabled = { settingsPreferences.neteaseLyricsEnabled.first() },
-            readQqLyrics = qqLyricsSource::fetch
+            readQqLyrics = qqLyricsSource::fetch,
+            externalOf = { songId -> queueOf().firstOrNull { it.songId == songId }?.external },
+            matchNeteaseId = neteaseLookup::find,
+            readExternalQqLyrics = qqLyricsSource::fetch
         )
     }
 }
@@ -244,7 +256,7 @@ val desktopViewModelModule = module {
             loadLikedSongIdsUseCase = get(),
             songLikeRepository = get(),
             syncProfileAfterLoginUseCase = get(),
-            sourceProviders = getAll<AudioSourceProvider>(),
+            externalResolver = get(),
             searchProviders = getAll<PlatformSearchProvider>(),
             settingsPreferences = getOrNull(),
             sourcePreferences = getOrNull(),
