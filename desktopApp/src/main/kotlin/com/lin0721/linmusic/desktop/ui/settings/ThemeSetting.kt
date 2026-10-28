@@ -28,6 +28,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,10 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.preferences.ThemeMode
@@ -51,6 +55,7 @@ import com.lin0721.linmusic.core.ui.theme.ThemeAccents
 import com.lin0721.linmusic.core.ui.theme.contentColorOn
 import com.lin0721.linmusic.core.ui.theme.contrastRatio
 import com.lin0721.linmusic.core.ui.theme.parseRgbHex
+import com.lin0721.linmusic.core.ui.theme.rememberThemeSwitcher
 import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.desktop.ui.components.DesktopDialog
 import com.lin0721.linmusic.desktop.ui.components.DesktopTooltip
@@ -58,6 +63,7 @@ import com.lin0721.linmusic.desktop.ui.components.DialogButton
 import com.lin0721.linmusic.desktop.ui.components.DialogLabel
 import com.lin0721.linmusic.desktop.ui.components.DialogTextField
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
+import com.lin0721.linmusic.desktop.ui.theme.SystemDarkTheme
 import com.lin0721.linmusic.desktop.ui.track.DangerColor
 
 private val ModeCardWidth = 136.dp
@@ -83,12 +89,17 @@ internal fun ThemeSetting(
     var pickerFor by remember { mutableStateOf<Boolean?>(null) }
     val darkAccent = ThemeAccents.resolve(settings.darkAccentId, settings.darkCustomHex, isDark = true)
     val lightAccent = ThemeAccents.resolve(settings.lightAccentId, settings.lightCustomHex, isDark = false)
+    val switcher = rememberThemeSwitcher()
+    val currentIsDark = DesktopColors.IsDark
+    val systemDark by SystemDarkTheme.isDark.collectAsState()
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text("主题（实验性）", color = DesktopColors.TextPrimary, fontSize = 14.sp)
         Text("切换深浅模式与主色，立即生效", color = DesktopColors.TextGray, fontSize = 12.sp)
         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ThemeMode.entries.forEach { mode ->
-                ModeCard(mode, darkAccent, lightAccent, selected = settings.mode == mode, onClick = { onModeChange(mode) })
+                ModeCard(mode, darkAccent, lightAccent, selected = settings.mode == mode, onClick = { center ->
+                    switcher.switch(center, changesDarkness = mode.isDark(systemDark) != currentIsDark) { onModeChange(mode) }
+                })
             }
         }
         val rows = when (settings.mode) {
@@ -123,13 +134,15 @@ internal fun ThemeSetting(
 }
 
 @Composable
-private fun ModeCard(mode: ThemeMode, darkAccent: Color, lightAccent: Color, selected: Boolean, onClick: () -> Unit) {
+private fun ModeCard(mode: ThemeMode, darkAccent: Color, lightAccent: Color, selected: Boolean, onClick: (windowCenter: Offset) -> Unit) {
+    var windowCenter by remember { mutableStateOf(Offset.Unspecified) }
     Surface(
-        onClick = onClick,
+        onClick = { onClick(windowCenter) },
         shape = CardShape,
         color = DesktopColors.CardSurface,
         border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) DesktopColors.Accent else DesktopColors.Overlay.copy(alpha = 0.1f)),
         modifier = Modifier.width(ModeCardWidth).pointerHoverIcon(PointerIcon.Hand)
+            .onGloballyPositioned { windowCenter = it.boundsInWindow().center }
     ) {
         Column(Modifier.padding(8.dp)) {
             Box(Modifier.fillMaxWidth().height(ModeThumbHeight).clip(ThumbShape)) {

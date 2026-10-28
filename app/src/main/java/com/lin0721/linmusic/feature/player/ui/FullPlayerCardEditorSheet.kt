@@ -204,7 +204,7 @@ private fun CardEditorRow(
         label = "card_editor_elev"
     )
     val bgColor by animateColorAsState(
-        targetValue = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        targetValue = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f),
         animationSpec = uiSpring(),
         label = "card_editor_bg"
     )

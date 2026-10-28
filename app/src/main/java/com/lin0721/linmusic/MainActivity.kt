@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable
 import androidx.compose.ui.graphics.toArgb
 import com.lin0721.linmusic.core.preferences.ThemeSettings
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPalette
+import com.lin0721.linmusic.core.ui.theme.ThemeRevealHost
 import com.lin0721.linmusic.feature.recognition.service.ACTION_OPEN_RECOGNITION_RESULT
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import android.content.pm.ActivityInfo
@@ -116,7 +117,9 @@ class MainActivity : ComponentActivity() {
                         applySystemBarStyle(palette.isDark)
                         window.setBackgroundDrawable(ColorDrawable(palette.pane.toArgb()))
                     }
-                    MelodiaApp()
+                    ThemeRevealHost(isDark = palette.isDark, enabled = uiMotion.enabled) {
+                        MelodiaApp()
+                    }
                 }
             }
         }

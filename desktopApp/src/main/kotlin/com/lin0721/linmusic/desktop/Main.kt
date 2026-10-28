@@ -31,6 +31,7 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.lin0721.linmusic.core.ui.theme.ThemeRevealHost
 import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.preferences.PreferencesStores
@@ -491,19 +492,21 @@ fun main() {
             TaskbarThumbnailEffect(taskbarThumbnail, controller)
             CompositionLocalProvider(LocalUiMotion provides uiMotion, LocalWindowEffects provides windowEffects) {
                 MelodiaDesktopTheme(uiScale = uiScaleFactor, palette = palette) {
-                    shellSession.Provide {
-                        MelodiaDesktopApp(
-                            deps = appDependencies,
-                            session = shellSession,
-                            windowState = windowState,
-                            fullscreen = fullscreen,
-                            lyricsView = lyricsView,
-                            searchFocusRequests = searchFocusRequests.receiveAsFlow(),
-                            settingsRequests = settingsRequests.receiveAsFlow(),
-                            loginRequests = loginRequests.receiveAsFlow(),
-                            onEnterMiniPlayer = enterMiniPlayer,
-                            onClose = closeMainWindow
-                        )
+                    ThemeRevealHost(isDark = palette.isDark, enabled = uiMotion.enabled) {
+                        shellSession.Provide {
+                            MelodiaDesktopApp(
+                                deps = appDependencies,
+                                session = shellSession,
+                                windowState = windowState,
+                                fullscreen = fullscreen,
+                                lyricsView = lyricsView,
+                                searchFocusRequests = searchFocusRequests.receiveAsFlow(),
+                                settingsRequests = settingsRequests.receiveAsFlow(),
+                                loginRequests = loginRequests.receiveAsFlow(),
+                                onEnterMiniPlayer = enterMiniPlayer,
+                                onClose = closeMainWindow
+                            )
+                        }
                     }
                 }
             }

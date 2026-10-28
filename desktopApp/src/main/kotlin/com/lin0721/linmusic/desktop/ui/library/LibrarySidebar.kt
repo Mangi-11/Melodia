@@ -331,7 +331,7 @@ private fun LibraryCompactToolbar(
             label = "librarySearchWidth"
         )
         val background by animateColorAsState(
-            if (searching) DesktopColors.Surface else Color.Transparent,
+            if (searching) DesktopColors.Surface else DesktopColors.Surface.copy(alpha = 0f),
             uiTween(SEARCH_ANIMATION_MS),
             label = "librarySearchBackground"
         )

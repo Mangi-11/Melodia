@@ -3,6 +3,7 @@ package com.lin0721.linmusic.feature.settings.ui
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,8 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -70,6 +74,7 @@ import com.lin0721.linmusic.core.ui.theme.ThemeAccents
 import com.lin0721.linmusic.core.ui.theme.contentColorOn
 import com.lin0721.linmusic.core.ui.theme.contrastRatio
 import com.lin0721.linmusic.core.ui.theme.parseRgbHex
+import com.lin0721.linmusic.core.ui.theme.rememberThemeSwitcher
 import com.lin0721.linmusic.core.ui.theme.themedShadow
 
 private val ModeThumbHeight = 72.dp
@@ -95,6 +100,9 @@ fun ThemeSettingSection(
     val lightDynamic = rememberDynamicAccent(isDark = false)
     val darkAccent = ThemeAccents.resolve(settings.darkAccentId, settings.darkCustomHex, isDark = true, dynamicColor = darkDynamic)
     val lightAccent = ThemeAccents.resolve(settings.lightAccentId, settings.lightCustomHex, isDark = false, dynamicColor = lightDynamic)
+    val switcher = rememberThemeSwitcher()
+    val currentIsDark = MelodiaColors.IsDark
+    val systemDark = isSystemInDarkTheme()
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Text("主题（实验性）", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
@@ -109,7 +117,9 @@ fun ThemeSettingSection(
                     darkAccent = darkAccent,
                     lightAccent = lightAccent,
                     selected = settings.mode == mode,
-                    onClick = { onModeChange(mode) },
+                    onClick = { center ->
+                        switcher.switch(center, changesDarkness = mode.isDark(systemDark) != currentIsDark) { onModeChange(mode) }
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -166,18 +176,19 @@ private fun ModeCard(
     darkAccent: Color,
     lightAccent: Color,
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick: (windowCenter: Offset) -> Unit,
     modifier: Modifier
 ) {
+    var windowCenter by remember { mutableStateOf(Offset.Unspecified) }
     Surface(
-        onClick = onClick,
+        onClick = { onClick(windowCenter) },
         shape = CardShape,
         color = MelodiaColors.Surface,
         border = BorderStroke(
             if (selected) 2.dp else 1.dp,
             if (selected) MelodiaColors.Accent else MelodiaColors.Overlay.copy(alpha = 0.1f)
         ),
-        modifier = modifier
+        modifier = modifier.onGloballyPositioned { windowCenter = it.boundsInWindow().center }
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Box(

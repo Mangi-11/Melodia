@@ -920,8 +920,9 @@ internal fun CardTile(
     val density = LocalDensity.current
     var tileHeightPx by remember { mutableIntStateOf(0) }
     var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
+    // 从同色全透明起步：Color.Transparent 是透明黑，浅色下插值会先变暗再变亮，看起来像闪烁
     val background by animateColorAsState(
-        if (hovered || contextMenuOffset != null) DesktopColors.CardSurface else Color.Transparent,
+        if (hovered || contextMenuOffset != null) DesktopColors.CardSurface else DesktopColors.CardSurface.copy(alpha = 0f),
         uiTween(HOVER_FADE_MS),
         label = "cardTileBg"
     )
