@@ -159,7 +159,7 @@ class PlaybackRepositoryImpl(
         transform = { contentFilter.filterBlockedArtists(it.songs) { song -> song.ar.map { a -> a.id } } }
     )
 
-    // 未指定歌单上下文时（如首页心动模式入口），取当前歌单列表首位
+    // 未指定歌单上下文时（如首页心动模式入口），取用户的红心歌单；歌单顺序可被用户调整，不能取首位
     override fun getIntelligenceSongs(songId: Long, playlistId: Long): Flow<Result<List<Track>>> = apiFlow(
         request = {
             val finalPlaylistId = if (playlistId != 0L) {
@@ -167,9 +167,12 @@ class PlaybackRepositoryImpl(
             } else {
                 val uid = userPreferences.userProfile.first()?.uid
                     ?: throw AppError.BizError(-1, null)
-                userPlaylistRepository.getUserPlaylists(uid, limit = 1).first().getOrThrow()
-                    .firstOrNull()?.id
-                    ?: throw AppError.BizError(-1, null)
+                val playlists = userPlaylistRepository.getUserPlaylists(uid).first().getOrThrow()
+                playlists.firstOrNull { it.isLikedPlaylist && it.userId == uid }?.id
+                    ?: run {
+                        AppLogger.w(TAG, "心动模式未找到红心歌单 uid=$uid playlists=${playlists.size}")
+                        throw AppError.BizError(-1, null)
+                    }
             }
             apiService.getIntelligenceSongs(
                 IntelligenceSongsRequest(
