@@ -130,6 +130,8 @@ class SettingsViewModel(
 
     val sidePlayerPinned = settingsPreferences.sidePlayerPinned.asState(true)
 
+    val sidePlayerPosition = settingsPreferences.sidePlayerPosition.asState(SettingsPreferences.SIDE_PLAYER_POSITION_RIGHT)
+
     val tabletImmersiveMode = settingsPreferences.tabletImmersiveMode.asState(false)
 
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
@@ -381,6 +383,8 @@ class SettingsViewModel(
     fun updatePlayerPageMode(mode: String) = launchSave { settingsPreferences.savePlayerPageMode(mode) }
 
     fun updateSidePlayerPinned(pinned: Boolean) = launchSave { settingsPreferences.saveSidePlayerPinned(pinned) }
+
+    fun updateSidePlayerPosition(position: String) = launchSave { settingsPreferences.saveSidePlayerPosition(position) }
  
     fun updateTabletImmersiveMode(enabled: Boolean) = launchSave { settingsPreferences.saveTabletImmersiveMode(enabled) }
 

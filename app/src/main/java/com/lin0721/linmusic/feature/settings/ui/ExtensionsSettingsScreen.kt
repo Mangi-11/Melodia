@@ -36,6 +36,11 @@ private val PlayerPageModes = listOf(
     SettingsPreferences.PLAYER_PAGE_MODE_SIDE to "侧边小窗式"
 )
 
+private val SidePlayerPositions = listOf(
+    SettingsPreferences.SIDE_PLAYER_POSITION_RIGHT to "右侧",
+    SettingsPreferences.SIDE_PLAYER_POSITION_LEFT to "左侧"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
@@ -46,6 +51,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val startInLibrary by viewModel.startInLibrary.collectAsStateWithLifecycle()
     val playerPageMode by viewModel.playerPageMode.collectAsStateWithLifecycle()
     val sidePlayerPinned by viewModel.sidePlayerPinned.collectAsStateWithLifecycle()
+    val sidePlayerPosition by viewModel.sidePlayerPosition.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
     val uiScalePercent by viewModel.uiScalePercent.collectAsStateWithLifecycle()
     val uiAnimationsEnabled by viewModel.uiAnimationsEnabled.collectAsStateWithLifecycle()
@@ -53,10 +59,12 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
 
     var showBottomBarSheet by remember { mutableStateOf(false) }
     var showPlayerModeSheet by remember { mutableStateOf(false) }
+    var showSidePositionSheet by remember { mutableStateOf(false) }
     val playerModeLabel = PlayerPageModes.firstOrNull { it.first == playerPageMode }?.second ?: "自动"
+    val sidePositionLabel = SidePlayerPositions.firstOrNull { it.first == sidePlayerPosition }?.second ?: "右侧"
     val playerModeSubtitle = when (playerPageMode) {
         SettingsPreferences.PLAYER_PAGE_MODE_FULLSCREEN -> "全屏式：点击展开，返回直接收起"
-        SettingsPreferences.PLAYER_PAGE_MODE_SIDE -> "侧边小窗式：播放页固定在右侧，与内容并排"
+        SettingsPreferences.PLAYER_PAGE_MODE_SIDE -> "侧边小窗式：播放页固定在${sidePositionLabel}，与内容并排"
         else -> "自动：竖屏全屏式，横屏侧边小窗式"
     }
 
@@ -115,6 +123,12 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                         onClick = { showPlayerModeSheet = true }
                     )
                     if (playerPageMode != SettingsPreferences.PLAYER_PAGE_MODE_FULLSCREEN) {
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        SettingsRow(
+                            title = "侧边播放页位置：$sidePositionLabel",
+                            subtitle = "侧边播放页与迷你播放条停靠在屏幕${sidePositionLabel}",
+                            onClick = { showSidePositionSheet = true }
+                        )
                         HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                         SettingsSwitchRow(
                             title = "侧边播放页钉住",
@@ -188,51 +202,23 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
         }
 
         if (showPlayerModeSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showPlayerModeSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = MaterialTheme.colorScheme.background,
-                shape = BottomSheetShape,
-                dragHandle = { MelodiaDragHandle() }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(start = MelodiaSpacing.lg, end = MelodiaSpacing.lg, bottom = MelodiaSpacing.lg)
-                ) {
-                    Text(
-                        text = "选择播放页模式",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(bottom = MelodiaSpacing.md)
-                    )
-                    PlayerPageModes.forEach { (key, label) ->
-                        val isSelected = playerPageMode == key
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.updatePlayerPageMode(key)
-                                    showPlayerModeSheet = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                fontSize = 15.sp
-                            )
-                            if (isSelected) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-            }
+            OptionPickerSheet(
+                title = "选择播放页模式",
+                options = PlayerPageModes,
+                selected = playerPageMode,
+                onSelect = viewModel::updatePlayerPageMode,
+                onDismiss = { showPlayerModeSheet = false }
+            )
+        }
+
+        if (showSidePositionSheet) {
+            OptionPickerSheet(
+                title = "选择侧边播放页位置",
+                options = SidePlayerPositions,
+                selected = sidePlayerPosition,
+                onSelect = viewModel::updateSidePlayerPosition,
+                onDismiss = { showSidePositionSheet = false }
+            )
         }
 
         if (showBottomBarSheet) {
@@ -243,6 +229,63 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                 onIconOnlyChange = { viewModel.updateBottomBarIconOnly(it) },
                 onDismiss = { showBottomBarSheet = false }
             )
+        }
+    }
+}
+
+// 单选列表底部弹窗，选中即保存并关闭
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OptionPickerSheet(
+    title: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = BottomSheetShape,
+        dragHandle = { MelodiaDragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = MelodiaSpacing.lg, end = MelodiaSpacing.lg, bottom = MelodiaSpacing.lg)
+        ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.padding(bottom = MelodiaSpacing.md)
+            )
+            options.forEach { (key, label) ->
+                val isSelected = selected == key
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onSelect(key)
+                            onDismiss()
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = label,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp
+                    )
+                    if (isSelected) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
         }
     }
 }

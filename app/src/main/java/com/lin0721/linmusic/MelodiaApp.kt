@@ -105,6 +105,7 @@ import com.lin0721.linmusic.core.ui.theme.PanelRiseSpec
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaPlayerPanelWidth
 import com.lin0721.linmusic.core.ui.theme.ProvideMelodiaContentSizeClass
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaSystemBarsConsumed
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPlayerPanelAtStart
 import kotlin.math.roundToInt
 
 private val SidebarWidth = 310.dp
@@ -138,6 +139,9 @@ fun MelodiaApp() {
     val playerPageMode by settingsPreferences.playerPageMode
         .collectAsStateWithLifecycle(initialValue = SettingsPreferences.PLAYER_PAGE_MODE_AUTO)
     val sidePlayerPinned by settingsPreferences.sidePlayerPinned.collectAsStateWithLifecycle(initialValue = true)
+    val sidePlayerPosition by settingsPreferences.sidePlayerPosition
+        .collectAsStateWithLifecycle(initialValue = SettingsPreferences.SIDE_PLAYER_POSITION_RIGHT)
+    val isPanelAtStart = sidePlayerPosition == SettingsPreferences.SIDE_PLAYER_POSITION_LEFT
     val tabletImmersiveMode by settingsPreferences.tabletImmersiveMode.collectAsStateWithLifecycle(initialValue = false)
     // 迷你条、面板等 Android 组件直接消费 Media3 MediaItem，取具体实现
     val playerManager: PlayerManager = koinInject()
@@ -366,11 +370,15 @@ fun MelodiaApp() {
         isPanelExpanded = false
     }
 
-    val isDrawerDraggable = userProfile != null && (sidebar.isOpen || sidebar.isTouchStartingAtEdge)
+    // 面板停靠左侧时左边缘被面板占住，边缘拉出侧边栏会和面板内的拖动手势冲突
+    val isEdgeSwipeBlocked = usePanel && isPanelAtStart && isPanelShown
+    val isDrawerDraggable = userProfile != null &&
+        (sidebar.isOpen || (sidebar.isTouchStartingAtEdge && !isEdgeSwipeBlocked))
 
     CompositionLocalProvider(
         LocalMelodiaWindowSizeClass provides windowSizeClass,
-        LocalMelodiaOrientationClass provides orientationClass
+        LocalMelodiaOrientationClass provides orientationClass,
+        LocalMelodiaPlayerPanelAtStart provides isPanelAtStart
     ) {
     Box(
         modifier = Modifier
@@ -444,12 +452,14 @@ fun MelodiaApp() {
                 // 面板展开时画布压暗一档，靠缝隙处的明度差勾出两张卡片轮廓
                 .background(if (isPanelDocked) BackgroundBlack else BackgroundDark)
         ) {
+            // 双卡片模式下靠屏幕边一侧只留 sm，靠面板一侧让出面板宽度 + 两侧间距
+            val edgeGap = if (isPanelDocked) MelodiaSpacing.sm else 0.dp
+            val panelGap = if (isPanelDocked) panelWidth + MelodiaSpacing.sm * 2 else 0.dp
             Row(modifier = Modifier.fillMaxSize()) {
-                // 双卡片模式下内容卡片左侧留白
                 Spacer(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(if (isPanelDocked) MelodiaSpacing.sm else 0.dp)
+                        .width(if (isPanelAtStart) panelGap else edgeGap)
                 )
                 CompositionLocalProvider(
                     LocalBottomOverlayInset provides bottomOverlayHeight,
@@ -581,27 +591,28 @@ fun MelodiaApp() {
                     }
                 }
 
-                // 播放面板让位占位：面板宽度 + 两侧间距
                 Spacer(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(if (isPanelDocked) panelWidth + MelodiaSpacing.sm * 2 else 0.dp)
+                        .width(if (isPanelAtStart) edgeGap else panelGap)
                 )
             }
 
-            // 平板常驻播放面板：浮在内容区之上的卡片，避开状态栏与手势条，右侧与迷你条同样留 sm 边距。
+            // 平板常驻播放面板：浮在内容区之上的卡片，避开状态栏与手势条，靠屏幕边一侧与迷你条同样留 sm 边距。
             // 卡片底边与迷你条所在行的底边只差 sm，起始矩形与迷你条重合；
             // 内容按卡片全高布局，只动画裁剪区域，避免 FullPlayerScreen 逐帧重排。
-            // 全屏时左边缘向左推到距屏幕左边 sm 处，宽度只在布局阶段读进度
+            // 全屏时朝内容区一侧推到距对侧屏幕边 sm 处，宽度只在布局阶段读进度
             if ((isPanelShown || hasPanelBeenShown) && usePanel) {
+                val panelEdgePadding = if (isLyricsFullScreen) 0.dp else MelodiaSpacing.sm
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(if (isPanelAtStart) Alignment.TopStart else Alignment.TopEnd)
                         // 首次展开后保留组合，收起时不测量也不摆放（不绘制、不接收触摸），再次展开无需重建整个播放器
                         .then(if (isPanelShown) Modifier else Modifier.layout { _, _ -> layout(0, 0) {} })
                         .padding(
+                            start = if (isPanelAtStart) panelEdgePadding else 0.dp,
                             top = if (isLyricsFullScreen) 0.dp else statusBarTop,
-                            end = if (isLyricsFullScreen) 0.dp else MelodiaSpacing.sm,
+                            end = if (isPanelAtStart) 0.dp else panelEdgePadding,
                             bottom = if (isLyricsFullScreen) 0.dp else navigationBarBottom
                         )
                         .layout { measurable, constraints ->

@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +34,7 @@ import com.lin0721.linmusic.core.player.PlaybackController
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.components.SwipeToSkipCover
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPlayerPanelAtStart
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
@@ -117,6 +119,7 @@ fun FullPlayerSourceBar(
     modifier: Modifier = Modifier
 ) {
     val motion = LocalUiMotion.current
+    val isPanelAtStart = LocalMelodiaPlayerPanelAtStart.current
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -130,11 +133,14 @@ fun FullPlayerSourceBar(
                         .size(32.dp)
                         .offset(x = (-4).dp)
                 ) {
+                    // 图标里的侧栏画在右侧，面板停靠左侧时水平翻转
                     Icon(
                         if (isSidebarFullscreen) Icons.Filled.ViewSidebar else Icons.Outlined.ViewSidebar,
                         contentDescription = if (isSidebarFullscreen) "收回侧栏" else "展开全屏",
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer { scaleX = if (isPanelAtStart) -1f else 1f }
                     )
                 }
                 Spacer(modifier = Modifier.width(SidebarToggleGap))

@@ -81,6 +81,7 @@ class SettingsPreferences(
         private val KEY_PANEL_DEFAULT_FULLSCREEN = booleanPreferencesKey("panel_default_fullscreen")
         private val KEY_PLAYER_PAGE_MODE = stringPreferencesKey("player_page_mode")
         private val KEY_SIDE_PLAYER_PINNED = booleanPreferencesKey("side_player_pinned")
+        private val KEY_SIDE_PLAYER_POSITION = stringPreferencesKey("side_player_position")
         // 平板全局沉浸，默认 false
         private val KEY_TABLET_IMMERSIVE_MODE = booleanPreferencesKey("tablet_immersive_mode")
         // 界面缩放百分比，默认 100
@@ -88,6 +89,8 @@ class SettingsPreferences(
         const val PLAYER_PAGE_MODE_AUTO = "auto"
         const val PLAYER_PAGE_MODE_FULLSCREEN = "fullscreen"
         const val PLAYER_PAGE_MODE_SIDE = "side"
+        const val SIDE_PLAYER_POSITION_RIGHT = "right"
+        const val SIDE_PLAYER_POSITION_LEFT = "left"
         // 悬浮歌词字体大小，默认 14sp
         private val KEY_LYRIC_TEXT_SIZE = intPreferencesKey("lyric_text_size")
         // 悬浮歌词颜色，默认 "#FFFFFF"
@@ -481,6 +484,17 @@ class SettingsPreferences(
     suspend fun saveSidePlayerPinned(pinned: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_SIDE_PLAYER_PINNED] = pinned
+        }
+    }
+
+    // 平板侧边播放页停靠在哪一侧
+    val sidePlayerPosition: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_SIDE_PLAYER_POSITION] ?: SIDE_PLAYER_POSITION_RIGHT
+    }
+
+    suspend fun saveSidePlayerPosition(position: String) {
+        dataStore.edit { prefs ->
+            prefs[KEY_SIDE_PLAYER_POSITION] = position
         }
     }
 

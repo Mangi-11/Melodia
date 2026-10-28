@@ -64,6 +64,7 @@ import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.melodiaNavigationBarBottomPadding
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaOrientationClass
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPlayerPanelAtStart
 import com.lin0721.linmusic.core.player.PlaySource
 import com.lin0721.linmusic.core.preferences.FullPlayerCard
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
@@ -446,6 +447,7 @@ fun FullPlayerScreen(
     }
 
     val isLandscape = rememberMelodiaOrientationClass() == MelodiaOrientationClass.Landscape
+    val isPanelAtStart = LocalMelodiaPlayerPanelAtStart.current
     val fullscreenProgress: () -> Float = { sidebarFullscreenProgress?.invoke()?.coerceIn(0f, 1f) ?: 0f }
     val canUseWideLayout = sidebarFullscreenProgress != null && isLandscape && fullscreenContentWidth.isSpecified
     val showColumnLayout by remember(canUseWideLayout) {
@@ -553,7 +555,7 @@ fun FullPlayerScreen(
             translationYProvider = { if (showColumnLayout) scrollMetrics.backgroundTranslationY else 0f }
         )
 
-        // 竖排列表：手机、侧栏与竖屏全屏。横屏铺开时贴右固定不动、随进度淡出，让位给宽屏两栏
+        // 竖排列表：手机、侧栏与竖屏全屏。横屏铺开时贴面板停靠侧固定不动、随进度淡出，让位给宽屏两栏
         if (showColumnLayout) {
             BoxWithConstraints(
                 modifier = Modifier
@@ -575,8 +577,17 @@ fun FullPlayerScreen(
                 } else {
                     0.dp
                 }
-                val startInset = if (canUseWideLayout) sideSpace else sideSpace / 2
-                val endInset = if (canUseWideLayout) 0.dp else sideSpace / 2
+                // 宽屏铺开过程中竖排列表贴住面板停靠的一侧，不随卡片变宽而平移
+                val startInset = when {
+                    !canUseWideLayout -> sideSpace / 2
+                    isPanelAtStart -> 0.dp
+                    else -> sideSpace
+                }
+                val endInset = when {
+                    !canUseWideLayout -> sideSpace / 2
+                    isPanelAtStart -> sideSpace
+                    else -> 0.dp
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -691,11 +702,11 @@ fun FullPlayerScreen(
             }
         }
 
-        // 宽屏两栏：按全屏最终宽度排一次、贴右放置，铺开过程中卡片左边缘逐步露出，同时淡入
+        // 宽屏两栏：按全屏最终宽度排一次、贴面板停靠侧放置，铺开过程中卡片另一侧边缘逐步露出，同时淡入
         if (showWideLayout) {
             val wideLayoutModifier = Modifier
-                .align(Alignment.TopEnd)
-                .wrapContentWidth(align = Alignment.End, unbounded = true)
+                .align(if (isPanelAtStart) Alignment.TopStart else Alignment.TopEnd)
+                .wrapContentWidth(align = if (isPanelAtStart) Alignment.Start else Alignment.End, unbounded = true)
                 .width(fullscreenContentWidth)
                 .padding(
                     top = melodiaStatusBarTopPadding(),
