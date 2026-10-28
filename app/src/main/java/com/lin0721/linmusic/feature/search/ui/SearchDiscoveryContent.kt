@@ -57,7 +57,8 @@ import com.lin0721.linmusic.core.ui.theme.FallbackBase
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
-import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.coverCardFill
+import com.lin0721.linmusic.core.ui.theme.coverCardGradient
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.search.domain.HotSearch
@@ -187,7 +188,7 @@ private fun FeaturedHotCard(
             .fillMaxWidth()
             .pressable(MelodiaPress.Card, onClick = onClick)
             .clip(MaterialTheme.shapes.medium)
-            .background(Brush.horizontalGradient(listOf(animatedBase, animatedBase.darken(0.45f))))
+            .background(Brush.horizontalGradient(coverCardGradient(animatedBase, 0.45f)))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -256,7 +257,7 @@ private fun FeaturedHotCard(
                 Icon(
                     Icons.Rounded.PlayArrow,
                     contentDescription = "播放 ${track.name}",
-                    tint = animatedBase.darken(0.3f),
+                    tint = coverCardFill(animatedBase, 0.3f),
                     modifier = Modifier.size(24.dp)
                 )
             }

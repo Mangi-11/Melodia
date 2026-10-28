@@ -15,9 +15,9 @@ import androidx.compose.foundation.gestures.scrollBy
 import com.lin0721.linmusic.core.comment.domain.CommentFloorState
 import com.lin0721.linmusic.core.comment.ui.CommentFloorScreen
 import com.lin0721.linmusic.core.comment.ui.CommentFullScreen
-import com.lin0721.linmusic.core.ui.theme.ImmersiveTheme
 import com.lin0721.linmusic.core.ui.theme.LightStatusBarIconsWhile
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import androidx.compose.foundation.background
@@ -55,6 +55,7 @@ import com.lin0721.linmusic.core.ui.components.ArtistPickerSheet
 import com.lin0721.linmusic.core.ui.components.SwipeToSkipCover
 import com.lin0721.linmusic.core.share.ShareCardKind
 import com.lin0721.linmusic.core.ui.components.ToastManager
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 import com.lin0721.linmusic.feature.player.share.LyricShareSheet
 import com.lin0721.linmusic.core.ui.theme.FallbackBackdropPalette
 import com.lin0721.linmusic.core.ui.theme.MelodiaOrientationClass
@@ -115,34 +116,30 @@ fun FullPlayerScreen(
     onLyricsFullScreenChange: (Boolean) -> Unit = {},
     onLyricsControlsVisibilityChange: (Boolean) -> Unit = {}
 ) {
-    // 手机全屏播放页盖住状态栏，浅色主题下状态栏图标跟随沉浸区改为浅色
-    LightStatusBarIconsWhile(isPlayerOpen && onToggleSidebarFullscreen == null)
-    ImmersiveTheme {
-        FullPlayerScreenContent(
-            currentTrack = currentTrack,
-            isPlaying = isPlaying,
-            currentPositionProvider = currentPositionProvider,
-            duration = duration,
-            onTogglePlay = onTogglePlay,
-            onSeek = onSeek,
-            onClose = onClose,
-            isPlayerOpen = isPlayerOpen,
-            onArtistClick = onArtistClick,
-            onAlbumClick = onAlbumClick,
-            onPlaylistClick = onPlaylistClick,
-            onNavigateToProfile = onNavigateToProfile,
-            onDragClose = onDragClose,
-            fitCoverAboveNavigationBar = fitCoverAboveNavigationBar,
-            fitCoverToViewport = fitCoverToViewport,
-            contentMaxWidth = contentMaxWidth,
-            onToggleSidebarFullscreen = onToggleSidebarFullscreen,
-            isSidebarFullscreen = isSidebarFullscreen,
-            sidebarFullscreenProgress = sidebarFullscreenProgress,
-            fullscreenContentWidth = fullscreenContentWidth,
-            onLyricsFullScreenChange = onLyricsFullScreenChange,
-            onLyricsControlsVisibilityChange = onLyricsControlsVisibilityChange
-        )
-    }
+    FullPlayerScreenContent(
+        currentTrack = currentTrack,
+        isPlaying = isPlaying,
+        currentPositionProvider = currentPositionProvider,
+        duration = duration,
+        onTogglePlay = onTogglePlay,
+        onSeek = onSeek,
+        onClose = onClose,
+        isPlayerOpen = isPlayerOpen,
+        onArtistClick = onArtistClick,
+        onAlbumClick = onAlbumClick,
+        onPlaylistClick = onPlaylistClick,
+        onNavigateToProfile = onNavigateToProfile,
+        onDragClose = onDragClose,
+        fitCoverAboveNavigationBar = fitCoverAboveNavigationBar,
+        fitCoverToViewport = fitCoverToViewport,
+        contentMaxWidth = contentMaxWidth,
+        onToggleSidebarFullscreen = onToggleSidebarFullscreen,
+        isSidebarFullscreen = isSidebarFullscreen,
+        sidebarFullscreenProgress = sidebarFullscreenProgress,
+        fullscreenContentWidth = fullscreenContentWidth,
+        onLyricsFullScreenChange = onLyricsFullScreenChange,
+        onLyricsControlsVisibilityChange = onLyricsControlsVisibilityChange
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -213,6 +210,8 @@ private fun FullPlayerScreenContent(
     val nextQueueItem by viewModel.playerManager.nextQueueItem.collectAsStateWithLifecycle()
     var showQueueSheet by remember { mutableStateOf(false) }
     var isLyricsFullScreen by remember { mutableStateOf(false) }
+    // 手机全屏歌词盖住状态栏且是有色底，浅色主题下状态栏图标切为浅色
+    LightStatusBarIconsWhile(isPlayerOpen && isLyricsFullScreen && onToggleSidebarFullscreen == null)
 
     LaunchedEffect(isLyricsFullScreen) {
         onLyricsFullScreenChange(isLyricsFullScreen)
@@ -745,7 +744,7 @@ private fun FullPlayerScreenContent(
                     onTogglePlay = onTogglePlay,
                     isLiked = if (podcast.isPodcast) podcast.subscribed else songDetailState.isLiked,
                     onToggleLike = if (podcast.isPodcast) viewModel::toggleSubscribe else viewModel::toggleLike,
-                    backgroundColor = colors.base,
+                    backgroundColor = themedCoverBase(colors.base),
                     currentPositionProvider = currentPositionProvider,
                     duration = duration,
                     onArtistClick = openSongArtist,
@@ -860,7 +859,8 @@ private fun FullPlayerScreenContent(
                 isLyricsLoading = songDetailState.isLyricsLoading,
                 currentLyricIndex = currentLyricIndex,
                 activeLyricIndices = activeLyricIndices,
-                highlightColor = colors.textHighlight,
+                // 宽屏两栏的歌词直接铺在页面上，浅色下未唱到的行改用三级文字色
+                highlightColor = if (MelodiaColors.IsDark) colors.textHighlight else MelodiaColors.TextTertiary,
                 currentPositionProvider = lyricPositionProvider,
                 isPlaying = isPlaying,
                 onLyricClick = { line -> viewModel.seekToTime(line.timeMs) },

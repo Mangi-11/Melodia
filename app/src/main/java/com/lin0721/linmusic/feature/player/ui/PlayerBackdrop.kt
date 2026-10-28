@@ -31,9 +31,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.ui.theme.darken
-import com.lin0721.linmusic.core.ui.theme.immersiveCoverFill
 import com.lin0721.linmusic.core.ui.theme.rememberImmersiveColors
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -142,12 +142,13 @@ fun PlayerBackdrop(
             val density = LocalDensity.current
             val gradientEndY = with(density) { COLLAPSED_GRADIENT_END_DP.dp.toPx() }
 
-            // base 本身已偏深且明度有上限，深色下直接铺底不再压暗，浅色下取中调
-            val fillColor = immersiveCoverFill(base)
-            val gradientBrush = remember(fillColor, gradientEndY) {
+            // base 本身已偏深且明度有上限，深色下直接铺底；浅色下取同色相浅调，两者都渐隐到页面底
+            val fillColor = themedCoverBase(base)
+            val endColor = Color.Transparent
+            val gradientBrush = remember(fillColor, endColor, gradientEndY) {
                 Brush.smoothVerticalGradient(
                     from = fillColor,
-                    to = Color.Transparent,
+                    to = endColor,
                     startY = 0f,
                     endY = gradientEndY,
                     fadeEndFraction = COLLAPSED_FADE_END_FRACTION,

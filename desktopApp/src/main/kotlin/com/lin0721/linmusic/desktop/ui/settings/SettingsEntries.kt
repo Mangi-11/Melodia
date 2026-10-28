@@ -654,7 +654,7 @@ internal fun settingsEntries(
             SettingsEntry(
                 key = "theme",
                 category = SettingsCategory.Interface,
-                title = "主题",
+                title = "主题（实验性）",
                 subtitle = "切换深浅模式与主色，立即生效",
                 keywords = listOf("主题", "外观", "深色", "浅色", "暗色", "亮色", "夜间", "跟随系统", "颜色", "主色", "强调色", "配色")
             ) {

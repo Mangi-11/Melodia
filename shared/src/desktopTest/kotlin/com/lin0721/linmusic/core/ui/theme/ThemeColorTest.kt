@@ -1,6 +1,7 @@
 package com.lin0721.linmusic.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.lin0721.linmusic.core.preferences.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -94,7 +95,7 @@ class ThemeColorTest {
     fun `头部浅调保留色相且足够浅`() {
         val tint = coverHeaderTint(Color(0xFFD9703A))
         val hsl = tint.toHsl()
-        assertTrue(abs(hsl.lightness - 0.92f) < 0.01f)
+        assertTrue(abs(tint.luminance() - 0.7f) < 0.01f)
         assertTrue(abs(hsl.hue - Color(0xFFD9703A).toHsl().hue) < 2f)
         assertTrue(contrastRatio(Color(0xFF141414), tint) > 12f)
     }

@@ -84,7 +84,7 @@ internal fun ThemeSetting(
     val darkAccent = ThemeAccents.resolve(settings.darkAccentId, settings.darkCustomHex, isDark = true)
     val lightAccent = ThemeAccents.resolve(settings.lightAccentId, settings.lightCustomHex, isDark = false)
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text("主题", color = DesktopColors.TextPrimary, fontSize = 14.sp)
+        Text("主题（实验性）", color = DesktopColors.TextPrimary, fontSize = 14.sp)
         Text("切换深浅模式与主色，立即生效", color = DesktopColors.TextGray, fontSize = 12.sp)
         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ThemeMode.entries.forEach { mode ->

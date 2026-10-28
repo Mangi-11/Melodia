@@ -118,7 +118,9 @@ fun FullPlayerTopBar(
             // 边缘进度条，跟 mini 栏同一个组件
             MiniPlayerProgress(
                 currentPositionProvider = currentPositionProvider,
-                duration = duration
+                duration = duration,
+                // 浅色收起顶栏是浅底，轨道改用描边色
+                trackColor = if (MelodiaColors.IsDark) Color.White.copy(alpha = 0.18f) else MelodiaColors.Outline
             )
         }
     }

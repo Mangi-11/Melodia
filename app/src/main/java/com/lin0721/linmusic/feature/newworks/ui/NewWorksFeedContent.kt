@@ -61,9 +61,11 @@ import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
 import com.lin0721.linmusic.core.ui.components.shimmerBackground
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.FallbackBase
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.immersiveMidFill
 import com.lin0721.linmusic.core.ui.theme.rememberMelodiaGridColumns
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 import com.lin0721.linmusic.feature.newworks.domain.NewWorksRelease
@@ -262,7 +264,12 @@ private fun ReleaseFeedCard(
     val baseColor by produceState(initialValue = FallbackBase, release.coverUrl) {
         value = extractBaseColorFromUrl(context, release.coverUrl)
     }
-    val cardColor by animateColorAsState(lerp(baseColor, Color.Black, CARD_COLOR_DARKEN), animationSpec = uiSpring(), label = "releaseCardColor")
+    val isDark = MelodiaColors.IsDark
+    val cardColor by animateColorAsState(
+        if (isDark) lerp(baseColor, Color.Black, CARD_COLOR_DARKEN) else immersiveMidFill(baseColor),
+        animationSpec = uiSpring(),
+        label = "releaseCardColor"
+    )
     val timeText = remember(release.publishTime) { formatRelativeTime(release.publishTime, System.currentTimeMillis()) }
 
     Column(

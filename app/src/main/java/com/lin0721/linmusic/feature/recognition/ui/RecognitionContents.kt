@@ -62,7 +62,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
 import com.lin0721.linmusic.core.ui.theme.TimerWarningRed
-import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.coverCardGradient
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import com.lin0721.linmusic.feature.player.ui.formatTime
@@ -327,7 +327,7 @@ private fun BestMatchCard(
             .fillMaxWidth()
             .pressable(style = MelodiaPress.Card, shape = cardShape, role = Role.Button, onClick = onOpen)
             .clip(cardShape)
-            .background(Brush.linearGradient(listOf(animatedBase, animatedBase.darken(0.4f))))
+            .background(Brush.linearGradient(coverCardGradient(animatedBase, 0.4f)))
             .padding(MelodiaSpacing.md),
         verticalArrangement = Arrangement.spacedBy(MelodiaSpacing.md)
     ) {

@@ -49,3 +49,15 @@ fun themedCoverBase(base: Color): Color = if (MelodiaColors.IsDark) base else co
 @ReadOnlyComposable
 fun themedCoverBase(base: Color, darkenFraction: Float): Color =
     if (MelodiaColors.IsDark) base.darken(darkenFraction) else coverHeaderTint(base)
+
+// 封面色卡片（白字）铺底：深色按 darkenFraction 压暗，浅色取中调，避免向黑混色在白底上发脏
+@Composable
+@ReadOnlyComposable
+fun coverCardFill(base: Color, darkenFraction: Float): Color =
+    if (MelodiaColors.IsDark) base.darken(darkenFraction) else immersiveMidFill(base)
+
+// 封面色卡片渐变：深色从原色过渡到压暗色，浅色从中调光斑色过渡到中调铺底色
+@Composable
+@ReadOnlyComposable
+fun coverCardGradient(base: Color, darkenFraction: Float): List<Color> =
+    if (MelodiaColors.IsDark) listOf(base, base.darken(darkenFraction)) else listOf(immersiveMidBlob(base), immersiveMidFill(base))

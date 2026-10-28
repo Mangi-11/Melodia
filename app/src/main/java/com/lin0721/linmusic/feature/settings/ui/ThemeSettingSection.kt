@@ -97,7 +97,7 @@ fun ThemeSettingSection(
     val lightAccent = ThemeAccents.resolve(settings.lightAccentId, settings.lightCustomHex, isDark = false, dynamicColor = lightDynamic)
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Text("主题", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
+        Text("主题（实验性）", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
         Text("切换深浅模式与主色，立即生效", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

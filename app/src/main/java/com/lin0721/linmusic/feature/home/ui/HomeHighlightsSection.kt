@@ -46,11 +46,13 @@ import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.FallbackBase
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaOrientationClass
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaOrientationClass
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.immersiveMidFill
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 import com.lin0721.linmusic.feature.home.data.DailySong
 import com.lin0721.linmusic.feature.home.data.PersonalizedPlaylist
@@ -171,8 +173,10 @@ private fun DailySpotlightCard(
             baseColor = extractBaseColorFromUrl(context, coverUrl)
         }
     }
+    // 浅色下改用与播放页一致的浓色中调，避免向黑混色在白底上发脏
+    val isDark = MelodiaColors.IsDark
     val containerColor by animateColorAsState(
-        targetValue = lerp(baseColor, Color.Black, SPOTLIGHT_DARKEN_FRACTION),
+        targetValue = if (isDark) lerp(baseColor, Color.Black, SPOTLIGHT_DARKEN_FRACTION) else immersiveMidFill(baseColor),
         animationSpec = uiSpring(),
         label = "daily_spotlight_color"
     )

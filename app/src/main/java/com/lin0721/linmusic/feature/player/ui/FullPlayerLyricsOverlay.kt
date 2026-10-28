@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lin0721.linmusic.core.player.PlayMode
+import com.lin0721.linmusic.core.ui.theme.ImmersiveTheme
 import com.lin0721.linmusic.core.ui.theme.PlayerBackdropPalette
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 import dev.chrisbanes.haze.HazeState
@@ -87,41 +88,44 @@ fun FullPlayerLyricsOverlay(
         modifier = Modifier.fillMaxSize()
     ) {
         val visibilityTransition = transition
-        FullScreenLyricsView(
-            coverage = coverage,
-            isFullyEntered = {
-                visibilityTransition.currentState == EnterExitState.Visible &&
-                    visibilityTransition.targetState == EnterExitState.Visible
-            },
-            lyrics = songState.lyrics,
-            currentIndex = currentLyricIndex,
-            activeIndices = activeLyricIndices,
-            isLoading = songState.isLyricsLoading,
-            title = title,
-            artist = artist,
-            coverUrl = coverUrl,
-            songLink = songLink,
-            base = colors.base,
-            highlightColor = colors.textHighlight,
-            onSeek = onSeek,
-            hazeState = hazeState,
-            onClose = onClose,
-            onDragClose = {
-                isDragClosed = true
-                onClose()
-            },
-            isPlaying = isPlaying,
-            currentPositionProvider = currentPositionProvider,
-            lyricPositionProvider = lyricPositionProvider,
-            duration = duration,
-            onTogglePlay = onTogglePlay,
-            onPlayNext = onPlayNext,
-            onPlayPrevious = onPlayPrevious,
-            playMode = playMode,
-            onToggleShuffle = onToggleShuffle,
-            onToggleRepeat = onToggleRepeat,
-            onMoreClick = onMoreClick,
-            onControlsVisibilityChange = onControlsVisibilityChange
-        )
+        // 全屏歌词是沉浸场景，浅色主题下仍按深色取色、中调铺底
+        ImmersiveTheme {
+            FullScreenLyricsView(
+                coverage = coverage,
+                isFullyEntered = {
+                    visibilityTransition.currentState == EnterExitState.Visible &&
+                        visibilityTransition.targetState == EnterExitState.Visible
+                },
+                lyrics = songState.lyrics,
+                currentIndex = currentLyricIndex,
+                activeIndices = activeLyricIndices,
+                isLoading = songState.isLyricsLoading,
+                title = title,
+                artist = artist,
+                coverUrl = coverUrl,
+                songLink = songLink,
+                base = colors.base,
+                highlightColor = colors.textHighlight,
+                onSeek = onSeek,
+                hazeState = hazeState,
+                onClose = onClose,
+                onDragClose = {
+                    isDragClosed = true
+                    onClose()
+                },
+                isPlaying = isPlaying,
+                currentPositionProvider = currentPositionProvider,
+                lyricPositionProvider = lyricPositionProvider,
+                duration = duration,
+                onTogglePlay = onTogglePlay,
+                onPlayNext = onPlayNext,
+                onPlayPrevious = onPlayPrevious,
+                playMode = playMode,
+                onToggleShuffle = onToggleShuffle,
+                onToggleRepeat = onToggleRepeat,
+                onMoreClick = onMoreClick,
+                onControlsVisibilityChange = onControlsVisibilityChange
+            )
+        }
     }
 }

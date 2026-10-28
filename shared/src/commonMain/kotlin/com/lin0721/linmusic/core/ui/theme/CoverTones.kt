@@ -10,8 +10,9 @@ private const val IMMERSIVE_FILL_LUMINANCE = 0.16f
 private const val IMMERSIVE_BLOB_LUMINANCE = 0.22f
 private const val IMMERSIVE_MIN_SATURATION = 0.35f
 private const val IMMERSIVE_MAX_SATURATION = 0.6f
-private const val HEADER_TINT_LIGHTNESS = 0.92f
-private const val HEADER_TINT_MAX_SATURATION = 0.45f
+// 头部浅调目标相对亮度：次要文字 #5E5E5E 在其上对比度约 4.6
+private const val HEADER_TINT_LUMINANCE = 0.7f
+private const val HEADER_TINT_MAX_SATURATION = 0.6f
 private const val ACCENT_TEXT_MIN_CONTRAST = 4.5f
 // 低于此饱和度视为灰色封面，不强行提饱和，避免灰图染出色偏
 private const val ACHROMATIC_SATURATION = 0.08f
@@ -46,11 +47,17 @@ fun immersiveMidFill(base: Color): Color = toneAtLuminance(base, IMMERSIVE_FILL_
 
 fun immersiveMidBlob(base: Color): Color = toneAtLuminance(base, IMMERSIVE_BLOB_LUMINANCE)
 
-// 浅色主题页面头部底色：同色相高明度，不走 RGB 混白，避免发灰发粉
+// 浅色主题页面头部底色：同色相浅调，按相对亮度定明暗，各色相浓淡观感一致且托得住次要文字
 fun coverHeaderTint(base: Color): Color {
     val hsl = base.toHsl()
     val saturation = if (hsl.saturation < ACHROMATIC_SATURATION) hsl.saturation else min(hsl.saturation, HEADER_TINT_MAX_SATURATION)
-    return Hsl(hsl.hue, saturation, HEADER_TINT_LIGHTNESS).toColor()
+    var low = 0f
+    var high = 1f
+    repeat(LUMINANCE_SEARCH_STEPS) {
+        val mid = (low + high) / 2f
+        if (Hsl(hsl.hue, saturation, mid).toColor().luminance() < HEADER_TINT_LUMINANCE) low = mid else high = mid
+    }
+    return Hsl(hsl.hue, saturation, high).toColor()
 }
 
 // 主色在浅底上作文字时的可读版本：对比度不足 4.5 时保持色相与饱和度，降低明度直到达标

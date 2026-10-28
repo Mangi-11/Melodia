@@ -62,6 +62,7 @@ import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.PaletteMemoryCache
+import com.lin0721.linmusic.core.ui.theme.immersiveMidFill
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.platform.LocalContext
@@ -137,7 +138,11 @@ fun MiniPlayerCard(
         animationSpec = uiTween(800),
         label = "mini_player_base"
     )
-    val fillColor = remember(animatedBase, expanded) { animatedBase.darken(if (expanded) 0.20f else 0.45f) }
+    // 浅色下取中调，与播放页铺底一致
+    val isDark = MelodiaColors.IsDark
+    val fillColor = remember(animatedBase, expanded, isDark) {
+        if (isDark) animatedBase.darken(if (expanded) 0.20f else 0.45f) else immersiveMidFill(animatedBase)
+    }
 
     // 左右滑动切歌的手势识别区域是整条悬浮栏
     // 视觉上是封面+歌名歌手那一行整体跟手平移，靠 SwipeToSkipCoverState 把两者串起来
@@ -475,14 +480,16 @@ private fun MiniPlayerContentRow(
 fun MiniPlayerProgress(
     currentPositionProvider: () -> Long,
     duration: Long,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    trackColor: Color = Color.White.copy(alpha = 0.18f),
+    progressColor: Color = MelodiaColors.Accent
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(2.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.08f))
+            .background(trackColor)
     ) {
         val currentPosition = currentPositionProvider()
         val progress = if (duration > 0) currentPosition.toFloat() / duration else 0f
@@ -491,7 +498,7 @@ fun MiniPlayerProgress(
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .fillMaxHeight()
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.85f))
+                .background(progressColor)
         )
     }
 }
