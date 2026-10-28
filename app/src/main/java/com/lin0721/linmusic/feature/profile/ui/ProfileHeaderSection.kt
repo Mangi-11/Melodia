@@ -31,11 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lin0721.linmusic.core.ui.interaction.pressable
-import com.lin0721.linmusic.core.ui.theme.BackgroundDark
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.feature.profile.domain.ProfileUserInfo
 
 // 头部资料区（头像/昵称/等级/签名/统计/关注按钮），不含 Tab 栏——
@@ -51,7 +50,7 @@ fun ProfileHeaderInfo(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(BackgroundDark)
+            .background(MelodiaColors.Background)
             .padding(horizontal = 20.dp, vertical = MelodiaSpacing.md)
     ) {
         // 用户资料行
@@ -74,7 +73,7 @@ fun ProfileHeaderInfo(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = userInfo.nickname,
-                        color = Color.White,
+                        color = MelodiaColors.TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -105,7 +104,7 @@ fun ProfileHeaderInfo(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = userInfo.signature,
-                        color = TextGray,
+                        color = MelodiaColors.TextSecondary,
                         fontSize = 13.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -128,14 +127,14 @@ fun ProfileHeaderInfo(
             ) {
                 Text(
                     text = "${userInfo.followsCount}",
-                    color = Color.White,
+                    color = MelodiaColors.TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "关注",
-                    color = TextGray,
+                    color = MelodiaColors.TextSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -146,14 +145,14 @@ fun ProfileHeaderInfo(
             ) {
                 Text(
                     text = "${userInfo.followedsCount}",
-                    color = Color.White,
+                    color = MelodiaColors.TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "粉丝",
-                    color = TextGray,
+                    color = MelodiaColors.TextSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -161,14 +160,14 @@ fun ProfileHeaderInfo(
             Column(horizontalAlignment = Alignment.Start) {
                 Text(
                     text = "${userInfo.playlistCount}",
-                    color = Color.White,
+                    color = MelodiaColors.TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "歌单",
-                    color = TextGray,
+                    color = MelodiaColors.TextSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -185,7 +184,7 @@ fun ProfileHeaderInfo(
                         onClick = onFollowClick
                     )
                     .border(
-                        border = if (userInfo.isFollowedByMe) BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                        border = if (userInfo.isFollowedByMe) BorderStroke(1.dp, MelodiaColors.Overlay.copy(alpha = 0.4f))
                         else BorderStroke(0.dp, Color.Transparent),
                         shape = RoundedCornerShape(PillRadius)
                     )
@@ -205,7 +204,7 @@ fun ProfileHeaderInfo(
 
         // 分割线
         HorizontalDivider(
-            color = Color.White.copy(alpha = 0.08f),
+            color = MelodiaColors.Divider,
             thickness = 1.dp
         )
     }
@@ -222,7 +221,7 @@ fun ProfileTabBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundDark)
+            .background(MelodiaColors.Background)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(28.dp)
     ) {

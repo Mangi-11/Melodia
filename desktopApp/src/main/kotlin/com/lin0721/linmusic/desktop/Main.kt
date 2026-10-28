@@ -35,6 +35,8 @@ import com.lin0721.linmusic.core.update.UpdateChecker
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.preferences.PreferencesStores
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.ThemeMode
+import com.lin0721.linmusic.core.preferences.ThemeSettings
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.desktop.app.AppInfo
 import com.lin0721.linmusic.desktop.app.DesktopCacheMigration
@@ -83,6 +85,8 @@ import com.lin0721.linmusic.desktop.ui.shell.WindowChromeEffect
 import com.lin0721.linmusic.desktop.ui.shell.rememberDesktopShellSession
 import com.lin0721.linmusic.desktop.ui.shell.rememberFullscreenState
 import com.lin0721.linmusic.desktop.ui.theme.MelodiaDesktopTheme
+import com.lin0721.linmusic.desktop.ui.theme.SystemDarkTheme
+import com.lin0721.linmusic.desktop.ui.theme.rememberDesktopPalette
 import com.lin0721.linmusic.desktop.ui.tray.TrayHost
 import com.lin0721.linmusic.desktop.ui.tray.TrayMenuEntry
 import com.lin0721.linmusic.desktop.ui.tray.isTraySupported
@@ -203,6 +207,11 @@ fun main() {
     val initialUiAnimationsEnabled = runCatching {
         runBlocking { settingsPreferences.uiAnimationsEnabled.first() }
     }.getOrDefault(true)
+    // 首帧即按已存主题渲染；跟随系统时先同步读一次系统深浅色
+    val initialThemeSettings = runCatching {
+        runBlocking { settingsPreferences.themeSettings.first() }
+    }.getOrDefault(ThemeSettings())
+    if (initialThemeSettings.mode == ThemeMode.SYSTEM) SystemDarkTheme.refreshBlocking(windowEffects)
     val restoredBounds = savedWindow.bounds
     val restoredPosition = restoredBounds?.takeIf { it.isReachableOn(currentScreenBounds()) }
     // 附属窗口每次打开都取最新保存的状态；显示器布局变化后够不着的位置交给默认值
@@ -248,6 +257,8 @@ fun main() {
         val uiScaleFactor = UiScale.toFactor(uiScalePercent)
         val uiAnimationsEnabled by settingsPreferences.uiAnimationsEnabled.collectAsState(initial = initialUiAnimationsEnabled)
         val uiMotion = remember { UiMotion(initialUiAnimationsEnabled) }
+        val themeSettings by settingsPreferences.themeSettings.collectAsState(initial = initialThemeSettings)
+        val palette = rememberDesktopPalette(themeSettings, windowEffects)
         LaunchedEffect(uiAnimationsEnabled) { uiMotion.enabled = uiAnimationsEnabled }
         val closeAction by desktopPreferences.closeAction.collectAsState(initial = CloseAction.TRAY)
         val isPlaying by controller.playWhenReady.collectAsState()
@@ -475,11 +486,11 @@ fun main() {
                 }
             }
             // 全屏与最大化一样不要圆角和边框线
-            WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating)
-            CanvasClearColorEffect()
+            WindowChromeEffect(windowEffects, maximized = windowState.placement != WindowPlacement.Floating, palette = palette)
+            CanvasClearColorEffect(palette.windowBackground)
             TaskbarThumbnailEffect(taskbarThumbnail, controller)
             CompositionLocalProvider(LocalUiMotion provides uiMotion, LocalWindowEffects provides windowEffects) {
-                MelodiaDesktopTheme(uiScale = uiScaleFactor) {
+                MelodiaDesktopTheme(uiScale = uiScaleFactor, palette = palette) {
                     shellSession.Provide {
                         MelodiaDesktopApp(
                             deps = appDependencies,
@@ -522,6 +533,7 @@ fun main() {
             MiniPlayerWindow(
                 init = remember { loadMiniPlayerInit() },
                 uiScale = uiScaleFactor,
+                palette = palette,
                 uiMotion = uiMotion,
                 windowEffects = windowEffects,
                 icon = appIcon,

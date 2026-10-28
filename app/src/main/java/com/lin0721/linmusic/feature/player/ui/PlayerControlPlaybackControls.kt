@@ -20,16 +20,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.ui.interaction.pressScale
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
 // 主控件行：随机/漫游、上一曲、播放暂停、下一曲、循环模式
@@ -77,7 +76,7 @@ fun PlaybackControls(
                     else -> Icons.Default.Shuffle
                 },
                 contentDescription = null,
-                tint = if (isRoaming || isIntelligence || playMode == PlayMode.SHUFFLE) Color.White else TextGray,
+                tint = if (isRoaming || isIntelligence || playMode == PlayMode.SHUFFLE) MelodiaColors.TextPrimary else MelodiaColors.TextSecondary,
                 modifier = Modifier.size(28.dp)
             )
         } else Spacer(Modifier.size(ModeButtonSlot))
@@ -87,7 +86,7 @@ fun PlaybackControls(
             verticalAlignment = Alignment.CenterVertically
         ) {
             MelodiaIconButton(onClick = onPlayPrevious, style = MelodiaPress.Transport) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = Color.White, modifier = Modifier.size(46.dp))
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = MelodiaColors.TextPrimary, modifier = Modifier.size(46.dp))
             }
             val playInteraction = remember { MutableInteractionSource() }
             val isPressed by playInteraction.collectIsPressedAsState()
@@ -114,7 +113,7 @@ fun PlaybackControls(
                     clickTrigger++
                     onTogglePlay()
                 },
-                containerColor = Color.White,
+                containerColor = MelodiaColors.TextPrimary,
                 shape = CircleShape,
                 interactionSource = playInteraction,
                 modifier = Modifier
@@ -123,10 +122,10 @@ fun PlaybackControls(
                         alpha = buttonAlpha.value
                     }
             ) {
-                PlayPauseIcon(isPlaying, Color.Black, size = 42.dp)
+                PlayPauseIcon(isPlaying, MelodiaColors.InverseText, size = 42.dp)
             }
             MelodiaIconButton(onClick = onPlayNext, style = MelodiaPress.Transport) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(46.dp))
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = MelodiaColors.TextPrimary, modifier = Modifier.size(46.dp))
             }
         }
 
@@ -137,7 +136,7 @@ fun PlaybackControls(
             Icon(
                 if (playMode == PlayMode.SINGLE_LOOP) Icons.Default.RepeatOne else Icons.Default.Repeat,
                 contentDescription = null,
-                tint = if (playMode == PlayMode.SINGLE_LOOP) Color.White else TextGray,
+                tint = if (playMode == PlayMode.SINGLE_LOOP) MelodiaColors.TextPrimary else MelodiaColors.TextSecondary,
                 modifier = Modifier.size(28.dp)
             )
         } else Spacer(Modifier.size(ModeButtonSlot))

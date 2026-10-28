@@ -29,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -81,7 +80,7 @@ fun CommentInputBar(
     }
 
     Column(modifier.fillMaxWidth().background(DesktopColors.Pane)) {
-        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+        HorizontalDivider(color = DesktopColors.Divider)
         if (replyTarget != null) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp),
@@ -89,7 +88,7 @@ fun CommentInputBar(
             ) {
                 Text(
                     "回复 @${replyTarget.user.nickname}:",
-                    color = DesktopColors.Accent,
+                    color = DesktopColors.AccentText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
@@ -134,9 +133,9 @@ fun CommentInputBar(
                 )
             ) {
                 if (isSubmitting) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(color = DesktopColors.OnAccent, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("发送", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("发送", color = DesktopColors.OnAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

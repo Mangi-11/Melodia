@@ -30,6 +30,7 @@ import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ fun PlaylistSongOptionsSheet(
             }
 
             HorizontalDivider(
-                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f),
+                color = MelodiaColors.Divider,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = MelodiaSpacing.sm)
             )
 

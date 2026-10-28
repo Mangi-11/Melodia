@@ -345,12 +345,12 @@ private fun LyricColorDropdown(options: List<FloatingLyricColorOption>, current:
     )
 }
 
-// 深色菜单上纯黑色块看不清，统一描一圈浅色边
+// 纯黑或纯白色块与菜单底色相近时看不清，统一描一圈边
 @Composable
 private fun ColorSwatch(hex: String) {
     Box(
         Modifier.size(14.dp).clip(CircleShape)
-            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .border(1.dp, DesktopColors.Overlay.copy(alpha = 0.3f), CircleShape)
             .background(Color((FloatingLyricPalette.parseArgb(hex) ?: 0xFFFFFFFFL).toInt()))
     )
 }
@@ -385,6 +385,7 @@ internal fun settingsEntries(
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
     val uiAnimationsEnabled by common.uiAnimationsEnabled.collectAsState()
+    val themeSettings by common.themeSettings.collectAsState()
     val downloadFolder by common.downloadFolderUri.collectAsState()
     val downloadLyrics by common.downloadLyricsEnabled.collectAsState()
     val localData by localLibrary.data.collectAsState()
@@ -575,7 +576,7 @@ internal fun settingsEntries(
                         LinearProgressIndicator(
                             progress = { progress.fraction },
                             modifier = Modifier.fillMaxWidth().height(3.dp),
-                            color = DesktopColors.Accent,
+                            color = DesktopColors.AccentText,
                             trackColor = DesktopColors.SurfaceLight
                         )
                     }
@@ -649,6 +650,22 @@ internal fun settingsEntries(
         )
         addAll(localMusicEntries(localLibrary, localData.filter, localScan, scope))
 
+        add(
+            SettingsEntry(
+                key = "theme",
+                category = SettingsCategory.Interface,
+                title = "主题",
+                subtitle = "切换深浅模式与主色，立即生效",
+                keywords = listOf("主题", "外观", "深色", "浅色", "暗色", "亮色", "夜间", "跟随系统", "颜色", "主色", "强调色", "配色")
+            ) {
+                ThemeSetting(
+                    settings = themeSettings,
+                    onModeChange = common::updateThemeMode,
+                    onAccentChange = common::updateThemeAccent,
+                    onCustomColorChange = common::updateThemeCustomColor
+                )
+            }
+        )
         add(
             rowEntry(
                 "desktopLyric", SettingsCategory.Interface, "显示桌面歌词",

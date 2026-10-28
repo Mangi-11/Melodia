@@ -15,7 +15,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lin0721.linmusic.LocalBottomOverlayInset
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.preferences.UiScale
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.feature.player.ui.LyricCapsuleSlider
 import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
@@ -54,6 +54,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
     val sidePlayerPosition by viewModel.sidePlayerPosition.collectAsStateWithLifecycle()
     val tabletImmersiveMode by viewModel.tabletImmersiveMode.collectAsStateWithLifecycle()
     val uiScalePercent by viewModel.uiScalePercent.collectAsStateWithLifecycle()
+    val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
     val uiAnimationsEnabled by viewModel.uiAnimationsEnabled.collectAsStateWithLifecycle()
     val isExpanded = LocalMelodiaWindowSizeClass.current == MelodiaWindowSizeClass.Expanded
 
@@ -105,7 +106,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                         subtitle = "当前启用：$enabledItemsSummary",
                         onClick = { showBottomBarSheet = true }
                     )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MelodiaColors.Divider)
                     SettingsSwitchRow(
                         title = "启动默认打开音乐库",
                         subtitle = "冷启动时直接进入音乐库页面",
@@ -123,13 +124,13 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                         onClick = { showPlayerModeSheet = true }
                     )
                     if (playerPageMode != SettingsPreferences.PLAYER_PAGE_MODE_FULLSCREEN) {
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = MelodiaColors.Divider)
                         SettingsRow(
                             title = "侧边播放页位置：$sidePositionLabel",
                             subtitle = "侧边播放页与迷你播放条停靠在屏幕${sidePositionLabel}",
                             onClick = { showSidePositionSheet = true }
                         )
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = MelodiaColors.Divider)
                         SettingsSwitchRow(
                             title = "侧边播放页钉住",
                             subtitle = "关闭后按返回键直接收起侧边播放页",
@@ -138,7 +139,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                         )
                     }
                     if (isExpanded) {
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = MelodiaColors.Divider)
                         SettingsSwitchRow(
                             title = "全局沉浸",
                             subtitle = "隐藏系统状态栏与导航栏，边缘滑动呼出",
@@ -151,6 +152,13 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
 
             item {
                 SettingsGroupCard(SettingsSubMenu.EXTENSIONS.sectionTitles[4]) {
+                    ThemeSettingSection(
+                        settings = themeSettings,
+                        onModeChange = viewModel::updateThemeMode,
+                        onAccentChange = viewModel::updateThemeAccent,
+                        onCustomColorChange = viewModel::updateThemeCustomColor
+                    )
+                    HorizontalDivider(color = MelodiaColors.Divider)
                     // 松手后才应用（会重建界面）；拖动中不应用，避免滑块在手指下移位
                     var pendingPercent by remember { mutableStateOf<Int?>(null) }
                     LaunchedEffect(uiScalePercent) { pendingPercent = null }
@@ -190,7 +198,7 @@ fun ExtensionsSettingsView(viewModel: SettingsViewModel) {
                             }
                         )
                     }
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MelodiaColors.Divider)
                     SettingsSwitchRow(
                         title = "界面过渡动画",
                         subtitle = "关闭后切页、面板展开收起等直接切换，不影响歌词滚动",

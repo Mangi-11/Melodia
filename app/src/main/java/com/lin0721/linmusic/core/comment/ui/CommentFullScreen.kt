@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -44,11 +43,9 @@ import com.lin0721.linmusic.core.model.CommentItem
 import com.lin0721.linmusic.core.ui.components.MelodiaButton
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.ui.theme.NeteaseRed
-import com.lin0721.linmusic.core.ui.theme.BackgroundDark
-import com.lin0721.linmusic.core.ui.theme.TextGray
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -79,7 +76,7 @@ fun CommentFullScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(MelodiaColors.Background)
             .statusBarsPadding()
     ) {
         val totalCount = commentsState.totalCount ?: (commentsState as? CommentsState.Success)?.total ?: 0
@@ -97,12 +94,12 @@ fun CommentFullScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "返回",
-                    tint = Color.White
+                    tint = MelodiaColors.TextPrimary
                 )
             }
             Text(
                 text = titleText,
-                color = Color.White,
+                color = MelodiaColors.TextPrimary,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -136,16 +133,16 @@ fun CommentFullScreen(
                     ) {
                         Text(
                             text = "加载失败: ${commentsState.message}",
-                            color = TextGray,
+                            color = MelodiaColors.TextSecondary,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         MelodiaButton(
                             onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(containerColor = NeteaseRed)
+                            colors = ButtonDefaults.buttonColors(containerColor = MelodiaColors.Accent)
                         ) {
-                            Text("重试", color = Color.White)
+                            Text("重试", color = MelodiaColors.OnAccent)
                         }
                     }
                 }
@@ -160,7 +157,7 @@ fun CommentFullScreen(
                         ) {
                             Text(
                                 text = "暂无评论",
-                                color = TextGray,
+                                color = MelodiaColors.TextSecondary,
                                 fontSize = 14.sp
                             )
                         }
@@ -218,7 +215,7 @@ fun CommentFullScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         CircularProgressIndicator(
-                                            color = NeteaseRed,
+                                            color = MelodiaColors.AccentText,
                                             modifier = Modifier.size(20.dp),
                                             strokeWidth = 2.dp
                                         )

@@ -65,6 +65,8 @@ internal class NoopWindowEffects : WindowEffects {
     override fun uninstall(window: Window) = Unit
     override fun applyFrame(window: Window, maximized: Boolean, borderRgb: Int) = Unit
     override fun systemBorderAccent(): Int? = null
+    override fun systemAppsUseLightTheme(): Boolean = false
+    override fun observeSystemTheme(onChanged: () -> Unit): () -> Unit = {}
     override fun setClickThrough(window: Window, enabled: Boolean) = Unit
     override fun beginSystemMove(window: Window): Boolean = false
     override fun beginSystemResize(window: Window, edge: WindowEdge): Boolean = false

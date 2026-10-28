@@ -31,6 +31,7 @@ import com.lin0721.linmusic.core.ui.components.ArtistPickerSheet
 import com.lin0721.linmusic.core.ui.components.WebViewLoginScreen
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.comment.ui.CommentFullScreen
@@ -943,7 +944,7 @@ fun PlaylistScreen(
                     }
 
                     HorizontalDivider(
-                        color = Color.White.copy(alpha = 0.08f),
+                        color = MelodiaColors.Divider,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = MelodiaSpacing.sm)
                     )
 

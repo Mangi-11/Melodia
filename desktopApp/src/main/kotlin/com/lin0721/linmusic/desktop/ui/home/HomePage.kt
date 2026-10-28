@@ -95,6 +95,7 @@ import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.ScrollArrow
 import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
+import com.lin0721.linmusic.desktop.ui.palette.themedCoverBackground
 import com.lin0721.linmusic.desktop.ui.playlist.DAILY_RECOMMEND_ID
 import com.lin0721.linmusic.desktop.ui.playlist.DAILY_RECOMMEND_NAME
 import com.lin0721.linmusic.desktop.ui.podcast.PodcastTab
@@ -199,7 +200,7 @@ fun HomePage(
     }
     val gradientColor by animateColorAsState(
         targetValue = if (activeCoverUrl.isNotBlank()) {
-            lerp(heroBase, Color.Black, HOME_GRADIENT_DARKEN_FRACTION)
+            themedCoverBackground(heroBase, HOME_GRADIENT_DARKEN_FRACTION)
         } else {
             DesktopColors.Pane
         },
@@ -579,7 +580,7 @@ private fun RecentTile(
     var tileHeightPx by remember { mutableIntStateOf(0) }
     var contextMenuOffset by remember { mutableStateOf<DpOffset?>(null) }
     val background by animateColorAsState(
-        if (hovered || contextMenuOffset != null) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+        if (hovered || contextMenuOffset != null) DesktopColors.Overlay.copy(alpha = 0.18f) else DesktopColors.Overlay.copy(alpha = 0.08f),
         uiTween(HOVER_FADE_MS),
         label = "recentTileBg"
     )
@@ -663,14 +664,15 @@ private fun DailySpotlight(songs: List<DailySong>, onOpen: () -> Unit, onPlay: (
         if (coverUrl.isNotBlank()) baseColor = extractCoverPaletteFromUrl(coverUrl).base
     }
     val containerColor by animateColorAsState(
-        lerp(baseColor, Color.Black, SPOTLIGHT_DARKEN_FRACTION),
+        themedCoverBackground(baseColor, SPOTLIGHT_DARKEN_FRACTION),
         uiSpring(),
         label = "dailySpotlightColor"
     )
     val today = remember { LocalDate.now() }
-    val trackLine = remember(songs) {
+    val countColor = DesktopColors.TextPrimary
+    val trackLine = remember(songs, countColor) {
         buildAnnotatedString {
-            withStyle(SpanStyle(color = DesktopColors.TextPrimary, fontWeight = FontWeight.Bold)) {
+            withStyle(SpanStyle(color = countColor, fontWeight = FontWeight.Bold)) {
                 append("${songs.size} 首")
             }
             songs.take(SPOTLIGHT_TRACK_PREVIEW_COUNT).forEach { song ->
@@ -710,7 +712,7 @@ private fun DailySpotlight(songs: List<DailySong>, onOpen: () -> Unit, onPlay: (
                 size = 48.dp,
                 description = "播放每日推荐",
                 containerColor = DesktopColors.TextPrimary,
-                iconTint = Color.Black,
+                iconTint = DesktopColors.InverseText,
                 onClick = onPlay
             )
         }

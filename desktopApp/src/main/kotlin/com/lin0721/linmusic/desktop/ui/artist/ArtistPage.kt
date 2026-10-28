@@ -62,7 +62,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -86,6 +85,7 @@ import com.lin0721.linmusic.desktop.ui.components.uiSpring
 import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.palette.FallbackCoverPalette
 import com.lin0721.linmusic.desktop.ui.palette.extractCoverPaletteFromUrl
+import com.lin0721.linmusic.desktop.ui.palette.themedCoverBackground
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.library.CreatePlaylistDialog
@@ -201,7 +201,7 @@ private fun ArtistContent(
     LaunchedEffect(backdropUrl) {
         if (backdropUrl.isNotBlank()) heroBase = extractCoverPaletteFromUrl(backdropUrl).base
     }
-    val heroColor by animateColorAsState(lerp(heroBase, Color.Black, HERO_DARKEN_FRACTION), uiSpring(), label = "artistHero")
+    val heroColor by animateColorAsState(themedCoverBackground(heroBase, HERO_DARKEN_FRACTION), uiSpring(), label = "artistHero")
 
     val listState = rememberLazyListState()
     val density = LocalDensity.current

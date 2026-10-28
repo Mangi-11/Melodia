@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
@@ -96,8 +97,8 @@ private fun SubStyleChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .pressable(MelodiaPress.Pill) { onClick() }
             .clip(CircleShape)
             .then(
-                if (selected) Modifier.background(Color.White)
-                else Modifier.border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
+                if (selected) Modifier.background(MelodiaColors.TextPrimary)
+                else Modifier.border(1.dp, MelodiaColors.Overlay.copy(alpha = 0.18f), CircleShape)
             )
             .padding(horizontal = 11.dp, vertical = 5.dp)
     ) {

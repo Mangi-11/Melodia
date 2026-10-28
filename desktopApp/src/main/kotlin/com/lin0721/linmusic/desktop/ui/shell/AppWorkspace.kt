@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.lin0721.linmusic.core.ui.theme.floatingOutline
 import com.lin0721.linmusic.desktop.data.LibraryMode
 import com.lin0721.linmusic.desktop.player.AudioOutputControl
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
@@ -179,6 +180,7 @@ internal fun Workspace(
 private fun Pane(modifier: Modifier, content: @Composable () -> Unit) {
     Box(
         modifier.fillMaxHeight().clip(RoundedCornerShape(DesktopDimens.PaneRadius)).background(DesktopColors.Pane)
+            .floatingOutline(RoundedCornerShape(DesktopDimens.PaneRadius))
     ) {
         content()
     }

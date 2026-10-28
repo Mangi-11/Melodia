@@ -37,6 +37,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.awtEventOrNull
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -77,6 +77,7 @@ import com.lin0721.linmusic.core.format.formatDuration
 import com.lin0721.linmusic.core.model.Artist
 import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.source.MusicPlatform
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.DesktopMenu
 import com.lin0721.linmusic.desktop.ui.components.MenuDivider
@@ -99,7 +100,7 @@ private const val DISABLED_ROW_ALPHA = 0.38f
 // 与歌单页表头的“添加日期”列同宽
 internal val ADDED_COLUMN_WIDTH = 120.dp
 
-internal val DangerColor = Color(0xFFFF6B6B)
+internal val DangerColor: Color @Composable @ReadOnlyComposable get() = DesktopColors.Error
 
 // 多选态下的行勾选状态与切换回调
 @Immutable
@@ -164,7 +165,7 @@ fun TrackRow(
             .then(
                 if (lifted && reorder != null) {
                     Modifier.zIndex(1f).graphicsLayer { translationY = reorder.offsetY }
-                        .then(if (dragging) Modifier.shadow(8.dp, rowShape) else Modifier)
+                        .then(if (dragging) Modifier.themedShadow(8.dp, rowShape) else Modifier)
                 } else {
                     Modifier
                 }
@@ -177,7 +178,7 @@ fun TrackRow(
                 .background(
                     when {
                         dragging -> DesktopColors.Surface
-                        hovered || contextMenuOffset != null || moreMenuOpen -> DesktopColors.PaneHover
+                        hovered || contextMenuOffset != null || moreMenuOpen -> DesktopColors.Hover
                         else -> Color.Transparent
                     }
                 )
@@ -242,7 +243,7 @@ fun TrackRow(
             } else {
                 Text(
                     "${index + 1}",
-                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextGray,
+                    color = if (isCurrent) DesktopColors.AccentText else DesktopColors.TextGray,
                     fontSize = 14.sp,
                     textAlign = TextAlign.End,
                     modifier = Modifier.width(32.dp)
@@ -253,7 +254,7 @@ fun TrackRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         track.name,
-                        color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
+                        color = if (isCurrent) DesktopColors.AccentText else DesktopColors.TextPrimary,
                         fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -457,7 +458,7 @@ internal fun TrackMenu(
     }
 }
 
-private val LinkStyles = TextLinkStyles(hoveredStyle = SpanStyle(color = DesktopColors.TextPrimary, textDecoration = TextDecoration.Underline))
+private val LinkStyles: TextLinkStyles @Composable @ReadOnlyComposable get() = TextLinkStyles(hoveredStyle = SpanStyle(color = DesktopColors.TextPrimary, textDecoration = TextDecoration.Underline))
 
 // 多位歌手各自可点，无 id 的歌手只展示名字
 @Composable
@@ -468,6 +469,7 @@ fun PlatformBadge(platform: MusicPlatform, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
 fun artistLinks(artists: List<Artist>, onClick: (Long, String) -> Unit): AnnotatedString = buildAnnotatedString {
     artists.forEachIndexed { i, artist ->
         if (i > 0) append(" / ")
@@ -481,6 +483,7 @@ fun artistLinks(artists: List<Artist>, onClick: (Long, String) -> Unit): Annotat
     }
 }
 
+@Composable
 private fun albumLink(track: Track, onClick: (Long, String) -> Unit): AnnotatedString = buildAnnotatedString {
     if (track.al.id > 0) {
         withLink(LinkAnnotation.Clickable("album_${track.al.id}", LinkStyles) { onClick(track.al.id, track.al.name) }) {

@@ -58,10 +58,8 @@ import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.player.rememberQueueItemCoverUrl
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
-import com.lin0721.linmusic.core.ui.theme.BackgroundDark
-import com.lin0721.linmusic.core.ui.theme.SurfaceDark
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.extractBackdropPaletteFromUrl
 import com.lin0721.linmusic.core.ui.theme.PaletteMemoryCache
 import com.lin0721.linmusic.core.ui.theme.uiTween
@@ -71,7 +69,6 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import com.lin0721.linmusic.core.ui.theme.FallbackBackdropPalette
-import com.lin0721.linmusic.core.ui.theme.NavPillSelected
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
@@ -188,15 +185,16 @@ fun MiniPlayerCard(
 
     val miniPlayerCornerRadius = 8.dp
     val miniPlayerShape = RoundedCornerShape(miniPlayerCornerRadius)
+    val miniPlayerShadowAlpha = if (MelodiaColors.IsDark) 0.4f else 0.16f
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // 弥散阴影让卡片从纯黑背景上浮起来，避免边缘跟背景生硬贴死
+            // 弥散阴影让卡片从背景上浮起来，避免边缘跟背景生硬贴死；浅色底上阴影需要淡很多
             .shadow(
                 elevation = 16.dp,
                 shape = miniPlayerShape,
-                ambientColor = Color.Black.copy(alpha = 0.4f),
-                spotColor = Color.Black.copy(alpha = 0.4f)
+                ambientColor = Color.Black.copy(alpha = miniPlayerShadowAlpha),
+                spotColor = Color.Black.copy(alpha = miniPlayerShadowAlpha)
             )
             .clip(miniPlayerShape)
             .border(0.5.dp, Color.White.copy(alpha = if (expanded) 0.14f else 0.08f), miniPlayerShape)
@@ -513,10 +511,9 @@ fun MelodiaNavigationBar(
     expanded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    // 平板宽屏下用 SurfaceDark（比页面背景 BackgroundDark 亮一档）+ 描边，
-    // 避免和几乎所有页面都在用的 BackgroundDark 背景融为一体
+    // 平板宽屏下用 MelodiaColors.Surface + 描边，避免和页面背景融为一体
     Surface(
-        color = if (expanded) SurfaceDark else BackgroundDark,
+        color = if (expanded) MelodiaColors.Surface else MelodiaColors.NavigationBar,
         shape = if (expanded) RoundedCornerShape(InfoCardRadius) else RectangleShape,
         modifier = modifier
             .fillMaxWidth()
@@ -524,7 +521,7 @@ fun MelodiaNavigationBar(
                 if (expanded) {
                     Modifier
                         .fillMaxHeight()
-                        .border(0.5.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(InfoCardRadius))
+                        .border(0.5.dp, if (MelodiaColors.IsDark) Color.White.copy(alpha = 0.14f) else MelodiaColors.Outline, RoundedCornerShape(InfoCardRadius))
                 } else {
                     Modifier
                 }
@@ -587,7 +584,7 @@ fun MelodiaNavigationBar(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) NavPillSelected else Color.Transparent)
+                            .background(if (isSelected) MelodiaColors.NavPillSelected else Color.Transparent)
                             .padding(
                                 horizontal = MelodiaSpacing.md,
                                 vertical = if (iconOnly) 6.dp else 1.dp
@@ -597,14 +594,14 @@ fun MelodiaNavigationBar(
                         Icon(
                             imageVector = icon,
                             contentDescription = label,
-                            tint = if (isSelected) Color.White else TextGray,
+                            tint = if (isSelected) MelodiaColors.TextPrimary else MelodiaColors.TextSecondary,
                             modifier = Modifier.size(if (iconOnly) 24.dp else 22.dp)
                         )
                     }
                     if (!iconOnly) {
                         Text(
                             text = label,
-                            color = if (isSelected) Color.White else TextGray,
+                            color = if (isSelected) MelodiaColors.TextPrimary else MelodiaColors.TextSecondary,
                             fontSize = 11.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )

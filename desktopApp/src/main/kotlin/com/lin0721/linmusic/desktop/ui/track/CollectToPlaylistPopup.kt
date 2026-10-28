@@ -47,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
@@ -77,6 +76,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectItem
 import com.lin0721.linmusic.core.ui.components.PlaylistCollectState
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.desktop.ui.components.Cover
 import com.lin0721.linmusic.desktop.ui.components.HoverScrollbarBox
 import com.lin0721.linmusic.desktop.ui.components.trackTextInputFocus
@@ -113,7 +113,7 @@ fun CollectToPlaylistPopup(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true)
     ) {
-        CollectPanel(songId, state, onSave, onCreate, onDismiss, Modifier.shadow(16.dp, PanelShape))
+        CollectPanel(songId, state, onSave, onCreate, onDismiss, Modifier.themedShadow(16.dp, PanelShape))
     }
 }
 
@@ -377,7 +377,7 @@ private fun CollectRow(item: PlaylistCollectItem, checked: Boolean, onToggle: ()
     val hovered by hoverSource.collectIsHoveredAsState()
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
-            .background(if (hovered) DesktopColors.PaneHover else Color.Transparent)
+            .background(if (hovered) DesktopColors.Hover else Color.Transparent)
             .hoverable(hoverSource).pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onToggle)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically

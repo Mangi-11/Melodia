@@ -92,6 +92,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowScope
 import com.lin0721.linmusic.core.auth.UserProfile
+import com.lin0721.linmusic.core.ui.theme.floatingOutline
 import com.lin0721.linmusic.desktop.data.download.DownloadTask
 import com.lin0721.linmusic.desktop.data.download.DownloadTaskStatus
 import com.lin0721.linmusic.desktop.ui.cloud.CloudMusicActions
@@ -239,7 +240,7 @@ private fun RecognitionButton(active: Boolean, onClick: () -> Unit) {
     val hoverSource = remember { MutableInteractionSource() }
     val isHovered by hoverSource.collectIsHoveredAsState()
     val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, uiTween(150))
-    val bgColor by animateColorAsState(if (isHovered || active) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), uiTween(150))
+    val bgColor by animateColorAsState(if (isHovered || active) DesktopColors.FieldOnCanvasHover else DesktopColors.FieldOnCanvas, uiTween(150))
     DesktopTooltip("听歌识曲", side = TooltipSide.Bottom) {
         Box(
             Modifier
@@ -250,6 +251,7 @@ private fun RecognitionButton(active: Boolean, onClick: () -> Unit) {
                 .size(48.dp)
                 .hoverable(hoverSource)
                 .clip(CircleShape)
+                .floatingOutline(CircleShape)
                 .background(bgColor)
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
@@ -268,7 +270,7 @@ private fun HomeButton(
     val isHovered by hoverSource.collectIsHoveredAsState()
 
     val scale by animateFloatAsState(if (isHovered) 1.06f else 1f, uiTween(150))
-    val bgColor by animateColorAsState(if (isHovered) Color(0xFF2A2A2A) else Color(0xFF1F1F1F), uiTween(150))
+    val bgColor by animateColorAsState(if (isHovered) DesktopColors.FieldOnCanvasHover else DesktopColors.FieldOnCanvas, uiTween(150))
 
     Box(
         Modifier
@@ -279,6 +281,7 @@ private fun HomeButton(
             .size(48.dp)
             .hoverable(hoverSource)
             .clip(CircleShape)
+            .floatingOutline(CircleShape)
             .background(bgColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -473,15 +476,16 @@ private fun SearchBox(
     }
 
     val targetBg = when {
-        isFocused || isHovered -> Color(0xFF2A2A2A)
-        else -> Color(0xFF1F1F1F)
+        isFocused || isHovered -> DesktopColors.FieldOnCanvasHover
+        else -> DesktopColors.FieldOnCanvas
     }
     val animatedBg by animateColorAsState(targetBg, uiTween(180))
 
     val borderColor = when {
-        isFocused -> Color.White
-        isHovered -> Color.White.copy(alpha = 0.55f)
-        else -> Color.Transparent
+        isFocused -> DesktopColors.TextPrimary
+        isHovered -> DesktopColors.TextPrimary.copy(alpha = 0.55f)
+        DesktopColors.IsDark -> Color.Transparent
+        else -> DesktopColors.Outline
     }
     val animatedBorderColor by animateColorAsState(borderColor, uiTween(180))
 
@@ -588,8 +592,8 @@ private fun SearchShortcutKey(label: String) {
     Box(
         Modifier
             .clip(RoundedCornerShape(4.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(4.dp))
-            .background(Color.White.copy(alpha = 0.05f))
+            .border(1.dp, DesktopColors.Overlay.copy(alpha = 0.22f), RoundedCornerShape(4.dp))
+            .background(DesktopColors.Overlay.copy(alpha = 0.05f))
             .padding(horizontal = 4.dp, vertical = 1.dp)
     ) {
         Text(
@@ -698,7 +702,7 @@ private fun NavArrow(icon: ImageVector, description: String, enabled: Boolean, o
 private fun WindowButton(
     icon: ImageVector,
     description: String,
-    hoverColor: Color = DesktopColors.PaneHover,
+    hoverColor: Color = DesktopColors.Hover,
     onClick: () -> Unit
 ) {
     var hovered by remember { mutableStateOf(false) }

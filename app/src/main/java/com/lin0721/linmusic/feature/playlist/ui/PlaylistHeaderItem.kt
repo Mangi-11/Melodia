@@ -27,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -48,10 +47,11 @@ import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
 import com.lin0721.linmusic.core.model.PlaylistDetail
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.core.ui.theme.uiTween
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ fun PlaylistHeaderItem(
         animationSpec = uiTween(800),
         label = "playlist_header_color"
     )
-    val gradientTop = remember(animatedDominant) { animatedDominant.darken(0.35f) }
+    val gradientTop = themedCoverBase(animatedDominant, 0.35f)
     val bgDark = MaterialTheme.colorScheme.background
     Column(
         modifier = Modifier
@@ -151,7 +151,7 @@ fun PlaylistHeaderItem(
                     .graphicsLayer {
                         alpha = 1f - (progressProvider() / 0.65f).coerceIn(0f, 1f)
                     }
-                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(RadiusCompact), clip = false)
+                    .themedShadow(elevation = 16.dp, shape = RoundedCornerShape(RadiusCompact), clip = false)
                     .clip(RoundedCornerShape(RadiusCompact))
             )
         }

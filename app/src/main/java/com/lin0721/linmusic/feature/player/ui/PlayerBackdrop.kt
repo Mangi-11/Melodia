@@ -31,7 +31,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.lin0721.linmusic.core.ui.theme.darken
-import com.lin0721.linmusic.core.ui.theme.saturateIfChromatic
+import com.lin0721.linmusic.core.ui.theme.immersiveCoverFill
+import com.lin0721.linmusic.core.ui.theme.rememberImmersiveColors
 import com.lin0721.linmusic.core.ui.theme.smoothVerticalGradient
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -141,8 +142,8 @@ fun PlayerBackdrop(
             val density = LocalDensity.current
             val gradientEndY = with(density) { COLLAPSED_GRADIENT_END_DP.dp.toPx() }
 
-            // base 本身已偏深且明度有上限，直接铺底不再压暗
-            val fillColor = base
+            // base 本身已偏深且明度有上限，深色下直接铺底不再压暗，浅色下取中调
+            val fillColor = immersiveCoverFill(base)
             val gradientBrush = remember(fillColor, gradientEndY) {
                 Brush.smoothVerticalGradient(
                     from = fillColor,
@@ -196,9 +197,9 @@ fun PlayerBackdrop(
 
         BackdropMode.Immersive -> {
             val meshPhaseMs = rememberMeshPhaseMs(animateMesh)
-            val vividBase = remember(base) { base.saturateIfChromatic(0.6f) }
-            val fillColor = remember(vividBase) { vividBase.darken(0.35f) }
-            val darkBlob = remember(vividBase) { vividBase.darken(0.15f) }
+            val immersive = rememberImmersiveColors(base)
+            val fillColor = immersive.fill
+            val darkBlob = immersive.blob
 
             Box(modifier = modifier) {
                 Box(

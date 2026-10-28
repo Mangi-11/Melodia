@@ -15,6 +15,9 @@ import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricPalette
 import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricSecondary
 import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricShadow
 import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
+import com.lin0721.linmusic.core.ui.theme.ThemeAccents
+import com.lin0721.linmusic.core.ui.theme.parseRgbHex
+import com.lin0721.linmusic.core.ui.theme.toRgbHex
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -86,6 +89,12 @@ class SettingsPreferences(
         private val KEY_TABLET_IMMERSIVE_MODE = booleanPreferencesKey("tablet_immersive_mode")
         // 界面缩放百分比，默认 100
         private val KEY_UI_SCALE_PERCENT = intPreferencesKey("ui_scale_percent")
+        // 主题模式与深浅两套主色，默认深色网易红
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+        private val KEY_THEME_DARK_ACCENT = stringPreferencesKey("theme_dark_accent")
+        private val KEY_THEME_LIGHT_ACCENT = stringPreferencesKey("theme_light_accent")
+        private val KEY_THEME_DARK_CUSTOM_COLOR = stringPreferencesKey("theme_dark_custom_color")
+        private val KEY_THEME_LIGHT_CUSTOM_COLOR = stringPreferencesKey("theme_light_custom_color")
         const val PLAYER_PAGE_MODE_AUTO = "auto"
         const val PLAYER_PAGE_MODE_FULLSCREEN = "fullscreen"
         const val PLAYER_PAGE_MODE_SIDE = "side"
@@ -517,6 +526,37 @@ class SettingsPreferences(
     suspend fun saveUiScalePercent(percent: Int) {
         dataStore.edit { prefs ->
             prefs[KEY_UI_SCALE_PERCENT] = UiScale.normalizePercent(percent)
+        }
+    }
+
+    val themeSettings: Flow<ThemeSettings> = dataStore.data.map { prefs ->
+        ThemeSettings(
+            mode = ThemeMode.fromKey(prefs[KEY_THEME_MODE]),
+            darkAccentId = prefs[KEY_THEME_DARK_ACCENT] ?: ThemeAccents.DEFAULT_ID,
+            lightAccentId = prefs[KEY_THEME_LIGHT_ACCENT] ?: ThemeAccents.DEFAULT_ID,
+            darkCustomHex = prefs[KEY_THEME_DARK_CUSTOM_COLOR],
+            lightCustomHex = prefs[KEY_THEME_LIGHT_CUSTOM_COLOR]
+        )
+    }.distinctUntilChanged()
+
+    suspend fun saveThemeMode(mode: ThemeMode) {
+        dataStore.edit { prefs ->
+            prefs[KEY_THEME_MODE] = mode.key
+        }
+    }
+
+    suspend fun saveThemeAccent(isDark: Boolean, accentId: String) {
+        dataStore.edit { prefs ->
+            prefs[if (isDark) KEY_THEME_DARK_ACCENT else KEY_THEME_LIGHT_ACCENT] = accentId
+        }
+    }
+
+    // 保存自定义色并切换到自定义主色；非法色值直接忽略
+    suspend fun saveThemeCustomColor(isDark: Boolean, hex: String) {
+        val normalized = parseRgbHex(hex)?.toRgbHex() ?: return
+        dataStore.edit { prefs ->
+            prefs[if (isDark) KEY_THEME_DARK_CUSTOM_COLOR else KEY_THEME_LIGHT_CUSTOM_COLOR] = normalized
+            prefs[if (isDark) KEY_THEME_DARK_ACCENT else KEY_THEME_LIGHT_ACCENT] = ThemeAccents.CUSTOM_ID
         }
     }
 

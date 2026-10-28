@@ -33,8 +33,9 @@ import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.TrackSelectionOverlay
 import com.lin0721.linmusic.core.ui.components.rememberSelectionBottomPadding
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
-import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 import com.lin0721.linmusic.core.ui.theme.uiEnter
 import com.lin0721.linmusic.core.ui.theme.uiExit
 import com.lin0721.linmusic.feature.playlist.ui.SearchBarItem
@@ -42,7 +43,6 @@ import com.lin0721.linmusic.feature.playlist.ui.rememberSearchBarRevealState
 import com.lin0721.linmusic.core.model.ArtistAlbum
 import com.lin0721.linmusic.core.model.ArtistDetailInfo
 import com.lin0721.linmusic.core.model.ArtistInfo
-import com.lin0721.linmusic.core.ui.theme.CoverPlaceholderDark
 import com.lin0721.linmusic.feature.playlist.ui.PlaylistSongOptionsSheet
 
 // 搜索展开、头图收起后第 0 项保留的最小高度：保证列表位置可恢复，也用于背板对齐
@@ -98,7 +98,8 @@ fun ArtistContent(
 
     var showMoreMenuSheet by remember { mutableStateOf(false) }
 
-    var dominantColor by remember { mutableStateOf(CoverPlaceholderDark) }
+    val coverPlaceholder = MelodiaColors.CoverPlaceholder
+    var dominantColor by remember { mutableStateOf(coverPlaceholder) }
 
     // 背景折叠临界点
     val collapseThresholdPx = with(density) { 320.dp.toPx() }
@@ -295,7 +296,7 @@ fun ArtistContent(
             selectionUi = selectionUi,
             actions = selectionActions,
             visibleIds = (if (songSearch.active) songSearch.results else topSongs).map { it.id },
-            headerColor = dominantColor.darken(0.35f),
+            headerColor = themedCoverBase(dominantColor, 0.35f),
             onToggleSelectAll = onToggleSelectAll,
             onExit = onExitSelection
         )

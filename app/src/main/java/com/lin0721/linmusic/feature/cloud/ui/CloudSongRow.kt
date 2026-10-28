@@ -26,6 +26,7 @@ import coil3.compose.SubcomposeAsyncImage
 import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
@@ -74,7 +75,7 @@ fun CloudSongRow(
         Column(modifier = Modifier.padding(start = MelodiaSpacing.sm).weight(1f)) {
             Text(
                 text = song.name,
-                color = Color.White,
+                color = MelodiaColors.TextPrimary,
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

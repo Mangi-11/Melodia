@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -52,10 +53,10 @@ import coil3.compose.SubcomposeAsyncImage
 import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.feature.podcast.domain.PodcastCategory
 import com.lin0721.linmusic.feature.podcast.domain.PodcastProgram
 import com.lin0721.linmusic.feature.podcast.domain.PodcastProgressEntry
@@ -73,7 +74,7 @@ internal val PodcastEdgePadding = 20.dp
 private val RadioCardWidthCompact = 120.dp
 private val RadioCardWidthExpanded = 150.dp
 private val GridGap = 12.dp
-private val TrackColor = Color.White.copy(alpha = 0.16f)
+private val TrackColor: Color @Composable @ReadOnlyComposable get() = MelodiaColors.Overlay.copy(alpha = 0.16f)
 
 // 电台封面自带查询串的情况与歌单同理，追加 param 前需判断
 internal fun String.withPodcastCoverParam(param: String): String =
@@ -127,12 +128,12 @@ fun PodcastSectionTitle(
                     .then(if (onTrailingClick != null) Modifier.clickable(onClick = onTrailingClick) else Modifier),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = it, color = TextGray, fontSize = 11.5.sp)
+                Text(text = it, color = MelodiaColors.TextSecondary, fontSize = 11.5.sp)
                 if (onTrailingClick != null) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = TextGray,
+                        tint = MelodiaColors.TextSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -149,8 +150,8 @@ fun PodcastFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .pressable(MelodiaPress.Pill) { onClick() }
             .clip(CircleShape)
             .then(
-                if (selected) Modifier.background(Color.White)
-                else Modifier.border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
+                if (selected) Modifier.background(MelodiaColors.TextPrimary)
+                else Modifier.border(1.dp, MelodiaColors.Overlay.copy(alpha = 0.18f), CircleShape)
             )
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
@@ -205,7 +206,7 @@ fun ContinueListeningTile(
             .height(56.dp)
             .pressable(MelodiaPress.Card) { onClick() }
             .clip(RoundedCornerShape(RadiusCompact))
-            .background(Color.White.copy(alpha = 0.08f))
+            .background(MelodiaColors.Fill)
     ) {
         Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             PodcastCover(
@@ -227,7 +228,7 @@ fun ContinueListeningTile(
                 )
                 val remaining = formatRemaining(entry.remainingMs)
                 if (remaining.isNotBlank()) {
-                    Text(text = remaining, color = TextGray, fontSize = 10.5.sp, maxLines = 1)
+                    Text(text = remaining, color = MelodiaColors.TextSecondary, fontSize = 10.5.sp, maxLines = 1)
                 }
             }
         }
@@ -302,7 +303,7 @@ fun PodcastRadioCard(
         if (meta.isNotBlank()) {
             Text(
                 text = meta,
-                color = TextGray,
+                color = MelodiaColors.TextSecondary,
                 fontSize = 10.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -438,7 +439,7 @@ fun PodcastEpisodeCard(
             if (source.isNotBlank()) {
                 Text(
                     text = source,
-                    color = TextGray,
+                    color = MelodiaColors.TextSecondary,
                     fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -448,7 +449,7 @@ fun PodcastEpisodeCard(
             if (program.description.isNotBlank()) {
                 Text(
                     text = program.description,
-                    color = TextGray.copy(alpha = 0.85f),
+                    color = MelodiaColors.TextSecondary.copy(alpha = 0.85f),
                     fontSize = 11.5.sp,
                     lineHeight = 15.sp,
                     maxLines = 2,
@@ -473,7 +474,7 @@ private fun EpisodeMetaRow(program: PodcastProgram, progress: PodcastProgressEnt
             formatListenerCount(program.listenerCount).takeIf { it.isNotBlank() && progress == null }
         ).joinToString(" · ")
         if (meta.isNotBlank()) {
-            Text(text = meta, color = TextGray.copy(alpha = 0.75f), fontSize = 10.5.sp, maxLines = 1)
+            Text(text = meta, color = MelodiaColors.TextSecondary.copy(alpha = 0.75f), fontSize = 10.5.sp, maxLines = 1)
         }
         when {
             finished -> {
@@ -514,7 +515,7 @@ fun PlayCircle(modifier: Modifier = Modifier) {
         Icon(
             imageVector = Icons.Rounded.PlayArrow,
             contentDescription = "播放",
-            tint = Color.White,
+            tint = MelodiaColors.OnAccent,
             modifier = Modifier.size(16.dp)
         )
     }

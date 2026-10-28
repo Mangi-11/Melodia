@@ -10,7 +10,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -18,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.interaction.copyOnLongClick
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.feature.podcast.ui.PodcastPlayerState
 
@@ -45,7 +45,7 @@ fun SongInfo(
         Column(modifier = Modifier.weight(1f).padding(end = MelodiaSpacing.md)) {
             Text(
                 text = title,
-                color = Color.White,
+                color = MelodiaColors.TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
@@ -56,7 +56,7 @@ fun SongInfo(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = artist,
-                color = Color.White.copy(alpha = 0.75f),
+                color = MelodiaColors.TextPrimary.copy(alpha = 0.75f),
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -69,7 +69,7 @@ fun SongInfo(
                     Icon(
                         if (podcast.subscribed) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (podcast.subscribed) "取消订阅电台" else "订阅电台",
-                        tint = Color.White,
+                        tint = MelodiaColors.TextPrimary,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -81,7 +81,7 @@ fun SongInfo(
             Icon(
                 if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MelodiaColors.TextPrimary,
                 modifier = Modifier.size(28.dp)
             )
         }

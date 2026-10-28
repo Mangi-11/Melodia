@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -32,7 +31,8 @@ import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.interaction.pressScale
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.ui.theme.darken
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlin.math.roundToInt
 
@@ -60,7 +60,7 @@ fun PlaylistTopBar(
         animationSpec = uiTween(800),
         label = "playlist_topbar_color"
     )
-    val fillColor = remember(animatedDominant) { animatedDominant.darken(0.35f) }
+    val fillColor = themedCoverBase(animatedDominant, 0.35f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -138,7 +138,7 @@ fun BoxScope.PlaylistDockedPlayButton(
             .offset { IntOffset(0, dockedOffsetYProvider().roundToInt()) }
             .size(56.dp)
             .zIndex(10f)
-            .shadow(8.dp, CircleShape)
+            .themedShadow(8.dp, CircleShape)
     ) {
         PlayPauseIcon(
             isPlaying = isCurrentlyPlayingThis,

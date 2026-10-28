@@ -66,6 +66,7 @@ import com.lin0721.linmusic.core.player.domain.LyricLine
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PillRadius
@@ -347,7 +348,7 @@ private fun WideRightColumn(
                 .padding(top = MelodiaSpacing.sm)
         ) {
             Surface(
-                color = Color.White.copy(alpha = 0.16f),
+                color = MelodiaColors.Overlay.copy(alpha = 0.16f),
                 shape = RoundedCornerShape(PillRadius),
                 modifier = Modifier.pressable(MelodiaPress.Pill) {
                     scope.launch { motion.scrollToItem(columnState, 0) }
@@ -360,11 +361,11 @@ private fun WideRightColumn(
                     Icon(
                         imageVector = Icons.Rounded.KeyboardArrowUp,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MelodiaColors.TextPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(MelodiaSpacing.xs))
-                    Text(text = "回到歌词", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(text = "回到歌词", color = MelodiaColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }

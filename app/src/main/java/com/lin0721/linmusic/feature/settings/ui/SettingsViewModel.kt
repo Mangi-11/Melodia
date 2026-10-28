@@ -9,6 +9,8 @@ import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricStyle
 import com.lin0721.linmusic.core.preferences.BottomBarItemSetting
 import com.lin0721.linmusic.core.preferences.BottomBarLayout
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.ThemeMode
+import com.lin0721.linmusic.core.preferences.ThemeSettings
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.auth.UserPreferences
 import com.lin0721.linmusic.feature.settings.data.UserBindingItem
@@ -135,6 +137,7 @@ class SettingsViewModel(
     val tabletImmersiveMode = settingsPreferences.tabletImmersiveMode.asState(false)
 
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
+    val themeSettings = settingsPreferences.themeSettings.asState(ThemeSettings())
 
     val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
 
@@ -389,6 +392,12 @@ class SettingsViewModel(
     fun updateTabletImmersiveMode(enabled: Boolean) = launchSave { settingsPreferences.saveTabletImmersiveMode(enabled) }
 
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
+
+    fun updateThemeMode(mode: ThemeMode) = launchSave { settingsPreferences.saveThemeMode(mode) }
+
+    fun updateThemeAccent(isDark: Boolean, accentId: String) = launchSave { settingsPreferences.saveThemeAccent(isDark, accentId) }
+
+    fun updateThemeCustomColor(isDark: Boolean, hex: String) = launchSave { settingsPreferences.saveThemeCustomColor(isDark, hex) }
 
     fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
 

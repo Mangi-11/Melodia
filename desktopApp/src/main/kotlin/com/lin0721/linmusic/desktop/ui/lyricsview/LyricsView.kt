@@ -42,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -88,8 +89,9 @@ import com.lin0721.linmusic.desktop.ui.components.uiExit
 import com.lin0721.linmusic.desktop.ui.components.uiTween
 import com.lin0721.linmusic.desktop.ui.nowplaying.rememberCoverBase
 import com.lin0721.linmusic.desktop.ui.nowplaying.verticalEdgeFade
-import com.lin0721.linmusic.desktop.ui.palette.darken
-import com.lin0721.linmusic.desktop.ui.palette.saturateIfChromatic
+import com.lin0721.linmusic.desktop.ui.palette.ImmersiveSurface
+import com.lin0721.linmusic.desktop.ui.palette.LocalImmersiveColors
+import com.lin0721.linmusic.desktop.ui.palette.rememberImmersiveColors
 import com.lin0721.linmusic.desktop.ui.shell.LocalDesktopNavigator
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.theme.DesktopDimens
@@ -120,7 +122,7 @@ private val HeaderButtonSize = 32.dp
 private val HeaderTopPadding = 16.dp
 // 歌名行底边：阴影到此为止，歌词区也从这里起算（与顶栏下半部分重叠）
 private val HeaderTitleRowBottom = HeaderTopPadding + HeaderButtonSize
-private val InactiveColor = Color.White.copy(alpha = 0.55f)
+private val InactiveColor: Color @Composable @ReadOnlyComposable get() = LocalImmersiveColors.current.content.copy(alpha = 0.55f)
 
 // 覆盖在标题栏与播放栏之间整个工作区的全屏歌词界面；不透明底并吞掉点击，收起后原样露出下层
 @Composable
@@ -197,9 +199,10 @@ private fun LyricsViewContent(
     onToggleFullscreen: () -> Unit,
     onClose: () -> Unit
 ) {
-    // 与移动端全屏歌词同一配方：主色提饱和后压暗铺底
+    // 与移动端全屏歌词同一配方：深色下主色提饱和后压暗铺底，浅色下取中调
     val base = rememberCoverBase(track.artworkUri)
-    val fill = remember(base) { base.saturateIfChromatic(0.6f).darken(0.35f) }
+    val immersive = rememberImmersiveColors(base)
+    val fill = immersive.fill
     val hasTranslation = remember(lines) { lines.any { it.translation != null } }
     val hasRoma = remember(lines) { lines.any { it.roma != null } }
 
@@ -229,73 +232,76 @@ private fun LyricsViewContent(
     var boxOrigin by remember { mutableStateOf(Offset.Zero) }
     var lastPointer by remember { mutableStateOf(Offset.Unspecified) }
 
-    Box(
-        // 先铺窗口底色再留边，边里不会露出下层的侧栏和面板
-        Modifier.fillMaxSize().background(DesktopColors.WindowBackground)
-            .padding(horizontal = DesktopDimens.PaneGap, vertical = verticalGap)
-            .clip(RoundedCornerShape(DesktopDimens.PaneRadius))
-            .background(fill)
-            .onGloballyPositioned { boxOrigin = it.positionInWindow() }
-            .onPointerEvent(PointerEventType.Scroll) { if (!manuallyHidden) moveTick++ }
-            .onPointerEvent(PointerEventType.Move) { event ->
-                val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                val position = boxOrigin + change.position
-                if (lastPointer == Offset.Unspecified || (position - lastPointer).getDistance() > MOVE_THRESHOLD_PX) {
-                    lastPointer = position
-                    if (!manuallyHidden) moveTick++
-                }
-            }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                if (settings.autoHideControls) {
-                    manuallyHidden = !controlsHidden
-                    moveTick++
-                }
-            }
-    ) {
-        // 让位高度与自动隐藏开关无关，切换开关不会让歌词移位
-        Box(Modifier.fillMaxSize().padding(top = headerInset)) {
-            when (lyricsPlaceholder(lines, isLoading)) {
-                LyricsPlaceholder.Loading -> CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.Center).size(28.dp),
-                    strokeWidth = 2.dp
-                )
-                LyricsPlaceholder.Empty -> Placeholder("暂无歌词")
-                LyricsPlaceholder.PureMusic -> Placeholder("纯音乐，请欣赏")
-                null -> LyricsList(lines, primaryIndex, activeIndices, settings, isPlaying, clock, onSeek)
-            }
-        }
-        // 退出组合后不再拦截点击
-        AnimatedVisibility(
-            visible = !controlsHidden,
-            modifier = Modifier.align(Alignment.TopCenter),
-            enter = fadeIn(uiTween(HEADER_FADE_MS)),
-            exit = fadeOut(uiTween(HEADER_FADE_MS))
-        ) {
-            Header(
-                track = track,
-                isFullscreen = isFullscreen,
-                settingsOpen = settingsOpen,
-                onSettingsOpenChange = { settingsOpen = it },
-                settingsContent = { LyricsSettingsPanel(settings, actions, hasTranslation, hasRoma) },
-                album = album,
-                artists = artists,
-                onToggleFullscreen = onToggleFullscreen,
-                onClose = onClose,
-                modifier = Modifier
-                    .drawBehind {
-                        // 阴影从顶边压到歌名行底部，越靠近顶边越深
-                        drawRect(
-                            Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = 0.75f),
-                                0.5f to Color.Black.copy(alpha = 0.32f),
-                                1f to Color.Transparent,
-                                endY = HeaderTitleRowBottom.toPx()
-                            ),
-                            size = Size(size.width, HeaderTitleRowBottom.toPx())
-                        )
+    val windowBackground = DesktopColors.WindowBackground
+    ImmersiveSurface(immersive) {
+        Box(
+            // 先铺窗口底色再留边，边里不会露出下层的侧栏和面板
+            Modifier.fillMaxSize().background(windowBackground)
+                .padding(horizontal = DesktopDimens.PaneGap, vertical = verticalGap)
+                .clip(RoundedCornerShape(DesktopDimens.PaneRadius))
+                .background(fill)
+                .onGloballyPositioned { boxOrigin = it.positionInWindow() }
+                .onPointerEvent(PointerEventType.Scroll) { if (!manuallyHidden) moveTick++ }
+                .onPointerEvent(PointerEventType.Move) { event ->
+                    val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                    val position = boxOrigin + change.position
+                    if (lastPointer == Offset.Unspecified || (position - lastPointer).getDistance() > MOVE_THRESHOLD_PX) {
+                        lastPointer = position
+                        if (!manuallyHidden) moveTick++
                     }
-            )
+                }
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    if (settings.autoHideControls) {
+                        manuallyHidden = !controlsHidden
+                        moveTick++
+                    }
+                }
+        ) {
+            // 让位高度与自动隐藏开关无关，切换开关不会让歌词移位
+            Box(Modifier.fillMaxSize().padding(top = headerInset)) {
+                when (lyricsPlaceholder(lines, isLoading)) {
+                    LyricsPlaceholder.Loading -> CircularProgressIndicator(
+                        color = LocalImmersiveColors.current.content,
+                        modifier = Modifier.align(Alignment.Center).size(28.dp),
+                        strokeWidth = 2.dp
+                    )
+                    LyricsPlaceholder.Empty -> Placeholder("暂无歌词")
+                    LyricsPlaceholder.PureMusic -> Placeholder("纯音乐，请欣赏")
+                    null -> LyricsList(lines, primaryIndex, activeIndices, settings, isPlaying, clock, onSeek)
+                }
+            }
+            // 退出组合后不再拦截点击
+            AnimatedVisibility(
+                visible = !controlsHidden,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = fadeIn(uiTween(HEADER_FADE_MS)),
+                exit = fadeOut(uiTween(HEADER_FADE_MS))
+            ) {
+                Header(
+                    track = track,
+                    isFullscreen = isFullscreen,
+                    settingsOpen = settingsOpen,
+                    onSettingsOpenChange = { settingsOpen = it },
+                    settingsContent = { LyricsSettingsPanel(settings, actions, hasTranslation, hasRoma) },
+                    album = album,
+                    artists = artists,
+                    onToggleFullscreen = onToggleFullscreen,
+                    onClose = onClose,
+                    modifier = Modifier
+                        .drawBehind {
+                            // 阴影从顶边压到歌名行底部，越靠近顶边越深
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to immersive.scrim.copy(alpha = 0.75f),
+                                    0.5f to immersive.scrim.copy(alpha = 0.32f),
+                                    1f to Color.Transparent,
+                                    endY = HeaderTitleRowBottom.toPx()
+                                ),
+                                size = Size(size.width, HeaderTitleRowBottom.toPx())
+                            )
+                        }
+                )
+            }
         }
     }
 }
@@ -329,14 +335,14 @@ private fun Header(
                 }
             }
             if (artists.isEmpty()) {
-                Text(track.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(track.artist, color = LocalImmersiveColors.current.content.copy(alpha = 0.7f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             } else {
                 Text(
                     artistLinks(artists) { id, name ->
                         navigator.openArtist(id, name)
                         onClose()
                     },
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = LocalImmersiveColors.current.content.copy(alpha = 0.7f),
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -371,7 +377,7 @@ private fun TitleLink(title: String, album: Album?, onOpenAlbum: (Album) -> Unit
     val hovered by hoverSource.collectIsHoveredAsState()
     Text(
         title,
-        color = Color.White,
+        color = LocalImmersiveColors.current.content,
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         maxLines = 1,
@@ -390,14 +396,14 @@ private fun TitleLink(title: String, album: Album?, onOpenAlbum: (Album) -> Unit
 private fun HeaderButton(icon: ImageVector, description: String, onClick: () -> Unit) {
     DesktopTooltip(description) {
         IconButton(onClick = onClick, modifier = Modifier.size(HeaderButtonSize)) {
-            Icon(icon, description, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+            Icon(icon, description, tint = LocalImmersiveColors.current.content.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
         }
     }
 }
 
 @Composable
 private fun BoxScope.Placeholder(text: String) {
-    Text(text, color = Color.White.copy(alpha = 0.7f), fontSize = 20.sp, modifier = Modifier.align(Alignment.Center))
+    Text(text, color = LocalImmersiveColors.current.content.copy(alpha = 0.7f), fontSize = 20.sp, modifier = Modifier.align(Alignment.Center))
 }
 
 // 可滚轮浏览：滚动后暂停跟随，停止操作 3 秒或点击歌词后回到当前行
@@ -482,8 +488,8 @@ private fun LyricsRow(
     val hovered by hoverSource.collectIsHoveredAsState()
     val color by animateColorAsState(
         when {
-            active -> Color.White
-            hovered -> Color.White.copy(alpha = 0.85f)
+            active -> LocalImmersiveColors.current.content
+            hovered -> LocalImmersiveColors.current.content.copy(alpha = 0.85f)
             else -> InactiveColor
         },
         tween(300),
@@ -502,7 +508,7 @@ private fun LyricsRow(
                 line = line,
                 positionProvider = clock,
                 inactiveColor = InactiveColor,
-                activeColor = Color.White,
+                activeColor = LocalImmersiveColors.current.content,
                 fontSize = fontSize,
                 lineHeight = fontSize * 1.3f,
                 textAlign = alignment.textAlign,
@@ -548,8 +554,8 @@ private fun BackgroundVocal(
     clock: () -> Long
 ) {
     // 未激活与本行激活但和声尚未开唱时用同一底色，避免状态切换变色
-    val inactive = Color.White.copy(alpha = 0.22f)
-    val activeColor = Color.White.copy(alpha = 0.82f)
+    val inactive = LocalImmersiveColors.current.content.copy(alpha = 0.22f)
+    val activeColor = LocalImmersiveColors.current.content.copy(alpha = 0.82f)
     val fontSize = settings.backgroundFontSize
     Column(Modifier.fillMaxWidth(0.9f).padding(top = 8.dp), horizontalAlignment = alignment.horizontal) {
         if (active && line.words.isNotEmpty()) {

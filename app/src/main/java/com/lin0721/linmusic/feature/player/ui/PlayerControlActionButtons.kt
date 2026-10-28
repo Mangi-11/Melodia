@@ -18,9 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
 import androidx.compose.foundation.shape.CircleShape
@@ -46,7 +46,7 @@ fun ActionButtons(
     onLyricsSettingsClick: (() -> Unit)? = null
 ) {
     val outputDeviceIcon = connectedDevice?.let { deviceIcon(it.type) } ?: Icons.Rounded.SpeakerGroup
-    val outputDeviceTint = if (connectedDevice != null) MaterialTheme.colorScheme.primary else TextGray
+    val outputDeviceTint = if (connectedDevice != null) MaterialTheme.colorScheme.primary else MelodiaColors.TextSecondary
 
     Box(
         modifier = Modifier
@@ -96,8 +96,8 @@ fun ActionButtons(
                         else -> "文" to "A"
                     }
                     val badgeTint = when {
-                        !hasAnySecondary -> TextGray.copy(alpha = 0.35f)
-                        secondaryMode == "none" -> TextGray.copy(alpha = 0.65f)
+                        !hasAnySecondary -> MelodiaColors.TextSecondary.copy(alpha = 0.35f)
+                        secondaryMode == "none" -> MelodiaColors.TextSecondary.copy(alpha = 0.65f)
                         else -> MaterialTheme.colorScheme.primary
                     }
                     Box(
@@ -131,7 +131,7 @@ fun ActionButtons(
                             Icon(
                                 imageVector = Icons.Rounded.Tune,
                                 contentDescription = "歌词设置",
-                                tint = TextGray,
+                                tint = MelodiaColors.TextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -142,7 +142,7 @@ fun ActionButtons(
                     Icon(
                         imageVector = Icons.Rounded.Share,
                         contentDescription = "分享",
-                        tint = TextGray,
+                        tint = MelodiaColors.TextSecondary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -150,14 +150,14 @@ fun ActionButtons(
                     onClick = onQueueClick,
                     modifier = if (showLyricsControls) Modifier else Modifier.offset(x = 12.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, contentDescription = null, tint = TextGray, modifier = Modifier.size(30.dp))
+                    Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, contentDescription = null, tint = MelodiaColors.TextSecondary, modifier = Modifier.size(30.dp))
                 }
             }
         }
         if (qualityLabel != null) {
             Text(
                 text = qualityLabel,
-                color = TextGray,
+                color = MelodiaColors.TextSecondary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,

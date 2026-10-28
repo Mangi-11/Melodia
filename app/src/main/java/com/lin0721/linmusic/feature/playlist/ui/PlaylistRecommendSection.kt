@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +22,7 @@ import com.lin0721.linmusic.core.model.Track
 import com.lin0721.linmusic.core.ui.components.SongRow
 import com.lin0721.linmusic.core.ui.components.SongRowData
 import com.lin0721.linmusic.core.ui.interaction.pressable
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 
@@ -66,7 +66,7 @@ fun LazyListScope.playlistRecommendItems(
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .size(22.dp)
-                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                            .background(MelodiaColors.Overlay.copy(alpha = 0.1f), CircleShape)
                             .padding(MelodiaSpacing.xxs)
                     )
                 }

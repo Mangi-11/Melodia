@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -38,6 +37,7 @@ import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.mergeSupportedOrder
 import com.lin0721.linmusic.core.preferences.setCardVisible
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.desktop.ui.components.LocalUiMotion
 import com.lin0721.linmusic.desktop.ui.nowplaying.SupportedInfoCards
 import com.lin0721.linmusic.desktop.ui.player.rememberQueueReorderState
@@ -82,7 +82,7 @@ internal fun CardLayoutEditor(layout: List<FullPlayerCardSetting>, onChange: (Li
                 Modifier.fillMaxWidth().height(EditorRowHeight)
                     .then(if (dragging || settling) Modifier.zIndex(1f) else if (LocalUiMotion.current.enabled) Modifier.animateItem() else Modifier)
                     .graphicsLayer { translationY = offsetY }
-                    .then(if (dragging) Modifier.shadow(8.dp, shape) else Modifier)
+                    .then(if (dragging) Modifier.themedShadow(8.dp, shape) else Modifier)
                     .clip(shape)
                     .background(if (dragging) DesktopColors.SurfaceLight else Color.Transparent)
                     .padding(horizontal = 4.dp),

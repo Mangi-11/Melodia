@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.components.MiniPlayerProgress
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.uiTween
@@ -71,7 +72,7 @@ fun FullPlayerTopBar(
                     Icon(
                         Icons.Rounded.KeyboardArrowDown,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MelodiaColors.TextPrimary,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -82,7 +83,7 @@ fun FullPlayerTopBar(
                 ) {
                     Text(
                         text = title,
-                        color = Color.White,
+                        color = MelodiaColors.TextPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -90,7 +91,7 @@ fun FullPlayerTopBar(
                     )
                     Text(
                         text = artist,
-                        color = Color.White.copy(alpha = 0.75f),
+                        color = MelodiaColors.TextPrimary.copy(alpha = 0.75f),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -105,12 +106,12 @@ fun FullPlayerTopBar(
                         Icon(
                             if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = MelodiaColors.TextPrimary,
                             modifier = Modifier.size(26.dp)
                         )
                     }
                     MelodiaIconButton(onClick = onTogglePlay, style = MelodiaPress.Transport) {
-                        PlayPauseIcon(isPlaying, Color.White)
+                        PlayPauseIcon(isPlaying, MelodiaColors.TextPrimary)
                     }
                 }
             }

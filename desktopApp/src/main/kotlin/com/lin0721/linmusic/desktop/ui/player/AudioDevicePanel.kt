@@ -103,7 +103,7 @@ private fun CurrentDeviceCard(device: AudioDevice) {
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
                 device.title,
-                color = DesktopColors.Accent,
+                color = DesktopColors.AccentText,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
                 maxLines = 1,

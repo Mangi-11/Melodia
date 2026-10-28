@@ -1,30 +1,52 @@
 package com.lin0721.linmusic.desktop.ui.theme
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPalette
+import com.lin0721.linmusic.core.ui.theme.MelodiaPalette
+import com.lin0721.linmusic.core.ui.theme.MelodiaPalettes
 
-// 背景分三档：窗口与边框 WindowBackground、大背景 Pane、卡片 CardSurface；
-// PopupSurface 是菜单、对话框与悬停的底色，Surface 是药丸、搜索框、图标按钮、选项格子等控件的底色
+// 色值来自当前主题的 MelodiaPalette，语义见 MelodiaPalette；仅能在组合作用域内读取
 object DesktopColors {
-    val WindowBackground = Color(0xFF000000)
-    val Pane = Color(0xFF121212)
-    val Surface = Color(0xFF2A2A2A)
-    val CardSurface = Color(0xFF1F1F1F)
-    val PopupSurface = Color(0xFF282828)
-    // 行与按钮的悬停底，与菜单同色
-    val PaneHover = PopupSurface
-    val SurfaceLight = Color(0xFF3E3E3E)
-    val TextPrimary = Color(0xFFFFFFFF)
-    val TextGray = Color(0xFFB3B3B3)
-    val Accent = Color(0xFFC20C0C)
-    val CoverPlaceholder = Color(0xFF2C2C2C)
+    val WindowBackground: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.windowBackground
+    val Pane: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.pane
+    val Surface: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.surface
+    val CardSurface: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.cardSurface
+    val PopupSurface: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.popupSurface
+    val SurfaceLight: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.surfaceLight
+    val FieldOnCanvas: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.fieldOnCanvas
+    val FieldOnCanvasHover: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.fieldOnCanvasHover
+    val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.textPrimary
+    val TextGray: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.textSecondary
+    val TextTertiary: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.textTertiary
+    val TextDisabled: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.textDisabled
+    val Accent: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.accent
+    val OnAccent: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.onAccent
+    val AccentText: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.accentText
+    val AccentContainer: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.accentContainer
+    val CoverPlaceholder: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.coverPlaceholder
+    val Overlay: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.overlay
+    val Hover: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.hover
+    val Pressed: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.pressed
+    val Selected: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.selected
+    val Fill: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.fill
+    val Divider: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.divider
+    val Outline: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.outline
+    val Scrim: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.scrim
+    val Success: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.success
+    val Error: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.error
+    val InverseText: Color @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.inverseText
+    val IsDark: Boolean @Composable @ReadOnlyComposable get() = LocalMelodiaPalette.current.isDark
 }
 
 object DesktopDimens {
@@ -46,24 +68,62 @@ object DesktopDimens {
 }
 
 @Composable
-fun MelodiaDesktopTheme(uiScale: Float = 1f, content: @Composable () -> Unit) {
+fun MelodiaDesktopTheme(
+    uiScale: Float = 1f,
+    palette: MelodiaPalette = MelodiaPalettes.dark,
+    content: @Composable () -> Unit
+) {
     val baseDensity = LocalDensity.current
     val scaledDensity = remember(baseDensity, uiScale) {
         Density(baseDensity.density * uiScale, baseDensity.fontScale)
     }
-    CompositionLocalProvider(LocalDensity provides scaledDensity) {
-        MaterialTheme(
-            colorScheme = darkColorScheme(
-                primary = DesktopColors.Accent,
-                background = DesktopColors.WindowBackground,
-                surface = DesktopColors.Pane,
-                surfaceVariant = DesktopColors.Surface,
-                onPrimary = DesktopColors.TextPrimary,
-                onBackground = DesktopColors.TextPrimary,
-                onSurface = DesktopColors.TextPrimary,
-                onSurfaceVariant = DesktopColors.TextGray
-            ),
-            content = content
-        )
+    val colorScheme = remember(palette) { melodiaColorScheme(palette) }
+    CompositionLocalProvider(
+        LocalDensity provides scaledDensity,
+        LocalMelodiaPalette provides palette
+    ) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
     }
 }
+
+// 沉浸区（封面色铺底、白字）内部一律按深色主题取色，保留当前主色；浅色主题下由此切换，深色主题下原样透传
+@Composable
+fun ImmersiveTheme(content: @Composable () -> Unit) {
+    val current = LocalMelodiaPalette.current
+    if (current.isDark) {
+        content()
+        return
+    }
+    val palette = remember(current.accent) { MelodiaPalettes.dark.withAccent(current.accent) }
+    val colorScheme = remember(palette) { melodiaColorScheme(palette) }
+    CompositionLocalProvider(LocalMelodiaPalette provides palette) {
+        MaterialTheme(colorScheme = colorScheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes, content = content)
+    }
+}
+
+private fun melodiaColorScheme(palette: MelodiaPalette): ColorScheme {
+    val base = if (palette.isDark) darkColorScheme() else lightColorScheme()
+    return base.copy(
+        primary = palette.accent,
+        onPrimary = palette.onAccent,
+        background = palette.windowBackground,
+        onBackground = palette.textPrimary,
+        surface = palette.pane,
+        onSurface = palette.textPrimary,
+        surfaceVariant = palette.surface,
+        onSurfaceVariant = palette.textSecondary
+    ).let { if (palette.isDark) it else it.withLightContainers(palette) }
+}
+
+// 浅色下 M3 组件的容器色、描边、遮罩、错误色改取色板；深色保持原有取值不变
+private fun ColorScheme.withLightContainers(palette: MelodiaPalette): ColorScheme = copy(
+    surfaceContainerLowest = palette.pane,
+    surfaceContainerLow = palette.cardSurface,
+    surfaceContainer = palette.surface,
+    surfaceContainerHigh = palette.popupSurface,
+    surfaceContainerHighest = palette.surfaceLight,
+    outline = palette.outline,
+    outlineVariant = palette.divider,
+    scrim = palette.scrim,
+    error = palette.error
+)

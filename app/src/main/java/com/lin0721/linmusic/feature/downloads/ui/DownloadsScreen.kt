@@ -46,13 +46,10 @@ import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.components.SecondaryScreenScaffold
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressable
-import com.lin0721.linmusic.core.ui.theme.DownloadFailedRed
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.ui.theme.NeteaseRed
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
-import com.lin0721.linmusic.core.ui.theme.SurfaceDark
-import com.lin0721.linmusic.core.ui.theme.TextGray
 import org.koin.androidx.compose.koinViewModel
 
 private val CoverSize = 52.dp
@@ -89,7 +86,7 @@ fun DownloadsScreen(
             when {
                 records == null -> item(key = "loading") {
                     Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = NeteaseRed, modifier = Modifier.size(28.dp))
+                        CircularProgressIndicator(color = MelodiaColors.Accent, modifier = Modifier.size(28.dp))
                     }
                 }
                 records.isEmpty() -> item(key = "empty") {
@@ -131,12 +128,12 @@ fun DownloadsScreen(
                     viewModel.delete(record)
                     deleteTarget = null
                 }) {
-                    Text("删除", color = NeteaseRed)
+                    Text("删除", color = MelodiaColors.AccentText)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) {
-                    Text("取消", color = TextGray)
+                    Text("取消", color = MelodiaColors.TextSecondary)
                 }
             }
         )
@@ -156,15 +153,15 @@ private fun TaskOverviewCard(tasks: List<DownloadTask>, onClick: (DownloadManage
             .padding(horizontal = MelodiaSpacing.md, vertical = MelodiaSpacing.sm)
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceDark.copy(alpha = 0.6f))
+            .background(MelodiaColors.Surface.copy(alpha = 0.6f))
             .pressable(MelodiaPress.Row) { onClick(tab) }
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Download, contentDescription = null, tint = NeteaseRed, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.Download, contentDescription = null, tint = MelodiaColors.Accent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "下载任务", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(text = "下载任务", color = MelodiaColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(2.dp))
                 val summary = when {
                     tasks.isEmpty() -> "暂无下载任务"
@@ -177,7 +174,7 @@ private fun TaskOverviewCard(tasks: List<DownloadTask>, onClick: (DownloadManage
                 }
                 Text(
                     text = summary,
-                    color = if (counts.failed > 0 && counts.active == 0) DownloadFailedRed else TextGray,
+                    color = if (counts.failed > 0 && counts.active == 0) MelodiaColors.Error else MelodiaColors.TextSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -203,7 +200,7 @@ private fun DownloadedHeader(records: List<DownloadRecord>, onPlayAll: () -> Uni
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "已下载的歌曲", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(text = "已下载的歌曲", color = MelodiaColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Text(
                 text = listOf("${records.size} 首", formatSize(records.sumOf { it.fileSize }))
                     .filter { it.isNotBlank() }
@@ -215,14 +212,14 @@ private fun DownloadedHeader(records: List<DownloadRecord>, onPlayAll: () -> Uni
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(18.dp))
-                .background(NeteaseRed)
+                .background(MelodiaColors.Accent)
                 .pressable(MelodiaPress.Action, onClick = onPlayAll)
                 .padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = MelodiaColors.OnAccent, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text(text = "播放全部", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(text = "播放全部", color = MelodiaColors.OnAccent, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -249,7 +246,7 @@ private fun DownloadedSongRow(record: DownloadRecord, onClick: () -> Unit, onDel
         Column(modifier = Modifier.padding(start = MelodiaSpacing.sm).weight(1f)) {
             Text(
                 text = record.displayName(),
-                color = Color.White,
+                color = MelodiaColors.TextPrimary,
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -261,7 +258,7 @@ private fun DownloadedSongRow(record: DownloadRecord, onClick: () -> Unit, onDel
                         .border(1.dp, MutedText, RoundedCornerShape(4.dp))
                         .padding(horizontal = 4.dp)
                 ) {
-                    Text(text = getQualityDisplayName(record.quality), color = TextGray, fontSize = 10.sp, maxLines = 1)
+                    Text(text = getQualityDisplayName(record.quality), color = MelodiaColors.TextSecondary, fontSize = 10.sp, maxLines = 1)
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(

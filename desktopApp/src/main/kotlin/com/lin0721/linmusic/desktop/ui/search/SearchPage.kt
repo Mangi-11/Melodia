@@ -235,7 +235,7 @@ private fun ExternalResultEntry(
         leading = { hovered ->
             when {
                 resolving -> CircularProgressIndicator(
-                    color = DesktopColors.Accent,
+                    color = DesktopColors.AccentText,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(18.dp)
                 )
@@ -247,7 +247,7 @@ private fun ExternalResultEntry(
                 )
                 else -> Text(
                     "${index + 1}",
-                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextGray,
+                    color = if (isCurrent) DesktopColors.AccentText else DesktopColors.TextGray,
                     fontSize = 14.sp,
                     textAlign = TextAlign.End
                 )

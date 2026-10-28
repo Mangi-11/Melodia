@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.ui.graphics.toArgb
+import com.lin0721.linmusic.core.preferences.ThemeSettings
+import com.lin0721.linmusic.core.ui.theme.LocalMelodiaPalette
 import com.lin0721.linmusic.feature.recognition.service.ACTION_OPEN_RECOGNITION_RESULT
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import android.content.pm.ActivityInfo
@@ -72,11 +76,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             window.colorMode = ActivityInfo.COLOR_MODE_WIDE_COLOR_GAMUT
         }
-        // App 全局强制暗色主题，系统栏样式固定按暗色处理，不跟随系统亮暗色
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-        )
+        applySystemBarStyle(isDark = true)
         requestNotificationPermissionIfNeeded()
         handleLaunchIntent(intent)
 
@@ -98,16 +98,34 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // 首帧即按已存主题渲染，避免先以深色绘制再跳变
+        val initialThemeSettings = runCatching {
+            runBlocking { settingsPreferences.themeSettings.first() }
+        }.getOrDefault(ThemeSettings())
+
         setContent {
+            val themeSettings by settingsPreferences.themeSettings.collectAsState(initial = initialThemeSettings)
             val uiAnimationsEnabled by settingsPreferences.uiAnimationsEnabled.collectAsState(initial = true)
             val uiMotion = remember { UiMotion() }
             LaunchedEffect(uiAnimationsEnabled) { uiMotion.enabled = uiAnimationsEnabled }
             CompositionLocalProvider(LocalUiMotion provides uiMotion) {
-                MelodiaTheme {
+                MelodiaTheme(themeSettings) {
+                    val palette = LocalMelodiaPalette.current
+                    // 系统栏图标与窗口底色随主题深浅切换；启动页底色仍固定深色
+                    LaunchedEffect(palette.isDark, palette.pane) {
+                        applySystemBarStyle(palette.isDark)
+                        window.setBackgroundDrawable(ColorDrawable(palette.pane.toArgb()))
+                    }
                     MelodiaApp()
                 }
             }
         }
+    }
+
+    private fun applySystemBarStyle(isDark: Boolean) {
+        val transparent = android.graphics.Color.TRANSPARENT
+        val style = if (isDark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
     }
 
     override fun onNewIntent(intent: Intent) {

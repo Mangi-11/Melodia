@@ -38,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,6 +56,7 @@ import com.lin0721.linmusic.core.ui.components.MelodiaDragHandle
 import com.lin0721.linmusic.core.ui.components.MelodiaSwitch
 import com.lin0721.linmusic.core.ui.theme.BottomSheetShape
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 
 // 全屏播放页信息卡片编辑弹窗：长按整行拖动排序，开关控制显隐
@@ -221,7 +221,7 @@ private fun CardEditorRow(
                 if (isDragging) Modifier
                     .zIndex(1f)
                     .graphicsLayer { translationY = dragOffsetY }
-                    .shadow(elevation, rowShape)
+                    .themedShadow(elevation, rowShape)
                 else Modifier
             )
             .clip(rowShape)

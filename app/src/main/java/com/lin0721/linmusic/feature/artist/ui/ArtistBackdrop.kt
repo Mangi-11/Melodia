@@ -17,6 +17,7 @@ import coil3.request.crossfade
 import com.lin0721.linmusic.core.model.ArtistDetailInfo
 import com.lin0721.linmusic.core.ui.components.CoverPlaceholder
 import com.lin0721.linmusic.core.ui.theme.extractBaseColorFromUrl
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 
 // 顶部大图背景层：固定不动，由上层滚动列表的不透明内容自然覆盖，并回传封面主色
 @Composable
@@ -67,7 +68,7 @@ fun BoxScope.ArtistBackdrop(
                 .fillMaxWidth()
                 .height(80.dp)
                 .align(Alignment.BottomCenter)
-                .background(dominantColor)
+                .background(themedCoverBase(dominantColor))
         )
     }
 }

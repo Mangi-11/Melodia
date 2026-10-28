@@ -35,10 +35,10 @@ import com.lin0721.linmusic.core.ui.components.rememberSelectionBottomPadding
 import com.lin0721.linmusic.core.ui.components.SelectionAction
 import com.lin0721.linmusic.core.ui.components.TrackSelectionUi
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
-import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.model.PlaylistDetail
 import com.lin0721.linmusic.core.ui.theme.FallbackBase
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 import com.lin0721.linmusic.core.ui.theme.uiEnter
 import com.lin0721.linmusic.core.ui.theme.uiExit
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -428,7 +428,7 @@ fun PlaylistContent(
         )
 
         val visibleTrackIds = remember(filteredTracks) { filteredTracks.map { it.id } }
-        val selectionHeaderColor = remember(dominantColor) { dominantColor.darken(0.35f) }
+        val selectionHeaderColor = themedCoverBase(dominantColor, 0.35f)
         TrackSelectionOverlay(
             selectionUi = selectionUi,
             actions = selectionActions,

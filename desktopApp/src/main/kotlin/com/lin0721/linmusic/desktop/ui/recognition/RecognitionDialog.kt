@@ -398,6 +398,7 @@ private fun ListeningOrb(mode: RecognitionMode) {
         animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
         label = "listeningRipplePhase"
     )
+    val rippleColor = DesktopColors.TextPrimary
     Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val inner = 36.dp.toPx()
@@ -405,7 +406,7 @@ private fun ListeningOrb(mode: RecognitionMode) {
             repeat(3) { ring ->
                 val progress = (phase + ring / 3f) % 1f
                 drawCircle(
-                    color = DesktopColors.TextPrimary.copy(alpha = (1f - progress) * 0.28f),
+                    color = rippleColor.copy(alpha = (1f - progress) * 0.28f),
                     radius = inner + (outer - inner) * progress,
                     style = Stroke(width = 1.5.dp.toPx())
                 )
@@ -478,7 +479,7 @@ private fun AttemptChip(attempt: MatchAttempt) {
         AttemptStatus.HIT -> "$range 命中"
     }
     val background by animateColorAsState(
-        if (active) DesktopColors.Accent.copy(alpha = 0.16f) else DesktopColors.Surface,
+        if (active) DesktopColors.AccentContainer else DesktopColors.Surface,
         uiTween(220),
         label = "attemptBackground"
     )
@@ -535,7 +536,7 @@ private fun FoundContent(
                 Column(Modifier.weight(1f).padding(start = 18.dp)) {
                     Text(
                         best.title,
-                        color = if (best.songId == currentSongId) DesktopColors.Accent else DesktopColors.TextPrimary,
+                        color = if (best.songId == currentSongId) DesktopColors.AccentText else DesktopColors.TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 26.sp,
@@ -799,7 +800,7 @@ private fun SongLine(
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(
                     track.name,
-                    color = if (isCurrent) DesktopColors.Accent else DesktopColors.TextPrimary,
+                    color = if (isCurrent) DesktopColors.AccentText else DesktopColors.TextPrimary,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

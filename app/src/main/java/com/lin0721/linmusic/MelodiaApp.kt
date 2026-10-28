@@ -68,6 +68,7 @@ import com.lin0721.linmusic.core.ui.components.ProfileSidebar
 import com.lin0721.linmusic.core.ui.components.ToastManager
 import com.lin0721.linmusic.core.ui.interaction.pressable
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
 import com.lin0721.linmusic.core.ui.components.MiniPlayerCard
 import com.lin0721.linmusic.core.ui.components.MiniPlayerLikeMode
@@ -76,8 +77,6 @@ import com.lin0721.linmusic.core.player.floatinglyric.FloatingLyricRequests
 import com.lin0721.linmusic.feature.recognition.service.PlaybackRecognitionState
 import com.lin0721.linmusic.feature.recognition.ui.RecognitionScreen
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
-import com.lin0721.linmusic.core.ui.theme.BackgroundBlack
-import com.lin0721.linmusic.core.ui.theme.BackgroundDark
 import com.lin0721.linmusic.core.ui.theme.InfoCardRadius
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.update.UpdateChecker
@@ -404,7 +403,7 @@ fun MelodiaApp() {
                 orientation = Orientation.Horizontal,
                 enabled = isDrawerDraggable
             )
-            .background(BackgroundDark)
+            .background(MelodiaColors.Background)
     ) {
         // 1. 侧边栏层 (位于最底层或同步移动)
         userProfile?.let { profile ->
@@ -450,7 +449,7 @@ fun MelodiaApp() {
                     shadowElevation = (sidebar.progress * 30f)
                 }
                 // 面板展开时画布压暗一档，靠缝隙处的明度差勾出两张卡片轮廓
-                .background(if (isPanelDocked) BackgroundBlack else BackgroundDark)
+                .background(if (isPanelDocked) MelodiaColors.WindowBackground else MelodiaColors.Background)
         ) {
             // 双卡片模式下靠屏幕边一侧只留 sm，靠面板一侧让出面板宽度 + 两侧间距
             val edgeGap = if (isPanelDocked) MelodiaSpacing.sm else 0.dp
@@ -477,7 +476,7 @@ fun MelodiaApp() {
                                         .padding(top = statusBarTop, bottom = navigationBarBottom)
                                         .consumeWindowInsets(WindowInsets.statusBars.union(WindowInsets.navigationBars))
                                         .clip(RoundedCornerShape(InfoCardRadius))
-                                        .background(BackgroundDark)
+                                        .background(MelodiaColors.Background)
                                 } else {
                                     Modifier
                                 }

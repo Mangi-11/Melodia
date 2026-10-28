@@ -3,6 +3,8 @@ package com.lin0721.linmusic.desktop.platform.windows
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.desktop.platform.WindowEdge
 import com.lin0721.linmusic.desktop.platform.WindowEffects
+import com.lin0721.linmusic.desktop.platform.windows.taskbar.SystemTheme
+import com.lin0721.linmusic.desktop.platform.windows.taskbar.isImmersiveColorSetChange
 import com.sun.jna.Callback
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -170,6 +172,17 @@ internal class WindowsWindowEffects : WindowEffects {
     }
 
     override fun systemBorderAccent(): Int? = SystemAccent.windowBorderAccent()
+
+    override fun systemAppsUseLightTheme(): Boolean = SystemTheme.appsUseLightTheme()
+
+    override fun observeSystemTheme(onChanged: () -> Unit): () -> Unit {
+        val hook = WindowMessageHook { _, msg, wParam, lParam ->
+            if (msg == User32.WM_SETTINGCHANGE && isImmersiveColorSetChange(wParam, lParam)) onChanged()
+            null
+        }
+        addMessageHook(hook)
+        return { removeMessageHook(hook) }
+    }
 
     // 锁定后加 WS_EX_TRANSPARENT，鼠标事件直接穿透到下层窗口
     override fun setClickThrough(window: Window, enabled: Boolean) = withHandle(window) { hwnd ->

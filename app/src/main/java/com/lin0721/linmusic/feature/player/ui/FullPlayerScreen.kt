@@ -15,6 +15,8 @@ import androidx.compose.foundation.gestures.scrollBy
 import com.lin0721.linmusic.core.comment.domain.CommentFloorState
 import com.lin0721.linmusic.core.comment.ui.CommentFloorScreen
 import com.lin0721.linmusic.core.comment.ui.CommentFullScreen
+import com.lin0721.linmusic.core.ui.theme.ImmersiveTheme
+import com.lin0721.linmusic.core.ui.theme.LightStatusBarIconsWhile
 import com.lin0721.linmusic.core.ui.theme.LocalUiMotion
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.ScreenSlideDurationMs
@@ -82,9 +84,70 @@ private const val WideCrossfadeSplit = 0.6f
 // 竖屏全屏时内容列占卡片宽度的比例
 private const val PortraitFullscreenColumnFraction = 0.62f
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FullPlayerScreen(
+    currentTrack: MediaItem?,
+    isPlaying: Boolean,
+    currentPositionProvider: () -> Long,
+    duration: Long,
+    onTogglePlay: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onClose: () -> Unit,
+    isPlayerOpen: Boolean,
+    onArtistClick: (Long) -> Unit,
+    onAlbumClick: (Long) -> Unit,
+    onPlaylistClick: (Long) -> Unit = {},
+    onNavigateToProfile: (Long) -> Unit = {},
+    onDragClose: (Float, Float) -> Unit = { _, _ -> },
+    // 手机全屏：封面按可用高度收缩，快捷操作行需让开导航栏
+    fitCoverAboveNavigationBar: Boolean = false,
+    // 以下为平板常驻面板用，手机全屏保持默认值
+    // 封面按可用高度收缩，保证首屏完整显示到快捷操作行
+    fitCoverToViewport: Boolean = false,
+    // 播放内容列的最大宽度，超出部分只铺背景、内容列居中
+    contentMaxWidth: Dp = Dp.Unspecified,
+    onToggleSidebarFullscreen: (() -> Unit)? = null,
+    isSidebarFullscreen: Boolean = false,
+    // 侧栏→全屏的铺开进度（0 侧栏、1 全屏）与全屏时的卡片宽度。横屏全屏换成宽屏两栏排版，
+    // 铺开过程中两套排版各按最终宽度排一次、交叉淡入淡出；竖屏全屏沿用竖排列表，按比例放宽并居中
+    sidebarFullscreenProgress: (() -> Float)? = null,
+    fullscreenContentWidth: Dp = Dp.Unspecified,
+    onLyricsFullScreenChange: (Boolean) -> Unit = {},
+    onLyricsControlsVisibilityChange: (Boolean) -> Unit = {}
+) {
+    // 手机全屏播放页盖住状态栏，浅色主题下状态栏图标跟随沉浸区改为浅色
+    LightStatusBarIconsWhile(isPlayerOpen && onToggleSidebarFullscreen == null)
+    ImmersiveTheme {
+        FullPlayerScreenContent(
+            currentTrack = currentTrack,
+            isPlaying = isPlaying,
+            currentPositionProvider = currentPositionProvider,
+            duration = duration,
+            onTogglePlay = onTogglePlay,
+            onSeek = onSeek,
+            onClose = onClose,
+            isPlayerOpen = isPlayerOpen,
+            onArtistClick = onArtistClick,
+            onAlbumClick = onAlbumClick,
+            onPlaylistClick = onPlaylistClick,
+            onNavigateToProfile = onNavigateToProfile,
+            onDragClose = onDragClose,
+            fitCoverAboveNavigationBar = fitCoverAboveNavigationBar,
+            fitCoverToViewport = fitCoverToViewport,
+            contentMaxWidth = contentMaxWidth,
+            onToggleSidebarFullscreen = onToggleSidebarFullscreen,
+            isSidebarFullscreen = isSidebarFullscreen,
+            sidebarFullscreenProgress = sidebarFullscreenProgress,
+            fullscreenContentWidth = fullscreenContentWidth,
+            onLyricsFullScreenChange = onLyricsFullScreenChange,
+            onLyricsControlsVisibilityChange = onLyricsControlsVisibilityChange
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FullPlayerScreenContent(
     currentTrack: MediaItem?,
     isPlaying: Boolean,
     currentPositionProvider: () -> Long,

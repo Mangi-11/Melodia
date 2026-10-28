@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -22,8 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.linmusic.core.ui.theme.SurfaceLight
-import com.lin0721.linmusic.core.ui.theme.TextGray
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlin.math.abs
@@ -130,7 +128,7 @@ fun ProgressSection(
                     .fillMaxWidth()
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(SurfaceLight)
+                    .background(MelodiaColors.SurfaceLight)
             )
 
             // 已播放进度轨道（满宽比例）
@@ -139,7 +137,7 @@ fun ProgressSection(
                     .fillMaxWidth(progress)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Color.White)
+                    .background(MelodiaColors.TextPrimary)
             )
 
             if (trackWidthPx > 0f && chorusFraction != null && progress < chorusFraction) {
@@ -153,7 +151,7 @@ fun ProgressSection(
                     modifier = Modifier
                         .offset(x = dotOffsetDp)
                         .size(ChorusDotSize)
-                        .background(Color.White, CircleShape)
+                        .background(MelodiaColors.TextPrimary, CircleShape)
                 )
             }
 
@@ -169,7 +167,7 @@ fun ProgressSection(
                     modifier = Modifier
                         .offset(x = thumbOffsetDp)
                         .size(thumbSize)
-                        .background(Color.White, CircleShape)
+                        .background(MelodiaColors.TextPrimary, CircleShape)
                 )
             }
         }
@@ -181,8 +179,8 @@ fun ProgressSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             val displayPosition = if (isSeeking) (seekPosition * duration).toLong() else currentPosition
-            Text(formatTime(displayPosition), color = TextGray, fontSize = 13.sp)
-            Text(formatTime(duration), color = TextGray, fontSize = 13.sp)
+            Text(formatTime(displayPosition), color = MelodiaColors.TextSecondary, fontSize = 13.sp)
+            Text(formatTime(duration), color = MelodiaColors.TextSecondary, fontSize = 13.sp)
         }
     }
 }

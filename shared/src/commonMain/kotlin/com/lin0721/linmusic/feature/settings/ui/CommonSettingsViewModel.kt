@@ -7,6 +7,8 @@ import com.lin0721.linmusic.core.player.CrossfadePolicy
 import com.lin0721.linmusic.core.preferences.FullPlayerCardLayout
 import com.lin0721.linmusic.core.preferences.FullPlayerCardSetting
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
+import com.lin0721.linmusic.core.preferences.ThemeMode
+import com.lin0721.linmusic.core.preferences.ThemeSettings
 import com.lin0721.linmusic.core.preferences.UiScale
 import com.lin0721.linmusic.core.source.SourcePreferences
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +38,7 @@ class CommonSettingsViewModel(
     val crossfadeDurationMs = settingsPreferences.crossfadeDurationMs.asState(CrossfadePolicy.DEFAULT_DURATION_MS)
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
     val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
+    val themeSettings = settingsPreferences.themeSettings.asState(ThemeSettings())
 
     val searchAggregationEnabled = sourcePreferences.searchAggregationEnabled.asState(false)
     val fallbackEnabled = sourcePreferences.fallbackEnabled.asState(false)
@@ -68,6 +71,12 @@ class CommonSettingsViewModel(
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
 
     fun updateUiAnimationsEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveUiAnimationsEnabled(enabled) }
+
+    fun updateThemeMode(mode: ThemeMode) = launchSave { settingsPreferences.saveThemeMode(mode) }
+
+    fun updateThemeAccent(isDark: Boolean, accentId: String) = launchSave { settingsPreferences.saveThemeAccent(isDark, accentId) }
+
+    fun updateThemeCustomColor(isDark: Boolean, hex: String) = launchSave { settingsPreferences.saveThemeCustomColor(isDark, hex) }
 
     fun updateSearchAggregationEnabled(enabled: Boolean) = launchSave { sourcePreferences.saveSearchAggregationEnabled(enabled) }
 

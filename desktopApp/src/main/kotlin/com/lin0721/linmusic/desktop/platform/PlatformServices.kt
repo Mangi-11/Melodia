@@ -84,6 +84,12 @@ interface WindowEffects {
     // 系统开启“窗口边框显示强调色”时返回 0xRRGGBB，否则为 null；阻塞调用
     fun systemBorderAccent(): Int?
 
+    // 系统应用是否使用浅色主题，读取失败按深色；阻塞调用
+    fun systemAppsUseLightTheme(): Boolean
+
+    // 系统切换深浅色时回调，可能在任意线程；返回注销函数
+    fun observeSystemTheme(onChanged: () -> Unit): () -> Unit
+
     val supportsClickThrough: Boolean
 
     fun setClickThrough(window: Window, enabled: Boolean)

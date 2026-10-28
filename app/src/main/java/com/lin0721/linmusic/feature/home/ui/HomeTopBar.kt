@@ -51,9 +51,8 @@ import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import com.lin0721.linmusic.core.auth.UserProfile
 import com.lin0721.linmusic.core.ui.interaction.pressable
-import com.lin0721.linmusic.core.ui.theme.BackgroundDark
-import com.lin0721.linmusic.core.ui.theme.FilterPillInactive
 import com.lin0721.linmusic.core.ui.theme.GradientStart
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.MelodiaPress
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.PressStyle
@@ -105,7 +104,7 @@ fun HomeSharedHeader(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .background(MelodiaColors.Overlay.copy(alpha = 0.15f))
                             .clickable { onAvatarClick() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -254,12 +253,12 @@ private fun FilterPillChip(
     pressStyle: PressStyle = MelodiaPress.Pill,
     animateColors: Boolean = true,
     activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = FilterPillInactive,
+    inactiveColor: Color = MelodiaColors.FilterPillInactive,
     labelStartInset: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val targetBackground = if (selected) activeColor else inactiveColor
-    val targetContent = if (selected) MaterialTheme.colorScheme.onPrimary else Color.LightGray
+    val targetContent = if (selected) MaterialTheme.colorScheme.onPrimary else MelodiaColors.PillContent
     // 动画值无条件求值，避免 animateColors 变化时组合槽位对不上
     val animatedBackground by animateColorAsState(targetValue = targetBackground, animationSpec = uiSpring(), label = "pillBackground")
     val animatedContent by animateColorAsState(targetValue = targetContent, animationSpec = uiSpring(), label = "pillContent")

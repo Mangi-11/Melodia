@@ -51,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,11 +69,12 @@ import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import com.lin0721.linmusic.core.download.DownloadPreferences
 import com.lin0721.linmusic.core.ui.interaction.copyOnLongClick
+import com.lin0721.linmusic.core.ui.theme.MelodiaColors
 import com.lin0721.linmusic.core.ui.theme.RadiusCompact
-import com.lin0721.linmusic.core.ui.theme.DownloadedGreen
 import com.lin0721.linmusic.core.ui.theme.LocalMelodiaWindowSizeClass
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
 import com.lin0721.linmusic.core.ui.theme.MelodiaWindowSizeClass
+import com.lin0721.linmusic.core.ui.theme.themedShadow
 import com.lin0721.linmusic.core.ui.theme.uiSpring
 import com.lin0721.linmusic.core.ui.theme.uiTween
 import kotlinx.coroutines.coroutineScope
@@ -283,7 +283,7 @@ fun SongRow(
                 Icon(
                     Icons.Rounded.DownloadDone,
                     contentDescription = "已下载",
-                    tint = DownloadedGreen,
+                    tint = MelodiaColors.Success,
                     modifier = Modifier
                         .padding(start = MelodiaSpacing.xs)
                         .size(16.dp)
@@ -430,7 +430,7 @@ fun DraggableSongRow(
                 if (isLifted) Modifier
                     .zIndex(1f)
                     .graphicsLayer { translationY = dragOffsetY }
-                    .shadow(elevation, RoundedCornerShape(8.dp))
+                    .themedShadow(elevation, RoundedCornerShape(8.dp))
                 else Modifier
             )
             .background(bgColor)

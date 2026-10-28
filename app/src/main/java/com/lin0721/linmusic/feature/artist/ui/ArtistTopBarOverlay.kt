@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,8 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.lin0721.linmusic.core.ui.components.MelodiaIconButton
 import com.lin0721.linmusic.core.ui.theme.MelodiaSpacing
-import com.lin0721.linmusic.core.ui.theme.darken
 import com.lin0721.linmusic.core.ui.theme.melodiaStatusBarTopPadding
+import com.lin0721.linmusic.core.ui.theme.themedCoverBase
 import com.lin0721.linmusic.core.ui.theme.uiTween
 
 private val TOP_BAR_HEIGHT = 56.dp
@@ -50,7 +49,7 @@ fun ArtistTopBarOverlay(
         animationSpec = uiTween(800),
         label = "artist_topbar_color"
     )
-    val fillColor = remember(animatedDominant) { animatedDominant.darken(0.35f) }
+    val fillColor = themedCoverBase(animatedDominant, 0.35f)
 
     Box(
         modifier = Modifier

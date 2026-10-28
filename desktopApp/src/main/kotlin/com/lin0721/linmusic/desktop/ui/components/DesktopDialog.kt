@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.lin0721.linmusic.core.ui.theme.floatingOutline
 import com.lin0721.linmusic.desktop.ui.theme.DesktopColors
 import com.lin0721.linmusic.desktop.ui.track.DangerColor
 
@@ -65,7 +66,7 @@ fun DesktopDialog(
 ) {
     // 平台默认宽度上限约 560dp，宽弹窗需关掉才能按 width 生效
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(modifier.width(width).clip(DialogShape).background(DesktopColors.PopupSurface).padding(20.dp)) {
+        Column(modifier.width(width).clip(DialogShape).background(DesktopColors.PopupSurface).floatingOutline(DialogShape).padding(20.dp)) {
             Text(title, color = DesktopColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(14.dp))
             content()
@@ -80,7 +81,7 @@ fun DesktopDialog(
     }
 }
 
-// primary 为白底黑字的主按钮，其余为灰色文字按钮；danger 用红色文字
+// primary 为主文字色底、反色字的主按钮，其余为灰色文字按钮；danger 用红色文字
 @Composable
 fun DialogButton(
     text: String,
@@ -102,12 +103,12 @@ fun DialogButton(
         if (loading) {
             CircularProgressIndicator(
                 Modifier.size(16.dp),
-                color = if (primary) Color.Black else DesktopColors.TextPrimary,
+                color = if (primary) DesktopColors.InverseText else DesktopColors.TextPrimary,
                 strokeWidth = 2.dp
             )
         } else {
             val color = when {
-                primary -> Color.Black
+                primary -> DesktopColors.InverseText
                 danger -> DangerColor
                 else -> if (enabled) DesktopColors.TextGray else DesktopColors.TextGray.copy(alpha = 0.5f)
             }
