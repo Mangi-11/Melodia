@@ -9,6 +9,7 @@ import com.lin0721.linmusic.core.network.AppError
 import com.lin0721.linmusic.core.network.apiFlow
 import com.lin0721.linmusic.core.network.mapToAppError
 import com.lin0721.linmusic.core.player.LocalRecentPlaylist
+import com.lin0721.linmusic.core.player.LoudnessPolicy
 import com.lin0721.linmusic.core.player.PlaySource
 import com.lin0721.linmusic.core.player.PlaybackPreferences
 import com.lin0721.linmusic.core.player.domain.LyricLine
@@ -54,11 +55,12 @@ class PlaybackRepositoryImpl(
         code = { it.code },
         transform = { response ->
             val item = response.data.first()
-            AppLogger.i(TAG, "播放链接响度字段 songId=$songId level=${item.level} gain=${item.gain} peak=${item.peak}")
+            AppLogger.d(TAG, "播放链接响度字段 songId=$songId level=${item.level} gain=${item.gain} peak=${item.peak}")
             SongPlaybackInfo(
                 url = item.url.orEmpty(),
                 isFreeTrial = item.isTrialAudio,
-                level = item.level?.takeIf { it.isNotBlank() }
+                level = item.level?.takeIf { it.isNotBlank() },
+                gainDb = LoudnessPolicy.neteaseGainDb(item.gain, item.peak)
             )
         }
     )

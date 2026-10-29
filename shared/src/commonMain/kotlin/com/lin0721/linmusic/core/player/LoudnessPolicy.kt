@@ -20,7 +20,16 @@ object LoudnessPolicy {
 
     private val REPLAY_GAIN_NUMBER = Regex("""[-+]?\d+(?:\.\d+)?""")
 
+    // 网易 gain 按真机样本标定约对齐到该 RMS 水平，需平移到本地目标
+    private const val NETEASE_REFERENCE_DBFS = -20.5
+
     fun clampGainDb(db: Double): Double = db.coerceIn(MIN_GAIN_DB, 0.0)
+
+    // 播放链接返回的曲目增益；peak 为 0 时 gain 是占位值（standard 音质固定为 1.5）
+    fun neteaseGainDb(gain: Double?, peak: Double?): Double? {
+        if (gain == null || peak == null || peak <= 0.0 || !gain.isFinite()) return null
+        return clampGainDb(gain + TARGET_DBFS - NETEASE_REFERENCE_DBFS)
+    }
 
     // 自测响度为 RMS dBFS，全程无声时无结果
     fun measuredGainDb(segments: List<List<LoudnessWindow>>): Double? =

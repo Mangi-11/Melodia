@@ -24,6 +24,7 @@ import com.lin0721.linmusic.core.source.ExternalTrackResolver
 import com.lin0721.linmusic.core.network.AppError
 import com.lin0721.linmusic.core.network.OnlineStateProvider
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
+import com.lin0721.linmusic.core.player.data.SongPlaybackInfo
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -744,6 +745,7 @@ class PlayerManager(
                 result.onSuccess { info ->
                     val mediaItem = item.toMediaItem(info.url, playbackQueue.playContext.value)
                     publishPlaybackLevel(item.songId, info.level)
+                    rememberNeteaseGain(item.songId, info)
                     pendingSkipFromIndex = null
                     if (info.trialFallback && playWhenReady) {
                         Toast.makeText(context, "换源失败，当前仅可试听", Toast.LENGTH_SHORT).show()
@@ -904,6 +906,7 @@ class PlayerManager(
                     // 退回试听的结果不缓存，真正切歌时重新取链并提示
                     if (info.trialFallback) return@onSuccess
                     prefetchedNextUrl = PrefetchedUrl(nextItem.songId, info.url, info.level)
+                    rememberNeteaseGain(nextItem.songId, info)
                 }
             }
         }
@@ -1007,6 +1010,12 @@ class PlayerManager(
         return buildUpon()
             .setMediaMetadata(mediaMetadata.buildUpon().setExtras(extras).build())
             .build()
+    }
+
+    // 网易返回的有效增益优先于自测，覆盖已缓存的值
+    private suspend fun rememberNeteaseGain(songId: Long, info: SongPlaybackInfo) {
+        val gainDb = info.gainDb ?: return
+        if (loudnessEnabled) loudnessMeter.remember(songId, gainDb)
     }
 
     // 已知的曲目增益：缓存优先，本地文件再读 ReplayGain 标签；音量平衡关闭时为 null

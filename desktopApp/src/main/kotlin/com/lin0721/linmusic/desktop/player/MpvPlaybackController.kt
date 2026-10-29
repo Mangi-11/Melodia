@@ -679,10 +679,12 @@ class MpvPlaybackController(
         localAudioOf(songId)?.let { return Result.success(Playback(it, null)) }
         val level = settingsPreferences.wifiQuality.first()
         audioCache?.completeFile(songId, level)?.let { return Result.success(Playback(it.absolutePath, null)) }
-        return repository.getSongUrl(songId).first().fold(
-            onSuccess = { url ->
+        return repository.getSongPlaybackInfo(songId).first().fold(
+            onSuccess = { info ->
+                // 网易返回的有效增益优先于自测，覆盖已缓存的值
+                if (loudnessEnabled) info.gainDb?.let { loudnessMeter.remember(songId, it) }
                 val record = audioCache?.let { RecordRequest(songId, it.tempFile(songId, level).absolutePath) }
-                Result.success(Playback(url, record))
+                Result.success(Playback(info.url, record))
             },
             onFailure = { error ->
                 audioCache?.anyCompleteFile(songId)?.let { Result.success(Playback(it.absolutePath, null)) }

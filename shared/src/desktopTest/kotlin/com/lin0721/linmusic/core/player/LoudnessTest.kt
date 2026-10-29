@@ -44,6 +44,17 @@ class LoudnessTest {
     }
 
     @Test
+    fun `网易 gain 平移到本地目标，peak 为 0 视为占位`() {
+        // 网易对齐约 -20.5dBFS，本地目标 -16，需上移 4.5dB
+        assertEquals(-4.35, LoudnessPolicy.neteaseGainDb(-8.85, 1.0)!!, 1e-9)
+        assertEquals(0.0, LoudnessPolicy.neteaseGainDb(-2.0, 1.0)!!, 1e-9)
+        assertEquals(LoudnessPolicy.MIN_GAIN_DB, LoudnessPolicy.neteaseGainDb(-20.0, 0.9)!!, 1e-9)
+        assertNull(LoudnessPolicy.neteaseGainDb(1.5, 0.0))
+        assertNull(LoudnessPolicy.neteaseGainDb(null, 1.0))
+        assertNull(LoudnessPolicy.neteaseGainDb(-8.0, null))
+    }
+
+    @Test
     fun `幅度与 mpv 音量系数换算`() {
         assertEquals(0.5012f, LoudnessPolicy.amplitude(-6.0), 1e-3f)
         assertEquals(1f, LoudnessPolicy.amplitude(0.0), 1e-6f)
