@@ -76,6 +76,9 @@ data class SongUrlItem(
     val freeTrialInfo: FreeTrialInfo? = null,
     val freeTrialPrivilege: FreeTrialPrivilege? = null,
     val time: Long = 0,
+    // 响度相关字段，含义待真机确认，暂只记录日志
+    val gain: Double? = null,
+    val peak: Double? = null,
 )
 
 // 判断音频是否属于试听片段或口播提示音

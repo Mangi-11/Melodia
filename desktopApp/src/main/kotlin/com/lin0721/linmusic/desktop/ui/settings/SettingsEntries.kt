@@ -383,6 +383,8 @@ internal fun settingsEntries(
     var confirmClearCache by remember { mutableStateOf(false) }
     val crossfadeEnabled by common.crossfadeEnabled.collectAsState()
     val crossfadeDurationMs by common.crossfadeDurationMs.collectAsState()
+    val smartCrossfadeEnabled by common.smartCrossfadeEnabled.collectAsState()
+    val loudnessNormalizationEnabled by common.loudnessNormalizationEnabled.collectAsState()
     val uiScalePercent by common.uiScalePercent.collectAsState()
     val uiAnimationsEnabled by common.uiAnimationsEnabled.collectAsState()
     val themeSettings by common.themeSettings.collectAsState()
@@ -431,6 +433,15 @@ internal fun settingsEntries(
         )
         add(
             rowEntry(
+                "loudnessNormalization", SettingsCategory.Playback, "音量平衡（实验性）",
+                subtitle = "按每首歌的响度统一音量",
+                keywords = listOf("音量", "响度", "均衡", "replaygain")
+            ) {
+                SettingSwitch(loudnessNormalizationEnabled, onChange = common::updateLoudnessNormalizationEnabled)
+            }
+        )
+        add(
+            rowEntry(
                 "crossfade", SettingsCategory.Playback, "歌曲淡入淡出",
                 subtitle = "自动切歌时前后两首交叉淡化，手动切歌不受影响",
                 keywords = listOf("交叉淡化", "切歌", "过渡")
@@ -447,6 +458,15 @@ internal fun settingsEntries(
                         label = ::formatSeconds,
                         onSelect = common::updateCrossfadeDurationMs
                     )
+                }
+            )
+            add(
+                rowEntry(
+                    "smartCrossfade", SettingsCategory.Playback, "智能过渡（实验性）",
+                    subtitle = "跳过歌曲首尾的静音段",
+                    keywords = listOf("淡入淡出", "静音")
+                ) {
+                    SettingSwitch(smartCrossfadeEnabled, onChange = common::updateSmartCrossfadeEnabled)
                 }
             )
         }

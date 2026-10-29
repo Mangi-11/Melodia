@@ -78,6 +78,8 @@ fun PlaybackDownloadSettingsView(viewModel: SettingsViewModel) {
     val resumeAfterExternalInterruption by viewModel.resumeAfterExternalInterruption.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDurationMs by viewModel.crossfadeDurationMs.collectAsStateWithLifecycle()
+    val smartCrossfadeEnabled by viewModel.smartCrossfadeEnabled.collectAsStateWithLifecycle()
+    val loudnessNormalizationEnabled by viewModel.loudnessNormalizationEnabled.collectAsStateWithLifecycle()
     val streamCacheEnabled by viewModel.streamCacheEnabled.collectAsStateWithLifecycle()
     val downloadFolderUri by viewModel.downloadFolderUri.collectAsStateWithLifecycle()
     val downloadLyricsEnabled by viewModel.downloadLyricsEnabled.collectAsStateWithLifecycle()
@@ -135,6 +137,13 @@ fun PlaybackDownloadSettingsView(viewModel: SettingsViewModel) {
                 )
                 HorizontalDivider(color = MelodiaColors.Divider)
                 SettingsSwitchRow(
+                    title = "音量平衡（实验性）",
+                    subtitle = "按每首歌的响度统一音量；在线歌曲仅 Wi-Fi 下分析",
+                    checked = loudnessNormalizationEnabled,
+                    onCheckedChange = { viewModel.updateLoudnessNormalizationEnabled(it) }
+                )
+                HorizontalDivider(color = MelodiaColors.Divider)
+                SettingsSwitchRow(
                     title = "切歌淡入淡出",
                     subtitle = "歌曲临近结束时与下一首交叠过渡，手动切歌不触发",
                     checked = crossfadeEnabled,
@@ -168,6 +177,12 @@ fun PlaybackDownloadSettingsView(viewModel: SettingsViewModel) {
                             endLabel = "长"
                         )
                     }
+                    SettingsSwitchRow(
+                        title = "智能过渡（实验性）",
+                        subtitle = "跳过歌曲首尾的静音段；仅 Wi-Fi 或本地歌曲生效",
+                        checked = smartCrossfadeEnabled,
+                        onCheckedChange = { viewModel.updateSmartCrossfadeEnabled(it) }
+                    )
                 }
             }
         }

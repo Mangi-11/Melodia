@@ -36,6 +36,8 @@ class CommonSettingsViewModel(
     val wifiQuality = settingsPreferences.wifiQuality.asState("lossless")
     val crossfadeEnabled = settingsPreferences.crossfadeEnabled.asState(false)
     val crossfadeDurationMs = settingsPreferences.crossfadeDurationMs.asState(CrossfadePolicy.DEFAULT_DURATION_MS)
+    val smartCrossfadeEnabled = settingsPreferences.smartCrossfadeEnabled.asState(false)
+    val loudnessNormalizationEnabled = settingsPreferences.loudnessNormalizationEnabled.asState(false)
     val uiScalePercent = settingsPreferences.uiScalePercent.asState(UiScale.DEFAULT_PERCENT)
     val uiAnimationsEnabled = settingsPreferences.uiAnimationsEnabled.asState(true)
     val themeSettings = settingsPreferences.themeSettings.asState(ThemeSettings())
@@ -67,6 +69,10 @@ class CommonSettingsViewModel(
     fun updateCrossfadeEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveCrossfadeEnabled(enabled) }
 
     fun updateCrossfadeDurationMs(durationMs: Int) = launchSave { settingsPreferences.saveCrossfadeDurationMs(durationMs) }
+
+    fun updateSmartCrossfadeEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveSmartCrossfadeEnabled(enabled) }
+
+    fun updateLoudnessNormalizationEnabled(enabled: Boolean) = launchSave { settingsPreferences.saveLoudnessNormalizationEnabled(enabled) }
 
     fun updateUiScalePercent(percent: Int) = launchSave { settingsPreferences.saveUiScalePercent(percent) }
 

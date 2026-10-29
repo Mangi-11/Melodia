@@ -112,7 +112,8 @@ private fun createPlaybackController(
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
         audioCache = audioCache,
         cacheManager = cacheManager,
-        externalResolver = externalResolver
+        externalResolver = externalResolver,
+        loudnessStoreFile = File(DesktopPaths.dataDir, "loudness_gain.json")
     )
 } catch (e: LinkageError) {
     AppLogger.e(TAG, "libmpv 加载失败，播放不可用", e)

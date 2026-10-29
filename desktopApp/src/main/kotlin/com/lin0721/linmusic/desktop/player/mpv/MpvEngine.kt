@@ -63,6 +63,17 @@ class MpvEngine(private val listener: Listener, extraOptions: Map<String, String
         command("loadfile", url, "replace")
     }
 
+    // 分析用：start 按 mpv 语法给出，如 "+12.5" 或 "25%"
+    fun loadSegment(url: String, start: String) {
+        setProperty("stream-record", "")
+        setProperty("start", start)
+        setProperty("pause", "no")
+        command("loadfile", url, "replace")
+    }
+
+    // 已载入文件的标签值，mpv 按键名不区分大小写匹配
+    fun metadataValue(key: String): String? = getProperty("metadata/by-key/$key")
+
     fun setPaused(paused: Boolean) = setProperty("pause", if (paused) "yes" else "no")
 
     fun seekTo(positionMs: Long) = command("seek", (positionMs.coerceAtLeast(0) / 1000.0).toString(), "absolute")

@@ -65,6 +65,10 @@ class SettingsPreferences(
         private val KEY_CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
         // 自动切歌交叉淡化时长 (ms)，默认 3000
         private val KEY_CROSSFADE_DURATION_MS = intPreferencesKey("crossfade_duration_ms")
+        // 智能过渡（跳过首尾静音），默认 false
+        private val KEY_SMART_CROSSFADE_ENABLED = booleanPreferencesKey("smart_crossfade_enabled")
+        // 音量平衡（整曲响度归一化），默认 false
+        private val KEY_LOUDNESS_NORMALIZATION_ENABLED = booleanPreferencesKey("loudness_normalization_enabled")
         // 默认播放顺序，默认 "loop" (列表循环)
         // 仅 Wi-Fi 网络下联网播放，默认 false
         private val KEY_WIFI_ONLY_PLAY = booleanPreferencesKey("wifi_only_play")
@@ -351,6 +355,28 @@ class SettingsPreferences(
     suspend fun saveCrossfadeDurationMs(durationMs: Int) {
         dataStore.edit { prefs ->
             prefs[KEY_CROSSFADE_DURATION_MS] = CrossfadePolicy.normalizeDurationMs(durationMs)
+        }
+    }
+
+    // 智能过渡开关 Flow
+    val smartCrossfadeEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_SMART_CROSSFADE_ENABLED] ?: false
+    }
+
+    suspend fun saveSmartCrossfadeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_SMART_CROSSFADE_ENABLED] = enabled
+        }
+    }
+
+    // 音量平衡开关 Flow
+    val loudnessNormalizationEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_LOUDNESS_NORMALIZATION_ENABLED] ?: false
+    }
+
+    suspend fun saveLoudnessNormalizationEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_LOUDNESS_NORMALIZATION_ENABLED] = enabled
         }
     }
 

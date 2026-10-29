@@ -54,6 +54,7 @@ class PlaybackRepositoryImpl(
         code = { it.code },
         transform = { response ->
             val item = response.data.first()
+            AppLogger.i(TAG, "播放链接响度字段 songId=$songId level=${item.level} gain=${item.gain} peak=${item.peak}")
             SongPlaybackInfo(
                 url = item.url.orEmpty(),
                 isFreeTrial = item.isTrialAudio,

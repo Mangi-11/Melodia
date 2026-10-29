@@ -2,6 +2,8 @@ package com.lin0721.linmusic.desktop.player
 
 import com.lin0721.linmusic.core.log.AppLogger
 import com.lin0721.linmusic.core.player.CrossfadePolicy
+import com.lin0721.linmusic.core.player.LoudnessPolicy
+import com.lin0721.linmusic.core.player.LoudnessStore
 import com.lin0721.linmusic.core.player.NowPlaying
 import com.lin0721.linmusic.core.player.PlayMode
 import com.lin0721.linmusic.core.player.PlaySource
@@ -14,6 +16,7 @@ import com.lin0721.linmusic.core.player.QueueItem
 import com.lin0721.linmusic.core.source.ExternalTrackResolver
 import com.lin0721.linmusic.core.player.SimilarRoamingController
 import com.lin0721.linmusic.core.player.SleepTimer
+import com.lin0721.linmusic.core.player.TrackLoudnessMeter
 import com.lin0721.linmusic.core.player.data.PlaybackRepository
 import com.lin0721.linmusic.core.preferences.SettingsPreferences
 import com.lin0721.linmusic.desktop.data.CacheLimits
@@ -24,6 +27,8 @@ import com.lin0721.linmusic.desktop.player.mpv.MpvEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +69,7 @@ private const val CROSSFADE_PREPARE_TIMEOUT_MS = 8_000L
 private const val CROSSFADE_PREPARE_POLL_MS = 100L
 
 // 到点时下一首仍是它才执行
-private class CrossfadePlan(val index: Int, val songId: Long, val fadeMs: Long)
+private class CrossfadePlan(val index: Int, val songId: Long, val fadeMs: Long, val url: String)
 
 // record 为空表示本地文件或缓存命中，非空表示联网播放时录制缓存
 private class Playback(val url: String, val record: RecordRequest?)
@@ -80,7 +85,9 @@ class MpvPlaybackController(
     engineOptions: Map<String, String> = emptyMap(),
     private val audioCache: AudioCache? = null,
     private val cacheManager: DesktopCacheManager? = null,
-    private val externalResolver: ExternalTrackResolver? = null
+    private val externalResolver: ExternalTrackResolver? = null,
+    // 音量平衡结果的持久化文件，为空时只存内存
+    loudnessStoreFile: File? = null
 ) : DesktopPlaybackController, MpvEngine.Listener {
 
     private val playbackQueue = PlaybackQueue()
@@ -149,6 +156,8 @@ class MpvPlaybackController(
 
     // mpv 已载入的曲目；冷启动恢复出的曲目只有元数据，首次播放时才取地址载入
     private var loadedSongId: Long? = null
+    // 已载入曲目的播放地址，供尾部分析读取
+    private var loadedUrl: String? = null
     private var restoreAttempted = false
     private var lastPeriodicSaveMs = 0L
 
@@ -161,6 +170,14 @@ class MpvPlaybackController(
     // 交叉淡化：触发位置由 mpv 事件线程读取，其余状态只在主线程读写
     @Volatile private var crossfadeEnabled = false
     private var crossfadeSettingMs = CrossfadePolicy.DEFAULT_DURATION_MS
+    @Volatile private var smartCrossfadeEnabled = false
+    private val pcmDecoder = MpvPcmDecoder()
+    private val edgeAnalyzer = MpvEdgeAnalyzer(pcmDecoder)
+
+    // 音量平衡：每首歌只测一次，结果持久缓存
+    @Volatile private var loudnessEnabled = false
+    private val loudnessMeter = TrackLoudnessMeter(LoudnessStore(loudnessStoreFile), pcmDecoder)
+    private var loudnessJob: Job? = null
     private var crossfadePlan: CrossfadePlan? = null
     private var crossfadePrepareJob: Job? = null
     @Volatile private var crossfadeTriggerMs = Long.MAX_VALUE
@@ -187,6 +204,16 @@ class MpvPlaybackController(
             }
         }
         scope.launch { settingsPreferences.crossfadeDurationMs.collect { crossfadeSettingMs = it } }
+        scope.launch { settingsPreferences.smartCrossfadeEnabled.collect { smartCrossfadeEnabled = it } }
+        scope.launch {
+            settingsPreferences.loudnessNormalizationEnabled.collect { enabled ->
+                loudnessEnabled = enabled
+                if (enabled) applyLoudness() else {
+                    loudnessJob?.cancel()
+                    engine.setTrackGain(0.0)
+                }
+            }
+        }
     }
 
     // 保存的设备已不在系统列表里时保持跟随系统默认，偏好不清除，设备插回后下次启动仍可用
@@ -550,6 +577,21 @@ class MpvPlaybackController(
             consecutiveFailures = 0
             _isPlaying.value = _playWhenReady.value
             startClock()
+            applyLoudness()
+        }
+    }
+
+    // 当前歌的曲目增益：ReplayGain 标签 > 缓存 > 自测，结果平滑生效
+    private fun applyLoudness() {
+        loudnessJob?.cancel()
+        if (!loudnessEnabled) return
+        val songId = loadedSongId ?: return
+        val url = loadedUrl ?: return
+        loudnessJob = scope.launch {
+            val tagged = LoudnessPolicy.replayGainDb(engine.activeMetadata("REPLAYGAIN_TRACK_GAIN"))
+            if (tagged != null) loudnessMeter.remember(songId, tagged)
+            val gainDb = tagged ?: loudnessMeter.measure(songId, url) ?: return@launch
+            if (loudnessEnabled && loadedSongId == songId) engine.setTrackGain(gainDb)
         }
     }
 
@@ -605,9 +647,11 @@ class MpvPlaybackController(
                 handleFailure(if (item.external != null) error.message.orEmpty() else "《${item.title}》暂无版权或需要会员")
                 return@launch
             }
+            val gainDb = if (loudnessEnabled) loudnessMeter.cachedGainDb(item.songId) ?: 0.0 else 0.0
             // 从中途起播录不出完整文件
-            engine.load(playback.url, startMs, record = playback.record.takeIf { startMs == 0L })
+            engine.load(playback.url, startMs, record = playback.record.takeIf { startMs == 0L }, gainDb = gainDb)
             loadedSongId = item.songId
+            loadedUrl = playback.url
             beginReporting(item.songId)
             prefetchRoaming(item.songId, index)
             saveState()
@@ -672,9 +716,22 @@ class MpvPlaybackController(
         if (nextIdx == playbackQueue.currentIndex.value || next.songId == songId) return
 
         crossfadeAttemptedSongId = songId
+        val currentUrl = loadedUrl
         crossfadePrepareJob = scope.launch {
             val playback = resolvePlayback(next).getOrNull() ?: return@launch
-            if (!engine.prepareSpare(playback.url, playback.record)) return@launch
+            // 智能过渡分析当前歌尾部与下一首开头，按有效结尾触发、从有效开头起播；音量平衡同时测下一首增益
+            val smart = smartCrossfadeEnabled
+            val (endMs, startMs, nextGainDb) = coroutineScope {
+                val endDeferred = async { if (smart) currentUrl?.let { edgeAnalyzer.effectiveEndMs(songId, it, duration) } else null }
+                val startDeferred = async { if (smart) edgeAnalyzer.effectiveStartMs(next.songId, playback.url) else null }
+                val gainDeferred = async { if (loudnessEnabled) loudnessMeter.measure(next.songId, playback.url) else null }
+                Triple(endDeferred.await(), startDeferred.await() ?: 0L, gainDeferred.await() ?: 0.0)
+            }
+            if (loadedSongId != songId) return@launch
+            val effectiveEndMs = endMs?.coerceAtMost(duration) ?: duration
+            val plannedFadeMs = CrossfadePolicy.autoFadeMs(crossfadeSettingMs, effectiveEndMs)
+            if (plannedFadeMs <= 0L) return@launch
+            if (!engine.prepareSpare(playback.url, playback.record.takeIf { startMs == 0L }, startMs, nextGainDb)) return@launch
             val ready = withTimeoutOrNull(CROSSFADE_PREPARE_TIMEOUT_MS) {
                 while (!engine.spareReady) delay(CROSSFADE_PREPARE_POLL_MS)
                 true
@@ -684,8 +741,9 @@ class MpvPlaybackController(
                 engine.discardSpare()
                 return@launch
             }
-            crossfadePlan = CrossfadePlan(nextIdx, next.songId, fadeMs)
-            crossfadeTriggerMs = CrossfadePolicy.triggerPositionMs(duration, fadeMs)
+            if (smart) AppLogger.i(TAG, "智能过渡 songId=$songId end=$effectiveEndMs/$duration nextStart=$startMs")
+            crossfadePlan = CrossfadePlan(nextIdx, next.songId, plannedFadeMs, playback.url)
+            crossfadeTriggerMs = CrossfadePolicy.triggerPositionMs(effectiveEndMs, plannedFadeMs)
         }
     }
 
@@ -707,6 +765,8 @@ class MpvPlaybackController(
         finishReporting()
         playbackQueue.setCurrentIndex(plan.index)
         loadedSongId = item.songId
+        loadedUrl = plan.url
+        applyLoudness()
         consecutiveFailures = 0
         _currentPosition.value = position
         _duration.value = duration
